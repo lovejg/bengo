@@ -1,0 +1,139 @@
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PreviewPipelineDto } from './dto/preview-pipeline.dto';
+import { PipelineCollectionService } from './pipeline-collection.service';
+import {
+  IngestBatchResult,
+  IngestOneResult,
+  PipelineIngestionService,
+} from './pipeline-ingestion.service';
+import { PipelineOrchestratorService } from './pipeline-orchestrator.service';
+import {
+  PipelinePruneReport,
+  PipelineQualityReport,
+  PipelineQualityService,
+} from './pipeline-quality.service';
+
+interface CollectAndIngestMvpResult {
+  mode: 'mvp';
+  targets: string[];
+  skipped: Array<{
+    source: string;
+    reason: string;
+  }>;
+  results: Array<{
+    source: string;
+    ingest: IngestBatchResult;
+  }>;
+  failedSources: Array<{
+    source: string;
+    message: string;
+  }>;
+}
+
+@ApiTags('pipeline')
+@Controller('pipeline')
+export class PipelineController {
+  constructor(
+    private readonly orchestratorService: PipelineOrchestratorService,
+    private readonly ingestionService: PipelineIngestionService,
+    private readonly collectionService: PipelineCollectionService,
+    private readonly qualityService: PipelineQualityService,
+  ) {}
+
+  @Get('sources')
+  @ApiOperation({ summary: '수집 가능한 소스 목록 조회' })
+  @ApiOkResponse({ description: '수집 소스 목록' })
+  listSources() {
+    return this.collectionService.listSources();
+  }
+
+  @Get('quality-report')
+  @ApiOperation({
+    summary: '수집/정규화 데이터 품질 리포트',
+    description:
+      '소스별 적재 현황과 MVP 범위 적합도, 신청정보 누락 비율을 요약합니다.',
+  })
+  @ApiOkResponse({ description: '품질 리포트' })
+  qualityReport(): Promise<PipelineQualityReport> {
+    return this.qualityService.getQualityReport();
+  }
+
+  @Post('prune-mvp')
+  @ApiOperation({
+    summary: 'MVP 범위 밖 활성 정책 비활성화',
+    description:
+      '현재 활성 정책 중 MVP 범위 밖 정책을 INACTIVE로 변경해 목록 품질을 정리합니다.',
+  })
+  @ApiOkResponse({ description: '정리 결과' })
+  pruneMvp(): Promise<PipelinePruneReport> {
+    return this.qualityService.pruneOutOfMvpActivePolicies();
+  }
+
+  @Post('preview')
+  @ApiOperation({
+    summary: '수집 원문에 대한 정규화/검증 결과 프리뷰',
+    description: '크롤링/공공API 원문이 정규화 스키마로 어떻게 변환되는지 확인합니다.',
+  })
+  @ApiOkResponse({ description: '정규화 및 검증 결과' })
+  preview(@Body() dto: PreviewPipelineDto) {
+    return this.orchestratorService.runPreview(dto);
+  }
+
+  @Post('ingest')
+  @ApiOperation({
+    summary: '수집 원문 단건 적재',
+    description: '원문 저장 후 정규화/검증을 거쳐 policies 테이블에 업서트합니다.',
+  })
+  @ApiOkResponse({ description: '적재 결과' })
+  ingest(@Body() dto: PreviewPipelineDto): Promise<IngestOneResult> {
+    return this.ingestionService.ingestOne(dto);
+  }
+
+  @Post('collect-and-ingest-mvp')
+  @ApiOperation({
+    summary: 'MVP 대상 소스 일괄 수집/적재',
+    description:
+      'MVP 기본 소스(data.go.kr, 온통청년 정책, 서울 열린데이터) 중 설정 완료된 소스를 순차 실행합니다.',
+  })
+  @ApiOkResponse({ description: 'MVP 일괄 적재 결과' })
+  async collectAndIngestMvp(): Promise<CollectAndIngestMvpResult> {
+    const batch = await this.collectionService.collectMvpBatchSources();
+    const results: Array<{ source: string; ingest: IngestBatchResult }> = [];
+    const failedSources: Array<{ source: string; message: string }> = [];
+
+    for (const item of batch.collected) {
+      try {
+        const ingest = await this.ingestionService.ingestBatch(item.items);
+        results.push({
+          source: item.source,
+          ingest,
+        });
+      } catch (error) {
+        failedSources.push({
+          source: item.source,
+          message: error instanceof Error ? error.message : '적재 중 알 수 없는 오류',
+        });
+      }
+    }
+
+    return {
+      mode: 'mvp',
+      targets: batch.targets,
+      skipped: batch.skipped,
+      results,
+      failedSources,
+    };
+  }
+
+  @Post('collect-and-ingest/:source')
+  @ApiOperation({
+    summary: '수집기 실행 후 배치 적재',
+    description: '선택한 소스 어댑터로 원문을 수집한 뒤 일괄 적재합니다.',
+  })
+  @ApiOkResponse({ description: '배치 적재 결과' })
+  async collectAndIngest(@Param('source') source: string): Promise<IngestBatchResult> {
+    const collected = await this.collectionService.collect(source);
+    return this.ingestionService.ingestBatch(collected);
+  }
+}
