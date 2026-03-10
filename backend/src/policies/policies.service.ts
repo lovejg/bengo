@@ -9,11 +9,9 @@ import { In, Repository } from 'typeorm';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../config/redis.module';
 import {
-  MVP_ALLOWED_CATEGORIES,
-  MVP_ALLOWED_REGIONS,
-  MVP_EXCLUDED_SOURCES,
+  evaluateMvpScope,
+  getPolicySource,
 } from '../common/constants/mvp-policy-scope.constant';
-import { EligibilityResult } from '../common/enums/eligibility-result.enum';
 import { Gender } from '../common/enums/gender.enum';
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
@@ -32,6 +30,7 @@ import {
   PolicySortBy,
   SortOrder,
 } from './dto/list-policies-query.dto';
+import { PublicListPoliciesQueryDto } from './dto/public-list-policies-query.dto';
 import { UpdateUserPolicyStateDto } from './dto/update-user-policy-state.dto';
 
 @Injectable()
@@ -49,6 +48,78 @@ export class PoliciesService {
     private readonly userPolicyStateRepository: Repository<UserPolicyState>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
+
+  async listPoliciesPublic(query: PublicListPoliciesQueryDto) {
+    const cacheKey = `policies:public:${JSON.stringify(query)}`;
+
+    const cached = await this.safeRedisGet(cacheKey);
+    if (cached) {
+      return JSON.parse(cached) as unknown;
+    }
+
+    const policies = await this.policyRepository.find({
+      where: { status: PolicyStatus.ACTIVE },
+    });
+
+    const filtered = policies
+      .filter((policy) => {
+        if (!this.isPolicyInMvpScope(policy)) {
+          return false;
+        }
+
+        if (query.interest && policy.categories.length > 0) {
+          if (!policy.categories.includes(query.interest)) {
+            return false;
+          }
+        }
+
+        if (query.regionCode && policy.regionCodes.length > 0) {
+          if (!policy.regionCodes.some((pr) => regionMatches(pr, query.regionCode!))) {
+            return false;
+          }
+        }
+
+        if (query.search) {
+          const keyword = query.search.toLowerCase();
+          const content = `${policy.title} ${policy.shortDescription}`.toLowerCase();
+          if (!content.includes(keyword)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+    const sorted = filtered.sort((a, b) => {
+      const direction = query.order === SortOrder.ASC ? 1 : -1;
+      if (query.sortBy === PolicySortBy.DEADLINE) {
+        const aD = a.endsAt ? new Date(a.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
+        const bD = b.endsAt ? new Date(b.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
+        return (aD - bD) * direction;
+      }
+      return (a.createdAt.getTime() - b.createdAt.getTime()) * direction;
+    });
+
+    const response = {
+      total: sorted.length,
+      items: sorted.map((policy) => ({
+        id: policy.id,
+        code: policy.code,
+        title: policy.title,
+        shortDescription: policy.shortDescription,
+        providerName: policy.providerName,
+        categories: policy.categories,
+        regionCodes: policy.regionCodes,
+        minAge: policy.minAge,
+        maxAge: policy.maxAge,
+        startsAt: policy.startsAt,
+        endsAt: policy.endsAt,
+      })),
+    };
+
+    await this.safeRedisSet(cacheKey, JSON.stringify(response), 120);
+    return response;
+  }
 
   async listPolicies(userId: string, query: ListPoliciesQueryDto) {
     const profile = await this.usersService.findProfileOrFail(userId);
@@ -139,8 +210,7 @@ export class PoliciesService {
         startsAt: policy.startsAt,
         endsAt: policy.endsAt,
         fitScore: policy.fitScore,
-        userState:
-          stateMap.get(policy.id)?.state ?? UserPolicyStateEnum.DISCOVERED,
+        userState: stateMap.get(policy.id)?.state ?? null,
       })),
     };
 
@@ -205,7 +275,7 @@ export class PoliciesService {
         selectionCriteria: (extra.selectionCriteria as string) ?? null,
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
       },
-      userState: state?.state ?? UserPolicyStateEnum.DISCOVERED,
+      userState: state?.state ?? null,
       lastEligibility: lastCheck
         ? {
             result: lastCheck.result,
@@ -293,13 +363,6 @@ export class PoliciesService {
       }),
     );
 
-    if (
-      evaluated.result === EligibilityResult.ELIGIBLE ||
-      evaluated.result === EligibilityResult.CONDITIONAL
-    ) {
-      await this.upsertPolicyState(userId, policyId, UserPolicyStateEnum.IN_REVIEW);
-    }
-
     return {
       result: evaluated.result,
       reasons: evaluated.reasons,
@@ -357,56 +420,43 @@ export class PoliciesService {
     };
   }
 
-  async listMyPolicies(userId: string) {
+  async listMyPolicies(userId: string, stateFilter?: UserPolicyStateEnum) {
+    const where: Record<string, unknown> = { userId };
+    if (stateFilter) {
+      where.state = stateFilter;
+    }
+
     const states = await this.userPolicyStateRepository.find({
-      where: { userId },
+      where,
       relations: ['policy'],
       order: { updatedAt: 'DESC' },
     });
-    const scopedStates = states.filter((state) => this.isPolicyInMvpScope(state.policy));
+    const scopedStates = states.filter((s) => this.isPolicyInMvpScope(s.policy));
 
     return {
       total: scopedStates.length,
-      items: scopedStates.map((state) => ({
-        policyId: state.policyId,
-        title: state.policy.title,
-        providerName: state.policy.providerName,
-        state: state.state,
-        note: state.note,
-        appliedAt: state.appliedAt,
-        updatedAt: state.updatedAt,
+      items: scopedStates.map((s) => ({
+        policyId: s.policyId,
+        title: s.policy.title,
+        shortDescription: s.policy.shortDescription,
+        providerName: s.policy.providerName,
+        categories: s.policy.categories,
+        state: s.state,
+        note: s.note,
+        appliedAt: s.appliedAt,
+        updatedAt: s.updatedAt,
       })),
     };
   }
 
-  private async upsertPolicyState(
-    userId: string,
-    policyId: string,
-    state: UserPolicyStateEnum,
-  ): Promise<void> {
-    const current = await this.userPolicyStateRepository.findOne({
+  async removeUserPolicyState(userId: string, policyId: string) {
+    const existing = await this.userPolicyStateRepository.findOne({
       where: { userId, policyId },
     });
-
-    if (!current) {
-      await this.userPolicyStateRepository.save(
-        this.userPolicyStateRepository.create({
-          userId,
-          policyId,
-          state,
-        }),
-      );
-      return;
+    if (!existing) {
+      throw new NotFoundException('저장된 정책이 없습니다.');
     }
-
-    if (current.state === UserPolicyStateEnum.APPLIED) {
-      return;
-    }
-
-    if (current.state !== state) {
-      current.state = state;
-      await this.userPolicyStateRepository.save(current);
-    }
+    await this.userPolicyStateRepository.remove(existing);
   }
 
   private isPolicyAvailableForProfile(
@@ -439,43 +489,8 @@ export class PoliciesService {
   }
 
   private isPolicyInMvpScope(policy: Policy): boolean {
-    const source = this.getPolicySource(policy);
-    if (source && MVP_EXCLUDED_SOURCES.includes(source)) {
-      return false;
-    }
-
-    const hasAllowedCategory = policy.categories.some((category) =>
-      MVP_ALLOWED_CATEGORIES.includes(category),
-    );
-
-    if (!hasAllowedCategory) {
-      return false;
-    }
-
-    const hasAllowedRegion = policy.regionCodes.some((regionCode) =>
-      MVP_ALLOWED_REGIONS.includes(regionCode),
-    );
-
-    return hasAllowedRegion;
-  }
-
-  private getPolicySource(policy: Policy): string | null {
-    const metadata = policy.extraMeta as Record<string, unknown> | undefined;
-    if (!metadata) return null;
-
-    const pipeline = metadata.pipeline as Record<string, unknown> | undefined;
-    if (pipeline && typeof pipeline.source === 'string' && pipeline.source.trim()) {
-      return pipeline.source.trim();
-    }
-
-    if (
-      typeof metadata.originalSource === 'string' &&
-      metadata.originalSource.trim()
-    ) {
-      return metadata.originalSource.trim();
-    }
-
-    return null;
+    const source = getPolicySource(policy.extraMeta) ?? 'unknown';
+    return evaluateMvpScope(source, policy.categories, policy.regionCodes).inScope;
   }
 
   private calculateFitScore(

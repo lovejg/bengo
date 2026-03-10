@@ -2,9 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
-  MVP_ALLOWED_CATEGORIES,
-  MVP_ALLOWED_REGIONS,
-  MVP_EXCLUDED_SOURCES,
+  evaluateMvpScope,
+  getPolicySource,
 } from '../common/constants/mvp-policy-scope.constant';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { Policy } from '../database/entities';
@@ -86,7 +85,7 @@ export class PipelineQualityService {
 
       sourceSummary.total += 1;
 
-      const scope = this.evaluateMvpScope(policy, source);
+      const scope = this.evaluateMvpScopeForPolicy(policy, source);
       if (scope.inScope) {
         inMvpScope += 1;
         sourceSummary.inMvpScope += 1;
@@ -156,7 +155,7 @@ export class PipelineQualityService {
 
     for (const policy of policies) {
       const source = this.getPolicySource(policy);
-      const scope = this.evaluateMvpScope(policy, source);
+      const scope = this.evaluateMvpScopeForPolicy(policy, source);
       if (scope.inScope) {
         continue;
       }
@@ -216,58 +215,14 @@ export class PipelineQualityService {
     return created;
   }
 
-  private evaluateMvpScope(
+  private evaluateMvpScopeForPolicy(
     policy: Policy,
     source: string,
   ): { inScope: boolean; reason: string } {
-    if (MVP_EXCLUDED_SOURCES.includes(source)) {
-      return {
-        inScope: false,
-        reason: `MVP 제외 소스(${source})`,
-      };
-    }
-
-    const hasAllowedCategory = policy.categories.some((category) =>
-      MVP_ALLOWED_CATEGORIES.includes(category),
-    );
-    if (!hasAllowedCategory) {
-      return {
-        inScope: false,
-        reason: '청년정책 카테고리 불일치',
-      };
-    }
-
-    const hasAllowedRegion = policy.regionCodes.some((regionCode) =>
-      MVP_ALLOWED_REGIONS.includes(regionCode),
-    );
-    if (!hasAllowedRegion) {
-      return {
-        inScope: false,
-        reason: 'MVP 지역(서울) 불일치',
-      };
-    }
-
-    return {
-      inScope: true,
-      reason: '',
-    };
+    return evaluateMvpScope(source, policy.categories, policy.regionCodes);
   }
 
   private getPolicySource(policy: Policy): string {
-    const metadata = policy.extraMeta as Record<string, unknown> | undefined;
-    const pipeline = metadata?.pipeline as Record<string, unknown> | undefined;
-
-    if (pipeline && typeof pipeline.source === 'string' && pipeline.source.trim()) {
-      return pipeline.source.trim();
-    }
-
-    if (
-      typeof metadata?.originalSource === 'string' &&
-      metadata.originalSource.trim()
-    ) {
-      return metadata.originalSource.trim();
-    }
-
-    return 'unknown';
+    return getPolicySource(policy.extraMeta) ?? 'unknown';
   }
 }

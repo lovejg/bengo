@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -13,27 +14,37 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { UserPolicyState } from '../common/enums/user-policy-state.enum';
 import { JwtUser } from '../common/interfaces/jwt-user.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CheckEligibilityDto } from './dto/check-eligibility.dto';
 import { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
+import { PublicListPoliciesQueryDto } from './dto/public-list-policies-query.dto';
 import { UpdateUserPolicyStateDto } from './dto/update-user-policy-state.dto';
 import { PoliciesService } from './policies.service';
 
 @ApiTags('policies')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller()
 export class PoliciesController {
   constructor(private readonly policiesService: PoliciesService) {}
 
   @Get('policies')
-  @ApiOperation({ summary: '정책 목록 조회 (검색/정렬/필터)' })
+  @ApiOperation({ summary: '정책 목록 조회 (공개, 로그인 불필요)' })
   @ApiOkResponse({ description: '정책 목록' })
-  listPolicies(
+  listPoliciesPublic(@Query() query: PublicListPoliciesQueryDto) {
+    return this.policiesService.listPoliciesPublic(query);
+  }
+
+  @Get('policies/recommended')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '맞춤 정책 목록 조회 (프로필 기반 필터링)' })
+  @ApiOkResponse({ description: '맞춤 정책 목록' })
+  listPoliciesRecommended(
     @CurrentUser() user: JwtUser,
     @Query() query: ListPoliciesQueryDto,
   ) {
@@ -41,6 +52,8 @@ export class PoliciesController {
   }
 
   @Get('policies/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '정책 상세 조회' })
   @ApiOkResponse({ description: '정책 상세' })
   getPolicyDetail(
@@ -51,6 +64,8 @@ export class PoliciesController {
   }
 
   @Post('policies/:id/check-eligibility')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '정책 신청 가능 여부 판정' })
   @ApiOkResponse({ description: '판정 결과' })
   checkEligibility(
@@ -62,7 +77,9 @@ export class PoliciesController {
   }
 
   @Patch('me/policies/:id/state')
-  @ApiOperation({ summary: '내 정책 상태 변경 (완료/숨김/검토중)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '정책 저장/신청완료 상태 변경' })
   @ApiOkResponse({ description: '변경 결과' })
   updateMyPolicyState(
     @CurrentUser() user: JwtUser,
@@ -72,10 +89,28 @@ export class PoliciesController {
     return this.policiesService.updateUserPolicyState(user.sub, id, dto);
   }
 
+  @Delete('me/policies/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '저장한 정책 삭제' })
+  @ApiOkResponse({ description: '삭제 완료' })
+  removeMyPolicy(
+    @CurrentUser() user: JwtUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.policiesService.removeUserPolicyState(user.sub, id);
+  }
+
   @Get('me/policies')
-  @ApiOperation({ summary: '내 정책 상태 목록 조회' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'MY 정책 목록 조회' })
+  @ApiQuery({ name: 'state', enum: UserPolicyState, required: false })
   @ApiOkResponse({ description: '내 정책 목록' })
-  getMyPolicies(@CurrentUser() user: JwtUser) {
-    return this.policiesService.listMyPolicies(user.sub);
+  getMyPolicies(
+    @CurrentUser() user: JwtUser,
+    @Query('state') state?: UserPolicyState,
+  ) {
+    return this.policiesService.listMyPolicies(user.sub, state);
   }
 }

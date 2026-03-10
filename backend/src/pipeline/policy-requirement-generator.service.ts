@@ -34,7 +34,6 @@ export class PolicyRequirementGeneratorService {
     const requirements: Array<Partial<PolicyRequirement>> = [];
     let displayOrder = 0;
 
-    // ── 나이 요건 (표시용, 실제 판별은 evaluateBaseConditions에서 처리) ──
     if (normalized.minAge !== null || normalized.maxAge !== null) {
       displayOrder += 1;
       requirements.push({
@@ -49,7 +48,6 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
-    // ── 취업 상태 요건 ──
     const employmentStatus = normalized.extraMeta?.employmentStatus;
     if (typeof employmentStatus === 'string' && employmentStatus.trim()) {
       displayOrder += 1;
@@ -65,7 +63,6 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
-    // ── 학력 요건 ──
     const educationReq = normalized.extraMeta?.educationReq;
     if (typeof educationReq === 'string' && educationReq.trim()) {
       displayOrder += 1;
@@ -81,7 +78,6 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
-    // ── 선정기준 (정보 표시용) ──
     const selectionCriteria = normalized.extraMeta?.selectionCriteria;
     if (typeof selectionCriteria === 'string' && selectionCriteria.trim()) {
       displayOrder += 1;
@@ -97,7 +93,6 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
-    // ── LLM 조건 추출 ──
     const llmResult = await this.llmExtractor.extractRules(policy, normalized);
 
     if (llmResult && llmResult.conditions.length > 0) {
@@ -120,7 +115,6 @@ export class PolicyRequirementGeneratorService {
         });
       }
 
-      // PolicyRule 생성
       const ruleDefinition: RuleDefinition = {
         id: `rule-${policy.code}-llm-v1`,
         name: `${policy.title} LLM 추출 규칙`,

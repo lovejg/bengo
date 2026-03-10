@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  MVP_ALLOWED_CATEGORIES,
-  MVP_ALLOWED_REGIONS,
-  MVP_EXCLUDED_SOURCES,
-} from '../common/constants/mvp-policy-scope.constant';
+import { evaluateMvpScope } from '../common/constants/mvp-policy-scope.constant';
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RegionCode } from '../common/enums/region-code.enum';
@@ -178,7 +174,6 @@ export class PipelineIngestionService {
     const savedPolicy = await this.policyRepository.save(nextPolicy);
     const action: 'created' | 'updated' = existing ? 'updated' : 'created';
 
-    // 파이프라인 수집 정책에 대해 requirements/rules 자동 생성
     await this.requirementGenerator.generateForPolicy(savedPolicy, normalized);
 
     const run = await this.runRepository.save(
@@ -238,37 +233,8 @@ export class PipelineIngestionService {
     categories: InterestCategory[],
     regionCodes: RegionCode[],
   ): { isInScope: boolean; reason: string } {
-    if (MVP_EXCLUDED_SOURCES.includes(source)) {
-      return {
-        isInScope: false,
-        reason: `MVP 범위 제외 소스(${source})입니다.`,
-      };
-    }
-
-    const hasAllowedCategory = categories.some((category) =>
-      MVP_ALLOWED_CATEGORIES.includes(category),
-    );
-    if (!hasAllowedCategory) {
-      return {
-        isInScope: false,
-        reason: 'MVP 범위(청년정책)와 일치하지 않습니다.',
-      };
-    }
-
-    const hasAllowedRegion = regionCodes.some((regionCode) =>
-      MVP_ALLOWED_REGIONS.includes(regionCode),
-    );
-    if (!hasAllowedRegion) {
-      return {
-        isInScope: false,
-        reason: 'MVP 범위(서울)와 일치하지 않습니다.',
-      };
-    }
-
-    return {
-      isInScope: true,
-      reason: '',
-    };
+    const result = evaluateMvpScope(source, categories, regionCodes);
+    return { isInScope: result.inScope, reason: result.reason };
   }
 
   private async deactivateExistingOutOfScopePolicy(

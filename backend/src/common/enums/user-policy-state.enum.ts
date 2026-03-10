@@ -1,6 +1,4 @@
 export enum UserPolicyState {
-  DISCOVERED = 'discovered',
-  IN_REVIEW = 'in_review',
+  SAVED = 'saved',
   APPLIED = 'applied',
-  HIDDEN = 'hidden',
 }
