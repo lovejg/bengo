@@ -21,6 +21,7 @@ import { PolicyNormalizationService } from './policy-normalization.service';
 import { PolicyRequirementGeneratorService } from './policy-requirement-generator.service';
 import { PolicyValidationService } from './policy-validation.service';
 import { LlmRuleExtractorService } from './llm-rule-extractor.service';
+import { PolicyEnrichmentService } from './policy-enrichment.service';
 
 @Module({
   imports: [
@@ -46,12 +47,14 @@ import { LlmRuleExtractorService } from './llm-rule-extractor.service';
     PolicyValidationService,
     PolicyRequirementGeneratorService,
     LlmRuleExtractorService,
+    PolicyEnrichmentService,
     PipelineQualityService,
   ],
   exports: [
     PipelineOrchestratorService,
     PipelineIngestionService,
     PipelineQualityService,
+    PolicyEnrichmentService,
   ],
 })
 export class PipelineModule {}

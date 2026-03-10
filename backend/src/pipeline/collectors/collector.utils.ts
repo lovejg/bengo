@@ -234,7 +234,6 @@ export function mapMvpRegionCodesFromStrings(values: string[]): RegionCode[] {
       return [RegionCode.SEOUL];
     }
 
-    // 타 지역 소관기관이면 서울 아님
     const nonSeoulRegions = [
       '부산', '대구', '인천', '광주', '대전', '울산', '세종',
       '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주',

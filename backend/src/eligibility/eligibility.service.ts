@@ -78,7 +78,6 @@ export class EligibilityService {
       }
     }
 
-    // 미확인 조건이 있으면 CONDITIONAL
     const unverified = input.unverifiedConditions ?? [];
     if (unverified.length > 0) {
       const conditionalReasons = [
@@ -92,7 +91,6 @@ export class EligibilityService {
       };
     }
 
-    // 자동 판별 가능한 조건 데이터가 하나도 없는 경우 → CONDITIONAL
     const hasAnyVerifiableData =
       input.policy.minAge !== null ||
       input.policy.maxAge !== null ||

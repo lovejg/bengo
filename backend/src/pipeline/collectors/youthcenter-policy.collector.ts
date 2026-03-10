@@ -146,6 +146,18 @@ export class YouthcenterPolicyCollector implements PolicyCollector {
         const selectionCriteria = pickFirstString(item, [
           'plcySlcnCn', '선정기준',
         ]);
+        const additionalQualification = pickFirstString(item, [
+          'addAplyQlfcCndCn', '추가신청자격조건',
+        ]);
+        const screeningMethod = pickFirstString(item, [
+          'srngMthdCn', '심사방법',
+        ]);
+        const requiredDocuments = pickFirstString(item, [
+          'sbmsnDcmntCn', '제출서류',
+        ]);
+        const participationTarget = pickFirstString(item, [
+          'ptcpPrpTrgtCn', '참여목적대상',
+        ]);
         const applicationPeriod = pickFirstString(item, [
           'aplyYmd', 'rceptBgngYmd',
         ]);
@@ -175,6 +187,10 @@ export class YouthcenterPolicyCollector implements PolicyCollector {
             applicationMethod,
             supportContent,
             selectionCriteria,
+            additionalQualification,
+            screeningMethod,
+            requiredDocuments,
+            participationTarget,
             ageInfo,
             employmentStatus,
             educationReq,

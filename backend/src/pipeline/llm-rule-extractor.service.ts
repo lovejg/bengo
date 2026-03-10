@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { QuestionType } from '../common/enums/question-type.enum';
-import {
-  RuleCondition,
-  RuleDefinition,
-} from '../common/interfaces/rule-expression.interface';
+import { RuleCondition } from '../common/interfaces/rule-expression.interface';
 import { Policy } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 
@@ -228,7 +225,6 @@ export class LlmRuleExtractorService {
     const validOps = new Set(['=', '!=', '>', '>=', '<', '<=', 'in', 'contains']);
     if (!validOps.has(op)) return null;
 
-    // type 결정
     let type = QuestionType.STRING;
     if (obj.type === 'select' || (Array.isArray(obj.options) && obj.options.length > 0)) {
       type = QuestionType.SELECT;

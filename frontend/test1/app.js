@@ -26,6 +26,7 @@ const els = {
   sourcesBtn: el("sourcesBtn"),
   qualityReportBtn: el("qualityReportBtn"),
   pruneMvpBtn: el("pruneMvpBtn"),
+  enrichBtn: el("enrichBtn"),
   collectMvpBtn: el("collectMvpBtn"),
   singleSource: el("singleSource"),
   collectOneBtn: el("collectOneBtn"),
@@ -462,6 +463,13 @@ function wireEvents() {
     if (!confirm("MVP 범위 밖 활성 정책을 모두 비활성화합니다. 계속할까요?")) return;
     apiRequest({ method: "POST", path: "/pipeline/prune-mvp" })
       .catch(e => logResponse("prune-mvp", 0, { message: e.message }));
+  });
+
+  els.enrichBtn.addEventListener("click", () => {
+    setCollectLoading(true, "데이터 보강 (크롤링) 중... (약 1분 소요)");
+    apiRequest({ method: "POST", path: "/pipeline/enrich-policies" })
+      .catch(e => logResponse("enrich-policies", 0, { message: e.message }))
+      .finally(() => setCollectLoading(false));
   });
 
   els.collectMvpBtn.addEventListener("click", () => {

@@ -13,6 +13,7 @@ import {
   PipelineQualityReport,
   PipelineQualityService,
 } from './pipeline-quality.service';
+import { PolicyEnrichmentService } from './policy-enrichment.service';
 
 interface CollectAndIngestMvpResult {
   mode: 'mvp';
@@ -39,6 +40,7 @@ export class PipelineController {
     private readonly ingestionService: PipelineIngestionService,
     private readonly collectionService: PipelineCollectionService,
     private readonly qualityService: PipelineQualityService,
+    private readonly enrichmentService: PolicyEnrichmentService,
   ) {}
 
   @Get('sources')
@@ -124,6 +126,17 @@ export class PipelineController {
       results,
       failedSources,
     };
+  }
+
+  @Post('enrich-policies')
+  @ApiOperation({
+    summary: '기존 정책 데이터 보강 (크롤링)',
+    description:
+      'sourceUrl이 있는 활성 정책의 상세 페이지를 크롤링하여 빈 필드(신청방법, 기간, 자격요건 등)를 보강합니다.',
+  })
+  @ApiOkResponse({ description: '보강 결과' })
+  enrichPolicies() {
+    return this.enrichmentService.enrichActivePolicies();
   }
 
   @Post('collect-and-ingest/:source')

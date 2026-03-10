@@ -35,7 +35,6 @@ export class UserPolicyState {
   @Column({
     type: 'enum',
     enum: UserPolicyStateEnum,
-    default: UserPolicyStateEnum.DISCOVERED,
   })
   state!: UserPolicyStateEnum;
 
