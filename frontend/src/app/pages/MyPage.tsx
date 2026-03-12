@@ -1,117 +1,212 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { User, MapPin, Sparkles, Edit, Trash2, X } from 'lucide-react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
+import { getPolicyDetail } from '../api/policies';
+import { ApiClientError, getStoredUserProfile, setStoredUserProfile } from '../api/client';
+import { getMyPolicies, removeMyPolicy } from '../api/me';
 import { MainLayout } from '../components/templates/MainLayout';
 import { Button } from '../components/atoms/Button';
 import { Badge } from '../components/atoms/Badge';
 import { Input } from '../components/atoms/Input';
-import { Chip } from '../components/atoms/Chip';
 import { PolicyCard, PolicyCardProps } from '../components/organisms/PolicyCard';
 import { EmptyState } from '../components/molecules/EmptyState';
+import type { MyPolicyItem, PolicyDetail, UserProfileSummary } from '../types';
+
+type StatusFilter = 'all' | 'upcoming' | 'recruiting' | 'closed';
+type SavedPolicy = PolicyCardProps & {
+  applicationStatus: 'upcoming' | 'recruiting' | 'closed';
+  stateId: string;
+};
+
+interface UserProfileView {
+  name: string;
+  age: number;
+  region: string;
+  interests: string[];
+}
+
+interface EditFormState {
+  age: string;
+  regionCode: string;
+  interests: string[];
+}
+
+const REGION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'seoul', label: '서울' },
+  { value: 'seoul_gangnam', label: '서울 강남구' },
+  { value: 'seoul_mapo', label: '서울 마포구' },
+  { value: 'seoul_songpa', label: '서울 송파구' },
+];
+
+const INTEREST_OPTIONS: { value: string; label: string }[] = [
+  { value: 'youth_policy', label: '청년정책' },
+  { value: 'childcare_policy', label: '육아/보육정책' },
+];
+
+const regionLabels: Record<string, string> = {
+  seoul: '서울',
+  seoul_gangnam: '서울 강남구',
+  seoul_mapo: '서울 마포구',
+  seoul_songpa: '서울 송파구',
+};
+
+const interestLabels: Record<string, string> = {
+  youth_policy: '청년정책',
+  childcare_policy: '육아정책',
+};
+
+function mapApplicationStatus(detail: PolicyDetail, state: MyPolicyItem['state']): SavedPolicy['applicationStatus'] {
+  if (state === 'applied' || (detail.endsAt && new Date(detail.endsAt).getTime() < Date.now())) {
+    return 'closed';
+  }
+
+  if (!detail.startsAt) {
+    return 'recruiting';
+  }
+
+  return new Date(detail.startsAt).getTime() > Date.now() ? 'upcoming' : 'recruiting';
+}
+
+function mapSavedPolicy(item: MyPolicyItem, detail: PolicyDetail): SavedPolicy {
+  return {
+    id: item.policyId,
+    stateId: item.policyId,
+    title: item.title,
+    code: detail.code ?? item.policyId,
+    shortDescription: detail.shortDescription ?? detail.description ?? item.note ?? '정책 요약 정보가 없습니다.',
+    providerName: detail.providerName ?? item.providerName,
+    categories: detail.categories ?? [],
+    regionCodes: detail.regionCodes ?? [],
+    minAge: detail.minAge ?? null,
+    maxAge: detail.maxAge ?? null,
+    startsAt: detail.startsAt ?? null,
+    endsAt: detail.endsAt ?? null,
+    fitScore: null,
+    userState: item.state,
+    bookmarked: item.state === 'saved',
+    applicationStatus: mapApplicationStatus(detail, item.state),
+  };
+}
+
+function mapStoredUserToView(user: UserProfileSummary | null): UserProfileView | null {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    name: user.email.split('@')[0],
+    age: user.age,
+    region: regionLabels[user.regionCode] ?? user.regionCode,
+    interests: user.interests.map((interest) => interestLabels[interest] ?? interest),
+  };
+}
 
 export function MyPage() {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'recruiting' | 'closed'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
-
-  // Mock user data
-  const [user, setUser] = useState({
-    name: '홍길동',
-    age: 28,
-    region: '강남구',
-    interests: ['청년정책'],
+  const [user, setUser] = useState<UserProfileView | null>(mapStoredUserToView(getStoredUserProfile()));
+  const [editForm, setEditForm] = useState<EditFormState>(() => {
+    const stored = getStoredUserProfile();
+    return {
+      age: stored ? String(stored.age) : '',
+      regionCode: stored?.regionCode ?? '',
+      interests: stored?.interests ?? [],
+    };
   });
+  const [savedPolicies, setSavedPolicies] = useState<SavedPolicy[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // Edit form state
-  const [editForm, setEditForm] = useState({
-    name: '',
-    age: 0,
-    region: '',
-    interests: '',
-  });
+  useEffect(() => {
+    const loadMyPolicies = async () => {
+      setIsLoading(true);
+      setHasError(false);
 
-  // Mock saved policies
-  const [savedPolicies, setSavedPolicies] = useState<(PolicyCardProps & { applicationStatus: 'upcoming' | 'recruiting' | 'closed' })[]>([
-    {
-      id: '1',
-      title: '청년 월세 지원 사업',
-      summary: '만 19~34세 청년에게 월 최대 20만원, 최대 12개월간 월세를 지원합니다.',
-      agency: '서울시 주택정책실',
-      region: '서울 전역',
-      period: '2026.01.01 ~ 2026.12.31',
-      status: 'recruiting',
-      eligibility: 'eligible',
-      source: '서울청년몽땅',
-      categories: ['housing'],
-      bookmarked: true,
-      applicationStatus: 'recruiting',
-    },
-    {
-      id: '3',
-      title: '강남구 청년 일자리 지원 프로그램',
-      summary: '강남구 거주 청년의 취업을 위한 교육 및 인턴십 프로그램',
-      agency: '강남구청',
-      region: '강남구',
-      period: '2026.03.01 ~ 2026.03.31',
-      status: 'recruiting',
-      eligibility: 'eligible',
-      source: '크롤링',
-      categories: ['employment', 'education'],
-      bookmarked: true,
-      applicationStatus: 'upcoming',
-    },
-    {
-      id: '5',
-      title: '마포구 청년 문화활동 지원',
-      summary: '마포구 거주 청년에게 문화활동비 연 30만원 지원',
-      agency: '마포구청',
-      region: '마포구',
-      period: '2026.01.01 ~ 2026.12.31',
-      status: 'recruiting',
-      source: '크롤링',
-      categories: ['culture'],
-      bookmarked: true,
-      applicationStatus: 'recruiting',
-    },
-    {
-      id: '4',
-      title: '서울시 청년 창업 지원금',
-      summary: '예비 창업자 및 초기 창업자를 대상으로 최대 1천만원 지원',
-      agency: '서울시 경제정책실',
-      region: '서울 전역',
-      period: '2026.02.01 ~ 2026.02.28',
-      status: 'closed',
-      source: '온통청년',
-      categories: ['employment'],
-      bookmarked: true,
-      applicationStatus: 'closed',
-    },
-  ]);
+      const storedUser = getStoredUserProfile();
+      setUser(mapStoredUserToView(storedUser));
 
-  const handleDelete = (id: string) => {
-    setSavedPolicies(savedPolicies.filter(p => p.id !== id));
-    toast.success('정책이 저장 목록에서 삭제되었습니다');
+      try {
+        const response = await getMyPolicies();
+        const visibleItems = response.items;
+        const details = await Promise.all(
+          visibleItems.map(async (item) => {
+            const detail = await getPolicyDetail(item.policyId);
+            return mapSavedPolicy(item, detail);
+          }),
+        );
+
+        setSavedPolicies(details);
+      } catch (error) {
+        setHasError(true);
+        const message = error instanceof ApiClientError ? error.message : '내 정책 정보를 불러오는데 실패했습니다';
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMyPolicies();
+  }, [reloadKey]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await removeMyPolicy(id);
+      setSavedPolicies((current) => current.filter((policy) => policy.id !== id));
+      toast.success('정책이 저장 목록에서 삭제되었습니다');
+    } catch (error) {
+      const message = error instanceof ApiClientError ? error.message : '정책 삭제에 실패했습니다';
+      toast.error(message);
+    }
   };
 
   const filteredPolicies = savedPolicies.filter((policy) => {
-    if (statusFilter === 'all') return true;
+    if (statusFilter === 'all') {
+      return true;
+    }
+
     return policy.applicationStatus === statusFilter;
   });
 
   const statusCounts = {
     all: savedPolicies.length,
-    upcoming: savedPolicies.filter((p) => p.applicationStatus === 'upcoming').length,
-    recruiting: savedPolicies.filter((p) => p.applicationStatus === 'recruiting').length,
-    closed: savedPolicies.filter((p) => p.applicationStatus === 'closed').length,
+    upcoming: savedPolicies.filter((policy) => policy.applicationStatus === 'upcoming').length,
+    recruiting: savedPolicies.filter((policy) => policy.applicationStatus === 'recruiting').length,
+    closed: savedPolicies.filter((policy) => policy.applicationStatus === 'closed').length,
+  };
+
+  const handleSaveProfile = () => {
+    const storedUser = getStoredUserProfile();
+
+    if (!storedUser) {
+      toast.error('로그인 정보가 없습니다');
+      return;
+    }
+
+    const nextStoredUser = {
+      ...storedUser,
+      age: editForm.age ? Number(editForm.age) : storedUser.age,
+      regionCode: (editForm.regionCode || storedUser.regionCode) as typeof storedUser.regionCode,
+      interests: editForm.interests.length > 0 ? editForm.interests as typeof storedUser.interests : storedUser.interests,
+    };
+
+    setStoredUserProfile(nextStoredUser);
+    setUser(mapStoredUserToView(nextStoredUser));
+    setEditProfileOpen(false);
+    toast.success('프로필이 저장되었습니다');
+  };
+
+  const handleRetry = () => {
+    setReloadKey((current) => current + 1);
   };
 
   return (
     <MainLayout>
       <div className="bg-gradient-to-b from-blue-50 to-white py-8 sm:py-10 md:py-12">
         <div className="container mx-auto px-4">
-          {/* Profile Card */}
           <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-6 md:mb-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               <div className="flex items-start gap-4">
@@ -119,32 +214,41 @@ export function MyPage() {
                   <User className="h-8 w-8 text-[var(--accent)]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="mb-2 text-xl sm:text-2xl md:text-3xl break-words">{user.name}님</h2>
+                  <h2 className="mb-2 text-xl sm:text-2xl md:text-3xl break-words">
+                    {user ? `${user.name}님` : '내 정보'}
+                  </h2>
                   <div className="flex flex-wrap gap-3 text-sm text-[var(--muted-foreground)]">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 flex-shrink-0" />
-                      <span>{user.age}세</span>
+                      <span>{user ? `${user.age}세` : '나이 정보 없음'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MapPin className="h-4 w-4 flex-shrink-0" />
-                      <span>{user.region}</span>
+                      <span>{user?.region ?? '지역 정보 없음'}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {user.interests.map((interest) => (
+                    {(user?.interests ?? []).map((interest) => (
                       <Badge key={interest}>{interest}</Badge>
                     ))}
                   </div>
                 </div>
               </div>
-              <Button variant="secondary" className="gap-2 w-full md:w-auto" onClick={() => setEditProfileOpen(true)}>
+              <Button variant="secondary" className="gap-2 w-full md:w-auto" onClick={() => {
+                const stored = getStoredUserProfile();
+                setEditForm({
+                  age: stored ? String(stored.age) : '',
+                  regionCode: stored?.regionCode ?? '',
+                  interests: stored?.interests ?? [],
+                });
+                setEditProfileOpen(true);
+              }}>
                 <Edit className="h-4 w-4" />
                 <span className="whitespace-nowrap">프로필 수정</span>
               </Button>
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 md:mb-8">
             <div className="bg-white rounded-xl p-4 text-center">
               <p className="text-xl sm:text-2xl font-semibold text-[var(--accent)] mb-1">{statusCounts.all}</p>
@@ -164,14 +268,11 @@ export function MyPage() {
             </div>
           </div>
 
-          {/* Filter Tabs */}
           <div className="bg-white rounded-xl p-2 mb-6 flex flex-wrap gap-2">
             <button
               onClick={() => setStatusFilter('all')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'all'
-                  ? 'bg-[var(--accent)] text-[var(--accent-foreground)]'
-                  : 'hover:bg-[var(--muted)]'
+                statusFilter === 'all' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
               전체 ({statusCounts.all})
@@ -179,9 +280,7 @@ export function MyPage() {
             <button
               onClick={() => setStatusFilter('upcoming')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'upcoming'
-                  ? 'bg-[var(--accent)] text-[var(--accent-foreground)]'
-                  : 'hover:bg-[var(--muted)]'
+                statusFilter === 'upcoming' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
               예정 ({statusCounts.upcoming})
@@ -189,9 +288,7 @@ export function MyPage() {
             <button
               onClick={() => setStatusFilter('recruiting')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'recruiting'
-                  ? 'bg-[var(--accent)] text-[var(--accent-foreground)]'
-                  : 'hover:bg-[var(--muted)]'
+                statusFilter === 'recruiting' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
               모집중 ({statusCounts.recruiting})
@@ -199,17 +296,18 @@ export function MyPage() {
             <button
               onClick={() => setStatusFilter('closed')}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'closed'
-                  ? 'bg-[var(--accent)] text-[var(--accent-foreground)]'
-                  : 'hover:bg-[var(--muted)]'
+                statusFilter === 'closed' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
               마감 ({statusCounts.closed})
             </button>
           </div>
 
-          {/* Policy List */}
-          {filteredPolicies.length === 0 ? (
+          {isLoading ? (
+            <div className="bg-white rounded-xl p-12 text-center text-[var(--muted-foreground)]">불러오는 중...</div>
+          ) : hasError ? (
+            <EmptyState type="error" onAction={handleRetry} actionLabel="다시 시도" />
+          ) : filteredPolicies.length === 0 ? (
             <div className="bg-white rounded-xl p-12 text-center">
               <p className="text-[var(--muted-foreground)] mb-4">저장된 정책이 없습니다</p>
               <Link to="/policies">
@@ -259,7 +357,6 @@ export function MyPage() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirmOpen && policyToDelete && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
@@ -274,18 +371,14 @@ export function MyPage() {
             </div>
             <p className="text-sm text-[var(--muted-foreground)] mb-6">정말로 이 정책을 삭제하시겠습니까?</p>
             <div className="flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                className="px-4 py-2"
-                onClick={() => setDeleteConfirmOpen(false)}
-              >
+              <Button variant="secondary" className="px-4 py-2" onClick={() => setDeleteConfirmOpen(false)}>
                 취소
               </Button>
               <Button
                 variant="danger"
                 className="px-4 py-2"
                 onClick={() => {
-                  handleDelete(policyToDelete);
+                  void handleDelete(policyToDelete);
                   setDeleteConfirmOpen(false);
                 }}
               >
@@ -296,7 +389,6 @@ export function MyPage() {
         </div>
       )}
 
-      {/* Edit Profile Modal */}
       {editProfileOpen && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
@@ -311,70 +403,73 @@ export function MyPage() {
             </div>
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">이름</label>
-                <Input
-                  type="text"
-                  value={editForm.name || user.name}
-                  onChange={(e) => {
-                    setEditForm({ ...editForm, name: e.target.value });
-                  }}
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium mb-2">나이</label>
                 <Input
                   type="number"
-                  value={editForm.age || user.age}
-                  onChange={(e) => {
-                    setEditForm({ ...editForm, age: parseInt(e.target.value, 10) });
-                  }}
+                  min={1}
+                  max={140}
+                  value={editForm.age}
+                  onChange={(e) => setEditForm((current) => ({ ...current, age: e.target.value }))}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">지역</label>
-                <Input
-                  type="text"
-                  value={editForm.region || user.region}
-                  onChange={(e) => {
-                    setEditForm({ ...editForm, region: e.target.value });
-                  }}
-                />
+                <select
+                  className="w-full border border-[var(--border)] rounded-xl px-3 py-2 text-sm bg-white"
+                  value={editForm.regionCode}
+                  onChange={(e) => setEditForm((current) => ({ ...current, regionCode: e.target.value }))}
+                >
+                  <option value="">선택하세요</option>
+                  {REGION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">관심사 (쉼표로 구분)</label>
-                <Input
-                  type="text"
-                  placeholder="청년정책, 주거, 취업"
-                  value={editForm.interests || user.interests.join(', ')}
-                  onChange={(e) => {
-                    setEditForm({ ...editForm, interests: e.target.value });
-                  }}
-                />
+                <label className="block text-sm font-medium mb-2">관심사</label>
+                <div className="flex flex-col gap-2">
+                  {INTEREST_OPTIONS.map((opt) => {
+                    const isSelected = editForm.interests.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() =>
+                          setEditForm((current) => ({
+                            ...current,
+                            interests: isSelected
+                              ? current.interests.filter((i) => i !== opt.value)
+                              : [...current.interests, opt.value],
+                          }))
+                        }
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors text-left ${
+                          isSelected
+                            ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
+                            : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                            isSelected ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-gray-300'
+                          }`}
+                        >
+                          {isSelected && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
+                              <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          )}
+                        </div>
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  variant="secondary"
-                  className="px-4 py-2"
-                  onClick={() => setEditProfileOpen(false)}
-                >
+                <Button variant="secondary" className="px-4 py-2" onClick={() => setEditProfileOpen(false)}>
                   취소
                 </Button>
-                <Button
-                  variant="primary"
-                  className="px-4 py-2"
-                  onClick={() => {
-                    // Save changes to server or update state
-                    const newUser = {
-                      name: editForm.name || user.name,
-                      age: editForm.age || user.age,
-                      region: editForm.region || user.region,
-                      interests: editForm.interests ? editForm.interests.split(',').map(i => i.trim()) : user.interests,
-                    };
-                    setUser(newUser);
-                    setEditProfileOpen(false);
-                    toast.success('프로필이 저장되었습니다');
-                  }}
-                >
+                <Button variant="primary" className="px-4 py-2" onClick={handleSaveProfile}>
                   저장
                 </Button>
               </div>

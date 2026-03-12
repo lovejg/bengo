@@ -10,6 +10,9 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ApiClientError, getAccessToken, getStoredUserProfile } from '../api/client';
+import { checkEligibility, getPolicyDetail } from '../api/policies';
+import { updateMyPolicyState, removeMyPolicy } from '../api/me';
 import { MainLayout } from '../components/templates/MainLayout';
 import { Button } from '../components/atoms/Button';
 import { Badge } from '../components/atoms/Badge';
@@ -17,26 +20,7 @@ import { Input } from '../components/atoms/Input';
 import { PolicyMetaRow } from '../components/molecules/PolicyMetaRow';
 import { PolicyDetailSkeleton } from '../components/molecules/PolicyDetailSkeleton';
 import { EmptyState } from '../components/molecules/EmptyState';
-
-interface PolicyDetail {
-  id: string | undefined;
-  title: string;
-  agency: string;
-  region: string;
-  period: string;
-  status: 'recruiting' | 'always' | 'closed';
-  source: string;
-  sourceUrl: string;
-  summary: string;
-  details: {
-    target: string;
-    criteria: string;
-    benefits: string;
-    applicationPeriod: string;
-    applicationMethod: string;
-  };
-  evidence: Array<{ text: string; source: string }>;
-}
+import type { EligibilityResponse, PolicyDetail as ApiPolicyDetail } from '../types';
 
 const statusLabels: Record<string, string> = {
   recruiting: '모집중',
@@ -44,76 +28,181 @@ const statusLabels: Record<string, string> = {
   closed: '마감',
 };
 
+const regionLabels: Record<string, string> = {
+  seoul: '서울',
+  seoul_gangnam: '서울 강남구',
+  seoul_mapo: '서울 마포구',
+  seoul_songpa: '서울 송파구',
+};
+
+function formatPolicyPeriod(startsAt?: string | null, endsAt?: string | null) {
+  if (!startsAt && !endsAt) {
+    return '상시 모집';
+  }
+
+  if (startsAt && endsAt) {
+    return `${startsAt.slice(0, 10)} ~ ${endsAt.slice(0, 10)}`;
+  }
+
+  return startsAt ? `${startsAt.slice(0, 10)}부터` : `${endsAt?.slice(0, 10)}까지`;
+}
+
+function mapStatus(_startsAt?: string | null, endsAt?: string | null): 'recruiting' | 'always' | 'closed' {
+  if (!endsAt) {
+    return 'always';
+  }
+
+  return new Date(endsAt).getTime() < Date.now() ? 'closed' : 'recruiting';
+}
+
+function getTargetText(policy: ApiPolicyDetail) {
+  const target = [
+    policy.minAge !== null && policy.minAge !== undefined ? `최소 ${policy.minAge}세` : null,
+    policy.maxAge !== null && policy.maxAge !== undefined ? `최대 ${policy.maxAge}세` : null,
+    policy.regionCodes?.length ? policy.regionCodes.map((code) => regionLabels[code] ?? code).join(', ') : null,
+  ]
+    .filter(Boolean)
+    .join(' / ');
+
+  return target || '세부 지원 대상 정보가 없습니다.';
+}
+
+function getEvidence(
+  policy: ApiPolicyDetail,
+  eligibilityResult?: EligibilityResponse | null,
+  eligibilityAnswers?: Record<string, string>,
+) {
+  if (eligibilityResult) {
+    // 결과 있을 때: 실제 입력한 답변 + 결과 근거
+    const answerItems = (policy.requirements ?? [])
+      .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
+      .filter((req) => eligibilityAnswers?.[req.key])
+      .map((req) => ({
+        text: `${req.label ?? req.key}: ${eligibilityAnswers![req.key]}`,
+        source: '입력한 정보',
+      }));
+
+    const reasonItems =
+      eligibilityResult.reasons.length > 0
+        ? eligibilityResult.reasons.map((reason) => ({ text: reason, source: '자격 확인 결과' }))
+        : [{ text: eligibilityResult.explanation, source: '자격 확인 결과' }];
+
+    return [...answerItems, ...reasonItems];
+  }
+
+  // 결과 없을 때: 요건 안내 + 이전 판정 (있으면)
+  const requirementItems = (policy.requirements ?? []).filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i).map((req) => ({
+    text: `${req.label ?? req.key}${req.description ? `: ${req.description}` : ''}`,
+    source: '요건 정보',
+  }));
+
+  const lastItems = policy.lastEligibility
+    ? (policy.lastEligibility.reasons.length > 0
+        ? policy.lastEligibility.reasons
+        : [policy.lastEligibility.explanation]
+      ).map((text) => ({ text, source: '최근 자격 판정' }))
+    : [];
+
+  return [...requirementItems, ...lastItems];
+}
+
 export function PolicyDetailPage() {
   const { id } = useParams();
   const [bookmarked, setBookmarked] = useState(false);
   const [showEligibilityForm, setShowEligibilityForm] = useState(false);
-  const [eligibilityResult, setEligibilityResult] = useState<'eligible' | 'notEligible' | 'needsReview' | null>(null);
+  const [eligibilityResult, setEligibilityResult] = useState<EligibilityResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [policy, setPolicy] = useState<PolicyDetail | null>(null);
+  const [policy, setPolicy] = useState<ApiPolicyDetail | null>(null);
+  const [eligibilityAnswers, setEligibilityAnswers] = useState<Record<string, string>>({});
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const loadPolicy = async () => {
+      if (!id) {
+        setHasError(true);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setHasError(false);
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        
-        // Mock data
-        setPolicy({
-          id,
-          title: '청년 월세 지원 사업',
-          agency: '서울시 주택정책실',
-          region: '서울 전역',
-          period: '2026.01.01 ~ 2026.12.31',
-          status: 'recruiting' as const,
-          source: '서울청년몽땅',
-          sourceUrl: 'https://example.com/policy',
-          summary: '만 19~34세 청년에게 월 최대 20만원, 최대 12개월간 월세를 지원합니다.',
-          details: {
-            target: '만 19~34세 서울시 거주 청년 중 무주택자',
-            criteria: '중위소득 150% 이하, 보증금 5천만원·월세 60만원 이하 거주자',
-            benefits: '월 최대 20만원 (최대 12개월)',
-            applicationPeriod: '2026년 1월 1일 ~ 12월 31일',
-            applicationMethod: '서울주거포털(http://housing.seoul.go.kr)에서 온라인 신청',
-          },
-          evidence: [
-            {
-              text: '만 19세 이상 34세 이하의 청년이 대상입니다.',
-              source: '지원 대상 기준 (공고문 p.2)',
-            },
-            {
-              text: '중위소득 150% 이하 가구에 한하여 지원합니다.',
-              source: '소득 기준 (공고문 p.3)',
-            },
-            {
-              text: '월세 60만원 이하 거주자만 신청 가능합니다.',
-              source: '주거 조건 (공고문 p.4)',
-            },
-          ],
-        });
+        const response = await getPolicyDetail(id);
+        setPolicy(response);
+        setBookmarked(!!getAccessToken() && response.userState === 'saved');
       } catch (error) {
         setHasError(true);
-        toast.error('정책 정보를 불러오는데 실패했습니다');
+        const message = error instanceof ApiClientError ? error.message : '정책 정보를 불러오는데 실패했습니다';
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadPolicy();
-  }, [id]);
+  }, [id, reloadKey]);
 
-  const handleCheckEligibility = (e: React.FormEvent) => {
+  const handleCheckEligibility = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEligibilityResult('eligible');
-    toast.success('자격 확인이 완료되었습니다');
+    if (!id) {
+      return;
+    }
+
+    try {
+      const missingRequired = (policy?.requirements ?? []).filter(
+        (req) => req.isRequired && !eligibilityAnswers[req.key],
+      );
+      if (missingRequired.length > 0) {
+        toast.error(`필수 항목을 모두 입력해주세요: ${missingRequired.map((r) => r.label ?? r.key).join(', ')}`);
+        return;
+      }
+
+      const answers: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(eligibilityAnswers)) {
+        if (value === '') continue;
+        const req = policy?.requirements?.find((r) => r.key === key);
+        if (req?.type === 'number') {
+          answers[key] = Number(value);
+        } else if (req?.type === 'boolean') {
+          answers[key] = value === 'true';
+        } else {
+          answers[key] = value;
+        }
+      }
+
+      const response = await checkEligibility(id, { answers });
+
+      setEligibilityResult(response);
+      toast.success('자격 확인이 완료되었습니다');
+      setTimeout(() => {
+        document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    } catch (error) {
+      const message = error instanceof ApiClientError ? error.message : '자격 확인에 실패했습니다';
+      toast.error(message);
+    }
   };
 
-  const handleBookmark = () => {
-    setBookmarked(!bookmarked);
-    toast.success(bookmarked ? '저장을 취소했습니다' : '정책이 저장되었습니다');
+  const handleBookmark = async () => {
+    if (!id) return;
+    if (!getAccessToken()) {
+      toast.error('로그인이 필요합니다');
+      return;
+    }
+    const next = !bookmarked;
+    try {
+      if (next) {
+        await updateMyPolicyState(id, { state: 'saved' });
+      } else {
+        await removeMyPolicy(id);
+      }
+      setBookmarked(next);
+      toast.success(next ? '정책이 저장되었습니다' : '저장을 취소했습니다');
+    } catch (error) {
+      const message = error instanceof ApiClientError ? error.message : '저장에 실패했습니다';
+      toast.error(message);
+    }
   };
 
   const handleShare = async () => {
@@ -121,7 +210,7 @@ export function PolicyDetailPage() {
       try {
         await navigator.share({
           title: policy?.title,
-          text: policy?.summary,
+          text: policy?.shortDescription ?? policy?.description,
           url: window.location.href,
         });
       } catch (err) {
@@ -135,7 +224,7 @@ export function PolicyDetailPage() {
   };
 
   const handleRetry = () => {
-    window.location.reload();
+    setReloadKey((current) => current + 1);
   };
 
   const sections = [
@@ -214,10 +303,14 @@ export function PolicyDetailPage() {
               <div className="flex-1 min-w-0">
                 <h1 className="mb-4 text-xl sm:text-2xl md:text-3xl break-words">{policy.title}</h1>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <Badge variant={policy.status}>{statusLabels[policy.status]}</Badge>
-                  <Badge>{policy.source}</Badge>
+                  <Badge variant={mapStatus(policy.startsAt, policy.endsAt)}>{statusLabels[mapStatus(policy.startsAt, policy.endsAt)]}</Badge>
+                  <Badge>{policy.providerName ?? '공식 출처'}</Badge>
                 </div>
-                <PolicyMetaRow agency={policy.agency} region={policy.region} period={policy.period} />
+                <PolicyMetaRow
+                  agency={policy.providerName}
+                  region={policy.regionCodes?.map((code) => regionLabels[code] ?? code).join(', ')}
+                  period={formatPolicyPeriod(policy.startsAt, policy.endsAt)}
+                />
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <Button
@@ -268,25 +361,29 @@ export function PolicyDetailPage() {
             {/* Summary */}
             <section id="summary" className="bg-white border border-[var(--border)] rounded-xl p-4 sm:p-6" style={{ scrollMarginTop: '100px' }}>
               <h3 className="mb-4 text-lg sm:text-xl">요약</h3>
-              <p className="text-[var(--muted-foreground)] leading-relaxed text-sm sm:text-base">{policy.summary}</p>
+              <p className="text-[var(--muted-foreground)] leading-relaxed text-sm sm:text-base">
+                {policy.shortDescription ?? policy.description ?? '요약 정보가 없습니다.'}
+              </p>
             </section>
 
             {/* Target */}
             <section id="target" className="bg-white border border-[var(--border)] rounded-xl p-4 sm:p-6" style={{ scrollMarginTop: '100px' }}>
               <h3 className="mb-4 text-lg sm:text-xl">지원대상</h3>
-              <p className="text-[var(--muted-foreground)] leading-relaxed text-sm sm:text-base">{policy.details.target}</p>
+              <p className="text-[var(--muted-foreground)] leading-relaxed text-sm sm:text-base">{getTargetText(policy)}</p>
             </section>
 
             {/* Criteria */}
             <section id="criteria" className="bg-white border border-[var(--border)] rounded-xl p-4 sm:p-6" style={{ scrollMarginTop: '100px' }}>
               <h3 className="mb-4 text-lg sm:text-xl">선정기준</h3>
-              <p className="text-[var(--muted-foreground)] leading-relaxed text-sm sm:text-base">{policy.details.criteria}</p>
+              <p className="text-[var(--muted-foreground)] leading-relaxed text-sm sm:text-base">
+                {policy.eligibilityInfo?.selectionCriteria ?? '선정 기준 정보가 없습니다.'}
+              </p>
             </section>
 
             {/* Benefits */}
             <section className="bg-blue-50 border border-blue-200 rounded-xl p-4 sm:p-6" style={{ scrollMarginTop: '100px' }}>
               <h3 className="mb-4 text-lg sm:text-xl">지원 혜택</h3>
-              <p className="text-lg">{policy.details.benefits}</p>
+              <p className="text-lg">{policy.eligibilityInfo?.supportContent ?? policy.description ?? '지원 내용 정보가 없습니다.'}</p>
             </section>
 
             {/* Application */}
@@ -295,11 +392,13 @@ export function PolicyDetailPage() {
               <div className="space-y-3">
                 <div>
                   <span className="font-medium">신청 기간: </span>
-                  <span className="text-[var(--muted-foreground)]">{policy.details.applicationPeriod}</span>
+                  <span className="text-[var(--muted-foreground)]">
+                    {policy.eligibilityInfo?.applicationDeadline ?? formatPolicyPeriod(policy.startsAt, policy.endsAt)}
+                  </span>
                 </div>
                 <div>
                   <span className="font-medium">신청 방법: </span>
-                  <span className="text-[var(--muted-foreground)]">{policy.details.applicationMethod}</span>
+                  <span className="text-[var(--muted-foreground)]">{policy.applicationMethod ?? '신청 방법 정보가 없습니다.'}</span>
                 </div>
               </div>
             </section>
@@ -312,56 +411,106 @@ export function PolicyDetailPage() {
               </p>
 
               {!showEligibilityForm && (
-                <Button onClick={() => setShowEligibilityForm(true)}>자격 확인하기</Button>
+                <Button onClick={() => {
+                  const profile = getStoredUserProfile();
+                  if (profile) {
+                    const prefilled: Record<string, string> = {};
+                    if (profile.age) prefilled['age'] = String(profile.age);
+                    setEligibilityAnswers(prefilled);
+                  }
+                  setShowEligibilityForm(true);
+                }}>자격 확인하기</Button>
               )}
 
               {showEligibilityForm && !eligibilityResult && (
                 <form onSubmit={handleCheckEligibility} className="space-y-4">
-                  <div>
-                    <label htmlFor="age-input" className="block mb-2">나이</label>
-                    <Input id="age-input" type="number" placeholder="예: 28" aria-label="나이 입력" />
-                  </div>
-                  <div>
-                    <label htmlFor="income-input" className="block mb-2">
-                      월 소득{' '}
-                      <span className="text-sm text-[var(--muted-foreground)]">(중위소득 기준)</span>
-                    </label>
-                    <Input id="income-input" type="number" placeholder="예: 250" aria-label="월 소득 입력" />
-                  </div>
-                  <div>
-                    <label htmlFor="rent-input" className="block mb-2">월세 금액</label>
-                    <Input id="rent-input" type="number" placeholder="예: 50" aria-label="월세 금액 입력" />
-                  </div>
+                  {(policy?.requirements ?? []).filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i).map((req) => (
+                    <div key={req.key}>
+                      <label htmlFor={`req-${req.key}`} className="block mb-2">
+                        {req.label ?? req.key}
+                        {req.isRequired && <span className="text-[var(--destructive)] ml-1">*</span>}
+                        {req.description && (
+                          <span className="text-sm text-[var(--muted-foreground)] ml-1">({req.description})</span>
+                        )}
+                      </label>
+                      {req.type === 'select' && req.options ? (
+                        <select
+                          id={`req-${req.key}`}
+                          className="w-full border border-[var(--border)] rounded-xl px-3 py-2 text-sm bg-white"
+                          value={eligibilityAnswers[req.key] ?? ''}
+                          onChange={(e) => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: e.target.value }))}
+                        >
+                          <option value="">선택하세요</option>
+                          {req.options.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : req.type === 'boolean' ? (
+                        <div className="flex gap-2">
+                          {(['true', 'false'] as const).map((val) => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: val }))}
+                              className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                                eligibilityAnswers[req.key] === val
+                                  ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
+                                  : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]'
+                              }`}
+                            >
+                              {val === 'true' ? '예' : '아니오'}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <Input
+                          id={`req-${req.key}`}
+                          type={req.type === 'number' ? 'number' : 'text'}
+                          value={eligibilityAnswers[req.key] ?? ''}
+                          onChange={(e) => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: e.target.value }))}
+                        />
+                      )}
+                    </div>
+                  ))}
                   <Button type="submit">확인하기</Button>
                 </form>
               )}
 
-              {eligibilityResult === 'eligible' && (
+              {eligibilityResult?.result === 'eligible' && (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6" role="alert">
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
                       <h4 className="text-emerald-900 mb-2">신청 가능합니다!</h4>
                       <p className="text-emerald-700 text-sm mb-4">
-                        입력하신 정보로 볼 때, 이 정책의 신청 자격을 충족합니다.
+                        {eligibilityResult.explanation}
                       </p>
-                      <Button size="sm">신청하러 가기</Button>
+                      <Button
+                        size="sm"
+                        onClick={() => window.open(eligibilityResult.policy.applicationUrl ?? policy.applicationUrl ?? policy.sourceUrl ?? '#', '_blank', 'noopener,noreferrer')}
+                      >
+                        신청하러 가기
+                      </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {eligibilityResult === 'needsReview' && (
+              {eligibilityResult?.result === 'conditional' && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-6" role="alert">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
                     <div>
                       <h4 className="text-amber-900 mb-2">추가 확인이 필요합니다</h4>
                       <p className="text-amber-700 text-sm mb-4">
-                        일부 조건이 명확하지 않습니다. 원문을 확인하시거나 해당 기관에 문의해주세요.
+                        {eligibilityResult.explanation}
                       </p>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="secondary">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => window.open(policy.sourceUrl ?? '#', '_blank', 'noopener,noreferrer')}
+                        >
                           원문 보기
                         </Button>
                         <Button size="sm" variant="secondary">
@@ -372,13 +521,24 @@ export function PolicyDetailPage() {
                   </div>
                 </div>
               )}
+              {eligibilityResult?.result === 'ineligible' && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-6" role="alert">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-6 w-6 text-rose-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                    <div>
+                      <h4 className="text-rose-900 mb-2">현재 조건으로는 신청이 어렵습니다</h4>
+                      <p className="text-rose-700 text-sm mb-4">{eligibilityResult.explanation}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Evidence */}
             <section id="evidence" className="bg-white border border-[var(--border)] rounded-xl p-4 sm:p-6">
               <h3 className="mb-4 text-lg sm:text-xl">근거 자료</h3>
               <div className="space-y-3">
-                {policy.evidence.map((item: any, index: number) => (
+                {getEvidence(policy, eligibilityResult, eligibilityAnswers).map((item, index) => (
                   <div key={index} className="bg-[var(--muted)] rounded-lg p-4">
                     <p className="mb-2">{item.text}</p>
                     <p className="text-sm text-[var(--muted-foreground)]">출처: {item.source}</p>
@@ -397,7 +557,7 @@ export function PolicyDetailPage() {
                     정확한 정보는 항상 공식 출처를 통해 확인하세요.
                   </p>
                   <a
-                    href={policy.sourceUrl}
+                    href={policy.sourceUrl ?? '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-[var(--accent)] hover:underline"
@@ -414,11 +574,18 @@ export function PolicyDetailPage() {
           <aside className="lg:col-span-1" aria-label="빠른 액션">
             <div className="sticky top-24 space-y-4">
               <div className="bg-white border border-[var(--border)] rounded-xl p-6 space-y-3">
-                <Button className="w-full gap-2">
+                <Button
+                  className="w-full gap-2"
+                  onClick={() => window.open(policy.applicationUrl ?? policy.sourceUrl ?? '#', '_blank', 'noopener,noreferrer')}
+                >
                   <ExternalLink className="h-4 w-4" />
                   신청하러 가기
                 </Button>
-                <Button variant="secondary" className="w-full gap-2">
+                <Button
+                  variant="secondary"
+                  className="w-full gap-2"
+                  onClick={() => window.open(policy.sourceUrl ?? '#', '_blank', 'noopener,noreferrer')}
+                >
                   <ExternalLink className="h-4 w-4" />
                   원문 보기
                 </Button>

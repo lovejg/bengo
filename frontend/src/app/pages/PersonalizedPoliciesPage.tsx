@@ -1,151 +1,75 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowRight, MapPin, User as UserIcon, LogIn, Gift } from 'lucide-react';
 import { toast } from 'sonner';
+import { getPoliciesRecommended } from '../api/policies';
+import { ApiClientError, getAccessToken, getStoredUserProfile, setStoredUserProfile } from '../api/client';
 import { MainLayout } from '../components/templates/MainLayout';
 import { PolicyList } from '../components/organisms/PolicyList';
 import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
 import { EmptyState } from '../components/molecules/EmptyState';
 import { Button } from '../components/atoms/Button';
-import { Badge } from '../components/atoms/Badge';
-import { PolicyCardProps } from '../components/organisms/PolicyCard';
 import { MatchSummaryCard } from '../components/organisms/MatchSummaryCard';
+import type { PolicyListItem } from '../types';
+const regionLabels: Record<string, string> = {
+  seoul: '서울',
+  seoul_gangnam: '서울 강남구',
+  seoul_mapo: '서울 마포구',
+  seoul_songpa: '서울 송파구',
+};
 
-// Mock data - 실제 구현 시 API 또는 Context에서 가져옴
-const mockPolicies: PolicyCardProps[] = [
-  {
-    id: '1',
-    title: '청년 월세 지원 사업',
-    summary: '만 19~34세 청년에게 월 최대 20만원, 최대 12개월간 월세를 지원합니다.',
-    agency: '서울시 주택정책실',
-    region: '서울 전역',
-    period: '2026.01.01 ~ 2026.12.31',
-    status: 'recruiting',
-    eligibility: 'eligible',
-    source: '서울청년몽땅',
-    categories: ['housing'],
-  },
-  {
-    id: '2',
-    title: '청년 구직활동 지원금',
-    summary: '구직 중인 청년에게 월 50만원씩 최대 6개월간 지원합니다.',
-    agency: '고용노동부',
-    region: '전국',
-    period: '상시 모집',
-    status: 'always',
-    eligibility: 'needsReview',
-    source: 'SSIS',
-    categories: ['employment'],
-  },
-  {
-    id: '3',
-    title: '강남구 청년 일자리 지원 프로그램',
-    summary: '강남구 거주 청년의 취업을 위한 교육 및 인턴십 프로그램',
-    agency: '강남구청',
-    region: '강남구',
-    period: '2026.03.01 ~ 2026.03.31',
-    status: 'recruiting',
-    eligibility: 'eligible',
-    source: '크롤링',
-    categories: ['employment', 'education'],
-  },
-  {
-    id: '4',
-    title: '서울시 청년 창업 지원금',
-    summary: '예비 창업자 및 초기 창업자를 대상으로 최대 1천만원 지원',
-    agency: '서울시 경제정책실',
-    region: '서울 전역',
-    period: '2026.02.01 ~ 2026.02.28',
-    status: 'closed',
-    source: '온통청년',
-    categories: ['employment'],
-  },
-  {
-    id: '5',
-    title: '마포구 청년 문화활동 지원',
-    summary: '마포구 거주 청년에게 문화활동비 연 30만원 지원',
-    agency: '마포구청',
-    region: '마포구',
-    period: '2026.01.01 ~ 2026.12.31',
-    status: 'recruiting',
-    eligibility: 'infoLacking',
-    source: '크롤링',
-    categories: ['culture'],
-  },
-  {
-    id: '6',
-    title: '청년 전월세 보증금 대출',
-    summary: '무주택 청년의 전월세 보증금 대출 이자 지원',
-    agency: '주택도시보증공사',
-    region: '전국',
-    period: '상시 모집',
-    status: 'always',
-    eligibility: 'needsReview',
-    source: 'SSIS',
-    categories: ['housing', 'welfare'],
-  },
-];
+const regionCodeByLabel: Record<string, string> = Object.fromEntries(
+  Object.entries(regionLabels).map(([code, label]) => [label, code]),
+);
 
 export function PersonalizedPoliciesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [personalizedPolicies, setPersonalizedPolicies] = useState<PolicyCardProps[]>([]);
-  
-  // Mock auth state - 실제 구현 시 Context 또는 Auth Provider에서 가져옴
-  // 테스트용: true로 설정하면 로그인 상태, false로 설정하면 로그아웃 상태
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  
-  // Mock user data
-  const user = {
-    name: '홍길동',
-    age: 28,
-    region: '강남구',
-    interests: ['청년정책', '주거', '취업'],
-  };
+  const [personalizedPolicies, setPersonalizedPolicies] = useState<PolicyListItem[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const isAuthenticated = Boolean(getAccessToken() && getStoredUserProfile());
+  const user = getStoredUserProfile();
 
   useEffect(() => {
     const loadPersonalizedPolicies = async () => {
+      const currentUser = getStoredUserProfile();
+
+      if (!currentUser) {
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setHasError(false);
-      
+
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        
-        // 로그인된 경우 사용자 정보 기반 필터링
-        if (isAuthenticated) {
-          // 연령대 필터링 (19-34세 청년 정책)
-          // 지역 필터링 (사용자 지역 + 전국)
-          const filtered = mockPolicies.filter((policy) => {
-            const matchesRegion = 
-              policy.region === '전국' || 
-              policy.region.includes('서울') || 
-              policy.region.includes(user.region);
-            
-            // 모집 중이거나 상시 모집인 정책만
-            const isAvailable = policy.status === 'recruiting' || policy.status === 'always';
-            
-            return matchesRegion && isAvailable;
-          });
-          
-          setPersonalizedPolicies(filtered);
-        }
+        const response = await getPoliciesRecommended({
+          regionCode: currentUser.regionCode,
+          interest: currentUser.interests.length > 0 ? currentUser.interests[0] : undefined,
+          sortBy: 'relevance',
+          order: 'desc',
+          onlyAvailable: true,
+        });
+
+        setPersonalizedPolicies(response.items);
       } catch (error) {
         setHasError(true);
-        toast.error('맞춤 정책을 불러오는데 실패했습니다');
+        const message = error instanceof ApiClientError ? error.message : '맞춤 정책을 불러오는데 실패했습니다';
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadPersonalizedPolicies();
-  }, [isAuthenticated]);
+    void loadPersonalizedPolicies();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey]);
 
   const handleRetry = () => {
-    window.location.reload();
+    setReloadKey((current) => current + 1);
   };
 
-  // 로그인하지 않은 경우 안내 화면
   if (!isLoading && !isAuthenticated) {
     return (
       <MainLayout>
@@ -160,9 +84,9 @@ export function PersonalizedPoliciesPage() {
                   <ArrowRight className="h-3 w-3 text-white" strokeWidth={3} />
                 </div>
               </div>
-              
+
               <h2 className="mb-4 leading-snug">나에게 딱 맞는<br />정책을 찾아보세요</h2>
-              
+
               <p className="text-[var(--muted-foreground)] mb-8 leading-relaxed">
                 로그인하면 연령, 지역 등 회원님의 조건에 맞는<br />
                 맞춤형 정책만 모아서 제공해드립니다
@@ -221,14 +145,11 @@ export function PersonalizedPoliciesPage() {
     );
   }
 
-  // 로그인한 경우 맞춤 정책 목록
   return (
     <MainLayout>
-      {/* Hero Section - 2 Column Layout */}
       <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-b border-blue-100 py-8 sm:py-10 md:py-12">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 lg:gap-8 items-start">
-            {/* Left Column - Title & Description */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="p-2 bg-white rounded-xl shadow-sm">
@@ -237,28 +158,57 @@ export function PersonalizedPoliciesPage() {
                 <span className="text-sm font-medium text-[var(--muted-foreground)]">맞춤정책</span>
               </div>
               <h1 className="text-[var(--foreground)] mb-2 text-2xl sm:text-3xl md:text-4xl">
-                <span className="inline-block">{user.name}님을 위한 정책</span>
+                <span className="inline-block">{user ? `${user.email.split('@')[0]}님을 위한 정책` : '맞춤 정책'}</span>
               </h1>
               <p className="text-[var(--muted-foreground)] text-sm sm:text-base">
                 회원님의 조건에 맞는 정책 <span className="font-semibold text-[var(--accent)]">{personalizedPolicies.length}개</span>를 찾았습니다
               </p>
             </div>
 
-            {/* Right Column - Match Summary Card */}
             <div className="w-full lg:w-[420px]">
               <MatchSummaryCard
                 userCondition={{
-                  age: user.age,
-                  region: user.region,
-                  status: '구직중',
-                  income: false,
-                  household: false,
+                  age: user?.age,
+                  region: user ? regionLabels[user.regionCode] ?? user.regionCode : undefined,
+                  interests: user?.interests,
                 }}
-                completionPercentage={60}
-                state="partial"
+                completionPercentage={
+                  user
+                    ? Math.round(
+                        ((user.age ? 1 : 0) +
+                          (user.regionCode ? 1 : 0) +
+                          (user.interests.length > 0 ? 1 : 0)) /
+                          3 *
+                          100,
+                      )
+                    : 0
+                }
                 onUpdate={(field, value) => {
-                  toast.success(`${field} 정보가 "${value}"(으)로 업데이트되었습니다.`);
-                  console.log(`Updated ${field} to ${value}`);
+                  const storedUser = getStoredUserProfile();
+
+                  if (!storedUser) {
+                    return;
+                  }
+
+                  const nextUser = { ...storedUser };
+                  if (field === 'age') {
+                    nextUser.age = Number(value) || storedUser.age;
+                  } else if (field === 'region') {
+                    const code = regionCodeByLabel[value];
+                    if (code) {
+                      nextUser.regionCode = code as typeof storedUser.regionCode;
+                    }
+                  } else if (field === 'interests') {
+                    try {
+                      nextUser.interests = JSON.parse(value) as typeof storedUser.interests;
+                    } catch {
+                      return;
+                    }
+                  }
+
+                  setStoredUserProfile(nextUser);
+                  toast.success('프로필이 업데이트되었습니다.');
+                  setReloadKey((current) => current + 1);
                 }}
               />
             </div>
@@ -266,9 +216,7 @@ export function PersonalizedPoliciesPage() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="container mx-auto px-4 py-8">
-        {/* Info Banner */}
         <div className="bg-blue-50/50 border border-blue-200/50 rounded-xl p-4 mb-8 flex items-start gap-3">
           <div className="p-2 bg-blue-100 rounded-lg">
             <Gift className="h-4 w-4 text-blue-600 flex-shrink-0" />
@@ -276,7 +224,7 @@ export function PersonalizedPoliciesPage() {
           <div className="text-sm">
             <p className="text-blue-900 font-medium mb-1">이 정책들을 확인해보세요!</p>
             <p className="text-blue-700">
-              회원님의 연령과 지역 조건에 맞는 정책만 선별했습니다. 
+              회원님의 연령과 지역 조건에 맞는 정책만 선별했습니다.
               <Link to="/me" className="underline ml-1 hover:text-blue-900 font-medium">
                 프로필을 수정
               </Link>
@@ -285,7 +233,6 @@ export function PersonalizedPoliciesPage() {
           </div>
         </div>
 
-        {/* Loading State */}
         {isLoading && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" role="status" aria-label="맞춤 정책 로딩 중">
             {[...Array(4)].map((_, i) => (
@@ -294,16 +241,10 @@ export function PersonalizedPoliciesPage() {
           </div>
         )}
 
-        {/* Error State */}
         {hasError && (
-          <EmptyState
-            type="error"
-            onAction={handleRetry}
-            actionLabel="다시 시도"
-          />
+          <EmptyState type="error" onAction={handleRetry} actionLabel="다시 시도" />
         )}
 
-        {/* Empty State */}
         {!isLoading && !hasError && personalizedPolicies.length === 0 && (
           <div className="bg-white rounded-xl p-12 text-center">
             <Gift className="h-12 w-12 text-[var(--muted-foreground)] mx-auto mb-4" />
@@ -322,12 +263,8 @@ export function PersonalizedPoliciesPage() {
           </div>
         )}
 
-        {/* Policy List */}
         {!isLoading && !hasError && personalizedPolicies.length > 0 && (
-          <PolicyList
-            policies={personalizedPolicies}
-            hasMore={false}
-          />
+          <PolicyList policies={personalizedPolicies} hasMore={false} />
         )}
       </div>
     </MainLayout>

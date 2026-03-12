@@ -1,13 +1,32 @@
-import { Link, useLocation } from 'react-router';
-import { ArrowRight, User, Menu, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { ArrowRight, User, Menu, X, LogOut } from 'lucide-react';
 import { Button } from '../atoms/Button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { NotificationButton } from '../molecules/NotificationButton';
+import { getAccessToken, getStoredUserProfile, clearAccessToken, clearStoredUserProfile } from '../../api/client';
 
 export function Header() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = getAccessToken();
+    const profile = getStoredUserProfile();
+    setIsAuthenticated(Boolean(token && profile));
+    setUserName(profile ? profile.email.split('@')[0] : null);
+  }, [location.pathname]);
+
+  const handleLogout = () => {
+    clearAccessToken();
+    clearStoredUserProfile();
+    setIsAuthenticated(false);
+    setUserName(null);
+    navigate('/login');
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -59,36 +78,53 @@ export function Header() {
               <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-[var(--accent)]"></span>
             )}
           </Link>
-          <Link
-            to="/me"
-            className={cn(
-              'text-[14px] font-medium transition-all duration-200 relative',
-              isActive('/me') 
-                ? 'text-[var(--accent)]' 
-                : 'text-[var(--foreground)] hover:text-[var(--accent)]'
-            )}
-            aria-current={isActive('/me') ? 'page' : undefined}
-          >
-            MY
-            {isActive('/me') && (
-              <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-[var(--accent)]"></span>
-            )}
-          </Link>
+          {isAuthenticated && (
+            <Link
+              to="/me"
+              className={cn(
+                'text-[14px] font-medium transition-all duration-200 relative',
+                isActive('/me')
+                  ? 'text-[var(--accent)]'
+                  : 'text-[var(--foreground)] hover:text-[var(--accent)]'
+              )}
+              aria-current={isActive('/me') ? 'page' : undefined}
+            >
+              MY
+              {isActive('/me') && (
+                <span className="absolute -bottom-[21px] left-0 right-0 h-0.5 bg-[var(--accent)]"></span>
+              )}
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-3">
           <div className="hidden sm:block">
             <NotificationButton />
           </div>
-          <Link to="/login" className="hidden sm:block">
-            <Button variant="ghost" size="sm" className="gap-1.5">
-              <User className="h-4 w-4" aria-hidden="true" />
-              로그인
-            </Button>
-          </Link>
-          <Link to="/signup" className="hidden sm:block">
-            <Button size="sm">회원가입</Button>
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link to="/me" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
+                <User className="h-4 w-4" aria-hidden="true" />
+                {userName}
+              </Link>
+              <Button variant="ghost" size="sm" className="hidden sm:flex gap-1.5" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                로그아웃
+              </Button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="hidden sm:block">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  로그인
+                </Button>
+              </Link>
+              <Link to="/signup" className="hidden sm:block">
+                <Button size="sm">회원가입</Button>
+              </Link>
+            </>
+          )}
           
           {/* Mobile Menu Button */}
           <button
@@ -133,31 +169,45 @@ export function Header() {
             >
               맞춤정책
             </Link>
-            <Link
-              to="/me"
-              className={cn(
-                'px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150',
-                isActive('/me') && 'bg-[var(--muted)]'
-              )}
-              onClick={() => setMobileMenuOpen(false)}
-              aria-current={isActive('/me') ? 'page' : undefined}
-            >
-              MY
-            </Link>
-            <Link
-              to="/login"
-              className="px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              로그인
-            </Link>
-            <Link
-              to="/signup"
-              className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] hover:opacity-90 transition-opacity duration-150 text-center"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              회원가입
-            </Link>
+            {isAuthenticated && (
+              <Link
+                to="/me"
+                className={cn(
+                  'px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150',
+                  isActive('/me') && 'bg-[var(--muted)]'
+                )}
+                onClick={() => setMobileMenuOpen(false)}
+                aria-current={isActive('/me') ? 'page' : undefined}
+              >
+                MY
+              </Link>
+            )}
+            {isAuthenticated ? (
+              <button
+                className="px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150 text-left flex items-center gap-2"
+                onClick={() => { setMobileMenuOpen(false); handleLogout(); }}
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                로그아웃 ({userName})
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  로그인
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] hover:opacity-90 transition-opacity duration-150 text-center"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  회원가입
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       )}

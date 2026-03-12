@@ -1,10 +1,9 @@
 import { Link } from 'react-router';
-import { ArrowRight, Search, Bookmark, Zap, ChevronDown, SlidersHorizontal, User, Check, Bell, Calendar, Sparkles, Shield, Clock } from 'lucide-react';
+import { ArrowRight, Search, Bookmark, ChevronDown, SlidersHorizontal, User, Check, Bell, Calendar, Shield, Clock } from 'lucide-react';
 import { Button } from '../components/atoms/Button';
 import { MainLayout } from '../components/templates/MainLayout';
 import { motion } from 'motion/react';
 import { useRef } from 'react';
-import { ImageWithFallback } from '../components/figma/ImageWithFallback';
 import { Summary } from '../components/organisms/Summary';
 import { FAQ } from '../components/organisms/FAQ';
 

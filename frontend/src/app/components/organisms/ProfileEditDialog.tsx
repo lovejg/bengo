@@ -11,57 +11,38 @@ import { Button } from '../atoms/Button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { cn } from '../../lib/utils';
 
 interface ProfileEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  field: 'age' | 'region' | 'status' | 'income' | 'household';
+  field: 'age' | 'region' | 'interests';
   currentValue: string;
   onSave: (value: string) => void;
 }
+
+const REGION_OPTIONS = ['서울', '서울 강남구', '서울 마포구', '서울 송파구'];
+
+const INTEREST_OPTIONS = [
+  { value: 'youth_policy', label: '청년정책' },
+  { value: 'childcare_policy', label: '육아/보육정책' },
+];
 
 const fieldConfig = {
   age: {
     title: '나이 수정',
     description: '현재 나이를 입력해주세요',
     label: '나이',
-    type: 'number' as const,
-    placeholder: '예: 28',
-    unit: '세',
   },
   region: {
     title: '지역 수정',
     description: '거주 지역을 선택해주세요',
     label: '지역',
-    type: 'select' as const,
-    options: [
-      '강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구',
-      '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구',
-      '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구',
-    ],
   },
-  status: {
-    title: '상태 수정',
-    description: '현재 상태를 선택해주세요',
-    label: '상태',
-    type: 'select' as const,
-    options: ['구직중', '재직중', '자영업', '학생', '무직', '기타'],
-  },
-  income: {
-    title: '소득 정보 입력',
-    description: '월 평균 소득을 입력해주세요',
-    label: '월 소득',
-    type: 'number' as const,
-    placeholder: '예: 3000000',
-    unit: '원',
-  },
-  household: {
-    title: '가구원 정보 입력',
-    description: '가구원 수를 입력해주세요',
-    label: '가구원 수',
-    type: 'number' as const,
-    placeholder: '예: 3',
-    unit: '명',
+  interests: {
+    title: '관심사 수정',
+    description: '관심 있는 정책 분야를 선택해주세요',
+    label: '관심사',
   },
 };
 
@@ -73,10 +54,31 @@ export function ProfileEditDialog({
   onSave,
 }: ProfileEditDialogProps) {
   const [value, setValue] = useState(currentValue);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(() => {
+    if (field !== 'interests') return [];
+    try {
+      return JSON.parse(currentValue) as string[];
+    } catch {
+      return [];
+    }
+  });
+
   const config = fieldConfig[field];
 
+  const toggleInterest = (interestValue: string) => {
+    setSelectedInterests((prev) =>
+      prev.includes(interestValue)
+        ? prev.filter((i) => i !== interestValue)
+        : [...prev, interestValue],
+    );
+  };
+
   const handleSave = () => {
-    onSave(value);
+    if (field === 'interests') {
+      onSave(JSON.stringify(selectedInterests));
+    } else {
+      onSave(value);
+    }
     onOpenChange(false);
   };
 
@@ -90,32 +92,70 @@ export function ProfileEditDialog({
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor={field}>{config.label}</Label>
-            {config.type === 'select' ? (
+
+            {field === 'age' && (
+              <div className="flex items-center gap-2">
+                <Input
+                  id={field}
+                  type="number"
+                  min={1}
+                  max={140}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="예: 28"
+                  className="flex-1"
+                />
+                <span className="text-sm text-[var(--muted-foreground)] font-medium">세</span>
+              </div>
+            )}
+
+            {field === 'region' && (
               <Select value={value} onValueChange={setValue}>
                 <SelectTrigger id={field}>
                   <SelectValue placeholder="선택해주세요" />
                 </SelectTrigger>
                 <SelectContent>
-                  {config.options?.map((option) => (
+                  {REGION_OPTIONS.map((option) => (
                     <SelectItem key={option} value={option}>
                       {option}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Input
-                  id={field}
-                  type={config.type}
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder={config.placeholder}
-                  className="flex-1"
-                />
-                {config.unit && (
-                  <span className="text-sm text-[var(--muted-foreground)] font-medium">{config.unit}</span>
-                )}
+            )}
+
+            {field === 'interests' && (
+              <div className="flex flex-col gap-2">
+                {INTEREST_OPTIONS.map((option) => {
+                  const isSelected = selectedInterests.includes(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => toggleInterest(option.value)}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors text-left',
+                        isSelected
+                          ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
+                          : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0',
+                          isSelected ? 'border-[var(--accent)] bg-[var(--accent)]' : 'border-gray-300',
+                        )}
+                      >
+                        {isSelected && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
+                            <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                          </svg>
+                        )}
+                      </div>
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

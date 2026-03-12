@@ -18,12 +18,12 @@ interface ExpandableFiltersProps {
   variant?: 'accordion' | 'tabs' | 'grid' | 'sidebar';
 }
 
-// Filter options - Same as FilterDrawer
 const regionOptions = [
   { id: 'all', label: '전체' },
-  { id: 'gangnam', label: '강남구' },
-  { id: 'mapo', label: '마포구' },
-  { id: 'songpa', label: '송파구' },
+  { id: 'seoul', label: '서울 전체' },
+  { id: 'seoul_gangnam', label: '서울 강남구' },
+  { id: 'seoul_mapo', label: '서울 마포구' },
+  { id: 'seoul_songpa', label: '서울 송파구' },
 ];
 
 const ageOptions = [

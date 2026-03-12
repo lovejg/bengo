@@ -7,7 +7,7 @@ export interface Policy {
   period: string;
   status: 'recruiting' | 'always' | 'closed';
   eligibility?: 'eligible' | 'needsReview' | 'infoLacking';
-  source: 'SSIS' | '온통청년' | '서울청년몽땅' | '크롤링';
+  source: string;
   sourceUrl?: string;
   details?: {
     target: string;
@@ -36,3 +36,7 @@ export interface Filter {
   label: string;
   value?: string;
 }
+
+export * from './api';
+export * from './policy';
+export * from './user';

@@ -1,5 +1,4 @@
-import { useState, FormEvent } from 'react';
-import { Search as SearchIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Input } from '../atoms/Input';
 
 export interface SearchBarProps {
@@ -11,7 +10,7 @@ export interface SearchBarProps {
 export function SearchBar({ placeholder = '예: 월세, 취업, 주거, 교육…', onSearch, defaultValue = '' }: SearchBarProps) {
   const [value, setValue] = useState(defaultValue);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSearch(value);
   };

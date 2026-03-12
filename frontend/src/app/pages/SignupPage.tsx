@@ -2,9 +2,25 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { signup } from '../api/auth';
+import { ApiClientError } from '../api/client';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import { Chip } from '../components/atoms/Chip';
+import type { Gender, InterestCategory, RegionCode } from '../types';
+
+const CURRENT_YEAR = 2026;
+
+const regionCodeMap: Record<string, RegionCode> = {
+  강남: 'seoul_gangnam',
+  마포: 'seoul_mapo',
+  송파: 'seoul_songpa',
+};
+
+const interestCategoryMap: Record<string, InterestCategory> = {
+  청년정책: 'youth_policy',
+  육아정책: 'childcare_policy',
+};
 
 export function SignupPage() {
   const navigate = useNavigate();
@@ -51,7 +67,7 @@ export function SignupPage() {
 
     if (!formData.birthYear) {
       newErrors.birthYear = '출생연도를 입력해주세요';
-    } else if (parseInt(formData.birthYear) < 1900 || parseInt(formData.birthYear) > 2026) {
+    } else if (parseInt(formData.birthYear) < 1900 || parseInt(formData.birthYear) > CURRENT_YEAR) {
       newErrors.birthYear = '올바른 출생연도를 입력해주세요';
     }
 
@@ -81,11 +97,27 @@ export function SignupPage() {
     if (validateStep2()) {
       setLoading(true);
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const birthYear = parseInt(formData.birthYear, 10);
+        const regionCode = regionCodeMap[formData.region];
+        const interests = formData.interests
+          .map((interest) => interestCategoryMap[interest])
+          .filter(Boolean) as InterestCategory[];
+        const age = Math.max(0, CURRENT_YEAR - birthYear);
+
+        await signup({
+          email: formData.email,
+          password: formData.password,
+          age,
+          gender: (formData.gender || 'unspecified') as Gender,
+          regionCode,
+          interests,
+        });
+
+        toast.success('회원가입이 완료되었습니다.');
         navigate('/policies');
       } catch (error) {
-        toast.error('회원가입에 실패했습니다. 다시 시도해주세요.');
+        const message = error instanceof ApiClientError ? error.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
+        toast.error(message);
       } finally {
         setLoading(false);
       }

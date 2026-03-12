@@ -1,68 +1,119 @@
 import { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router';
 import { NotificationBadge } from '../atoms/NotificationBadge';
 import { NotificationPopover } from '../organisms/NotificationPopover';
 import { NotificationItemProps } from './NotificationItem';
+import { getMyPolicies } from '../../api/me';
+import { getPolicyDetail } from '../../api/policies';
+import { getAccessToken, getStoredUserProfile } from '../../api/client';
 
-// Mock notifications data
-const mockNotifications: NotificationItemProps[] = [
-  {
-    id: '1',
-    type: 'deadline',
-    title: '[D-3] 청년 월세 지원 사업 마감 임박',
-    subtitle: '청년 월세 지원 사업 · 2026.03.28',
-    actionLabel: '바로 신청',
-    isUnread: true,
-    onAction: () => toast.success('신청 페이지로 이동합니다'),
-    onClick: () => {},
-  },
-  {
-    id: '2',
-    type: 'recruitment',
-    title: '강남구 청년 일자리 지원 모집 시작',
-    subtitle: '강남구 청년 일자리 · 2026.03.01 시작',
-    actionLabel: '자세히 보기',
-    isUnread: true,
-    onAction: () => toast.success('상세 페이지로 이동합니다'),
-    onClick: () => {},
-  },
-  {
-    id: '3',
-    type: 'document',
-    title: '청년 구직활동 지원금 서류 필요',
-    subtitle: '청년 구직활동 지원금 · 추가 서류 필요',
-    actionLabel: '서류 보기',
-    isUnread: false,
-    onAction: () => toast.success('서류 페이지로 이동합니다'),
-    onClick: () => {},
-  },
-  {
-    id: '4',
-    type: 'profile',
-    title: '프로필 업데이트로 더 많은 정책 받기',
-    subtitle: '조건 보완 시 5개 추가 정책 추천 가능',
-    actionLabel: '조건 보완',
-    isUnread: false,
-    onAction: () => toast.success('프로필 페이지로 이동합니다'),
-    onClick: () => {},
-  },
-];
+type NavigateFn = (path: string) => void;
+
+function getDaysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+async function buildNotifications(navigate: NavigateFn): Promise<NotificationItemProps[]> {
+  const notifs: NotificationItemProps[] = [];
+
+  // Profile completeness notification
+  const profile = getStoredUserProfile();
+  const isProfileIncomplete = !profile || !profile.age || !profile.regionCode || !profile.interests?.length;
+  if (isProfileIncomplete) {
+    notifs.push({
+      id: 'profile',
+      type: 'profile',
+      title: '프로필 업데이트로 더 많은 정책 받기',
+      subtitle: profile ? '조건 보완 시 더 많은 정책 추천 가능' : '프로필을 등록하면 맞춤 정책을 받을 수 있어요',
+      actionLabel: '조건 보완',
+      isUnread: true,
+      onAction: () => navigate('/me'),
+      onClick: () => navigate('/me'),
+    });
+  }
+
+  // Deadline & upcoming notifications from saved policies
+  const token = getAccessToken();
+  if (!token) return notifs;
+
+  try {
+    const res = await getMyPolicies();
+    const activePolicies = res.items;
+
+    const details = await Promise.allSettled(activePolicies.map((p) => getPolicyDetail(p.policyId)));
+
+    for (let i = 0; i < activePolicies.length; i++) {
+      const result = details[i];
+      if (result.status !== 'fulfilled') continue;
+
+      const detail = result.value;
+      const policy = activePolicies[i];
+
+      // Ending within 7 days
+      const daysUntilEnd = getDaysUntil(detail.endsAt);
+      if (daysUntilEnd !== null && daysUntilEnd >= 0 && daysUntilEnd <= 7) {
+        notifs.push({
+          id: `deadline-${policy.policyId}`,
+          type: 'deadline',
+          title: `[D-${daysUntilEnd}] ${policy.title} 마감 임박`,
+          subtitle: `${policy.providerName} · ${detail.endsAt?.slice(0, 10)}`,
+          actionLabel: '바로 신청',
+          isUnread: true,
+          onAction: () => {
+            if (detail.applicationUrl) {
+              window.open(detail.applicationUrl, '_blank');
+            } else {
+              navigate(`/policies/${policy.policyId}`);
+            }
+          },
+          onClick: () => navigate(`/policies/${policy.policyId}`),
+        });
+      }
+
+      // Starting within 7 days
+      const daysUntilStart = getDaysUntil(detail.startsAt);
+      if (daysUntilStart !== null && daysUntilStart >= 0 && daysUntilStart <= 7) {
+        notifs.push({
+          id: `recruitment-${policy.policyId}`,
+          type: 'recruitment',
+          title: `${policy.title} 모집 시작`,
+          subtitle: `${policy.providerName} · ${detail.startsAt?.slice(0, 10)} 시작`,
+          actionLabel: '자세히 보기',
+          isUnread: true,
+          onAction: () => navigate(`/policies/${policy.policyId}`),
+          onClick: () => navigate(`/policies/${policy.policyId}`),
+        });
+      }
+    }
+  } catch {
+    // API error - skip policy notifications
+  }
+
+  return notifs;
+}
 
 export function NotificationButton() {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItemProps[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<NotificationItemProps[]>([]);
 
   const unreadCount = notifications.filter((n) => n.isUnread).length;
 
   const handleToggle = async () => {
     setIsOpen(!isOpen);
-    
+
     if (!isOpen) {
-      // Simulate loading notifications
       setIsLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const notifs = await buildNotifications(navigate);
+      setNotifications(notifs);
       setIsLoading(false);
     }
   };
@@ -73,7 +124,7 @@ export function NotificationButton() {
   };
 
   const handleEmptyAction = () => {
-    toast.success('프로필 페이지로 이동합니다');
+    navigate('/me');
     setIsOpen(false);
   };
 

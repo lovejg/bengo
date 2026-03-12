@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { getPolicies } from '../api/policies';
+import { ApiClientError } from '../api/client';
 import { MainLayout } from '../components/templates/MainLayout';
 import { SearchBar } from '../components/molecules/SearchBar';
 import { SortDropdown, SortOption } from '../components/molecules/SortDropdown';
@@ -12,89 +14,11 @@ import { ExpandableFilters, ExpandableFiltersState } from '../components/organis
 import { EmptyState } from '../components/molecules/EmptyState';
 import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
 import { Button } from '../components/atoms/Button';
-import { PolicyCardProps } from '../components/organisms/PolicyCard';
-
-// Mock data
-const mockPolicies: PolicyCardProps[] = [
-  {
-    id: '1',
-    title: '청년 월세 지원 사업',
-    summary: '만 19~34세 청년에게 월 최대 20만원, 최대 12개월간 월세를 지원합니다.',
-    agency: '서울시 주택정책실',
-    region: '서울 전역',
-    period: '2026.01.01 ~ 2026.12.31',
-    status: 'recruiting',
-    eligibility: 'eligible',
-    source: '서울청년몽땅',
-    categories: ['housing'],
-  },
-  {
-    id: '2',
-    title: '청년 구직활동 지원금',
-    summary: '구직 중인 청년에게 월 50만원씩 최대 6개월간 지원합니다.',
-    agency: '고용노동부',
-    region: '전국',
-    period: '상시 모집',
-    status: 'always',
-    eligibility: 'needsReview',
-    source: 'SSIS',
-    categories: ['employment'],
-  },
-  {
-    id: '3',
-    title: '강남구 청년 일자리 지원 프로그램',
-    summary: '강남구 거주 청년의 취업을 위한 교육 및 인턴십 프로그램',
-    agency: '강남구청',
-    region: '강남구',
-    period: '2026.03.01 ~ 2026.03.31',
-    status: 'recruiting',
-    eligibility: 'eligible',
-    source: '크롤링',
-    categories: ['employment', 'education'],
-  },
-  {
-    id: '4',
-    title: '서울시 청년 창업 지원금',
-    summary: '예비 창업자 및 초기 창업자를 대상으로 최대 1천만원 지원',
-    agency: '서울시 경제정책실',
-    region: '서울 전역',
-    period: '2026.02.01 ~ 2026.02.28',
-    status: 'closed',
-    source: '온통청년',
-    categories: ['employment'],
-  },
-  {
-    id: '5',
-    title: '마포구 청년 문화활동 지원',
-    summary: '마포구 거주 청년에게 문화활동비 연 30만원 지원',
-    agency: '마포구청',
-    region: '마포구',
-    period: '2026.01.01 ~ 2026.12.31',
-    status: 'recruiting',
-    eligibility: 'infoLacking',
-    source: '크롤링',
-    categories: ['culture'],
-  },
-  {
-    id: '6',
-    title: '청년 전월세 보증금 대출',
-    summary: '무주택 청년의 전월세 보증금 대출 이자 지원',
-    agency: '주택도시보증공사',
-    region: '전국',
-    period: '상시 모집',
-    status: 'always',
-    eligibility: 'needsReview',
-    source: 'SSIS',
-    categories: ['housing', 'welfare'],
-  },
-];
+import type { PolicyListItem, RegionCode } from '../types';
 
 const quickFilters = [
-  { id: 'housing', label: '주거' },
-  { id: 'employment', label: '취업·창업' },
-  { id: 'education', label: '교육' },
-  { id: 'culture', label: '문화' },
-  { id: 'welfare', label: '복지·생활' },
+  { id: 'youth_policy', label: '청년정책' },
+  { id: 'childcare_policy', label: '육아정책' },
 ];
 
 export function PoliciesPage() {
@@ -111,40 +35,41 @@ export function PoliciesPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [policies, setPolicies] = useState<PolicyCardProps[]>([]);
+  const [policies, setPolicies] = useState<PolicyListItem[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // Simulate initial data loading
   useEffect(() => {
     const loadPolicies = async () => {
       setIsLoading(true);
       setHasError(false);
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setPolicies(mockPolicies);
+        const rawRegion = expandableFilters.regions[0];
+        const selectedRegion = rawRegion && rawRegion !== 'all' ? (rawRegion as RegionCode) : undefined;
+        const selectedInterest = selectedFilters[0] as 'youth_policy' | 'childcare_policy' | undefined;
+        const apiSortBy = sortBy === 'recommended' ? 'relevance' : sortBy;
+        const response = await getPolicies({
+          search: searchQuery || undefined,
+          sortBy: apiSortBy,
+          order: 'desc',
+          regionCode: selectedRegion,
+          interest: selectedInterest,
+        });
+
+        setPolicies(response.items);
       } catch (error) {
         setHasError(true);
-        toast.error('정책 목록을 불러오는데 실패했습니다');
+        const message = error instanceof ApiClientError ? error.message : '정책 목록을 불러오는데 실패했습니다';
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadPolicies();
-  }, []);
+  }, [searchQuery, sortBy, selectedFilters, expandableFilters, reloadKey]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    if (!query) return;
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      // In real app, filter by query
-      toast.success(`"${query}"로 검색했습니다`);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleFilterChange = (filters: string[]) => {
@@ -252,23 +177,8 @@ export function PoliciesPage() {
   };
 
   const handleRetry = () => {
-    window.location.reload();
+    setReloadKey((current) => current + 1);
   };
-
-  // 검색어와 카테고리 필터 적용
-  const filteredPolicies = policies.filter((policy) => {
-    // 검색어 필터
-    const matchesSearch = searchQuery
-      ? policy.title.toLowerCase().includes(searchQuery.toLowerCase())
-      : true;
-    
-    // 카테고리 필터
-    const matchesCategory = selectedFilters.length > 0
-      ? selectedFilters.some(filter => policy.categories?.includes(filter) ?? false)
-      : true;
-    
-    return matchesSearch && matchesCategory;
-  });
 
   return (
     <MainLayout>
@@ -335,46 +245,60 @@ export function PoliciesPage() {
         {!isLoading && !hasError && (
           <div className="mb-6">
             <p className="text-[var(--muted-foreground)]">
-              총 <span className="text-[var(--foreground)] font-semibold">{filteredPolicies.length}개</span>의
+              총 <span className="text-[var(--foreground)] font-semibold">{policies.length}개</span>의
               정책을 찾았습니다
             </p>
           </div>
         )}
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" role="status" aria-label="정책 목록 로딩 중">
-            {[...Array(4)].map((_, i) => (
-              <PolicyCardSkeleton key={i} />
-            ))}
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {isLoading && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+              role="status"
+              aria-label="정책 목록 로딩 중"
+            >
+              {[...Array(6)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: i * 0.05 }}
+                >
+                  <PolicyCardSkeleton />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
 
-        {/* Error State */}
-        {hasError && (
-          <EmptyState
-            type="error"
-            onAction={handleRetry}
-            actionLabel="다시 시도"
-          />
-        )}
+          {!isLoading && hasError && (
+            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+              <EmptyState type="error" onAction={handleRetry} actionLabel="다시 시도" />
+            </motion.div>
+          )}
 
-        {/* No Results */}
-        {!isLoading && !hasError && filteredPolicies.length === 0 && (
-          <EmptyState
-            type="noResult"
-            onAction={handleClearAll}
-            actionLabel="필터 초기화"
-          />
-        )}
+          {!isLoading && !hasError && policies.length === 0 && (
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+              <EmptyState type="noResult" onAction={handleClearAll} actionLabel="필터 초기화" />
+            </motion.div>
+          )}
 
-        {/* Policy List */}
-        {!isLoading && !hasError && filteredPolicies.length > 0 && (
-          <PolicyList
-            policies={filteredPolicies}
-            hasMore={false}
-          />
-        )}
+          {!isLoading && !hasError && policies.length > 0 && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <PolicyList policies={policies} hasMore={false} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </MainLayout>
   );

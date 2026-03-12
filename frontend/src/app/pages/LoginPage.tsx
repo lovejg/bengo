@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { ApiClientError } from '../api/client';
+import { login } from '../api/auth';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 
@@ -37,12 +39,15 @@ export function LoginPage() {
     if (validate()) {
       setLoading(true);
       try {
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await login({
+          email: formData.email,
+          password: formData.password,
+        });
         toast.success('로그인 성공!');
         navigate('/policies');
       } catch (error) {
-        toast.error('로그인에 실패했습니다');
+        const message = error instanceof ApiClientError ? error.message : '로그인에 실패했습니다';
+        toast.error(message);
       } finally {
         setLoading(false);
       }
