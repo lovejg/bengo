@@ -12,6 +12,7 @@ import { MockSeoulCollector } from './collectors/mock-seoul.collector';
 import { SeoulOpenApiCollector } from './collectors/seoul-open-api.collector';
 import { YouthcenterCenterCollector } from './collectors/youthcenter-center.collector';
 import { YouthcenterPolicyCollector } from './collectors/youthcenter-policy.collector';
+import { YouthSeoulCollector } from './collectors/youth-seoul.collector';
 import { PipelineCollectionService } from './pipeline-collection.service';
 import { PipelineController } from './pipeline.controller';
 import { PipelineIngestionService } from './pipeline-ingestion.service';
@@ -43,6 +44,7 @@ import { PolicyEnrichmentService } from './policy-enrichment.service';
     YouthcenterPolicyCollector,
     YouthcenterCenterCollector,
     SeoulOpenApiCollector,
+    YouthSeoulCollector,
     PolicyNormalizationService,
     PolicyValidationService,
     PolicyRequirementGeneratorService,

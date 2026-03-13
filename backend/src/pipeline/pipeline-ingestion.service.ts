@@ -103,6 +103,35 @@ export class PipelineIngestionService {
     }
 
     const normalized = normalizedResult.normalized;
+
+    if (this.isExpired(normalized.endsAt)) {
+      const expiredRun = await this.runRepository.save(
+        this.runRepository.create({
+          rawDocumentId: rawDoc.id,
+          policyId: null,
+          normalized: this.toJsonRecord(normalized),
+          validation: this.toJsonRecord(validation),
+          persisted: false,
+          action: 'skipped',
+          message: `마감된 정책: ${normalized.endsAt}`,
+        }),
+      );
+
+      return {
+        rawDocumentId: rawDoc.id,
+        runId: expiredRun.id,
+        persisted: false,
+        action: 'skipped',
+        message: expiredRun.message,
+        policy: null,
+        validation,
+        normalizationMeta: {
+          confidence: normalizedResult.confidence,
+          usedLlmFallback: normalizedResult.usedLlmFallback,
+        },
+      };
+    }
+
     const scope = this.evaluateMvpScope(raw.source, normalized.categories, normalized.regionCodes);
     if (!scope.isInScope) {
       const deactivatedPolicyId = await this.deactivateExistingOutOfScopePolicy(
@@ -161,6 +190,7 @@ export class PipelineIngestionService {
       maxAge: normalized.maxAge,
       startsAt: normalized.startsAt,
       endsAt: normalized.endsAt,
+      isAlwaysOpen: normalized.isAlwaysOpen,
       extraMeta: {
         ...(existing?.extraMeta ?? {}),
         ...(normalized.extraMeta ?? {}),
@@ -222,6 +252,33 @@ export class PipelineIngestionService {
       skipped: results.filter((item) => item.action === 'skipped').length,
       items: results,
     };
+  }
+
+  async deactivateExpiredPolicies(): Promise<{ deactivated: number }> {
+    const today = new Date().toISOString().slice(0, 10);
+    const active = await this.policyRepository.find({
+      where: { status: PolicyStatus.ACTIVE },
+    });
+
+    let deactivated = 0;
+    for (const policy of active) {
+      if (this.isExpired(policy.endsAt)) {
+        policy.status = PolicyStatus.INACTIVE;
+        await this.policyRepository.save(policy);
+        deactivated++;
+      }
+    }
+
+    return { deactivated };
+  }
+
+  private isExpired(endsAt: string | null): boolean {
+    if (!endsAt) return false;
+    const endDate = new Date(endsAt);
+    if (isNaN(endDate.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return endDate < today;
   }
 
   private toJsonRecord(input: unknown): Record<string, unknown> {

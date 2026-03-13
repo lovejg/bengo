@@ -5,6 +5,8 @@ export interface RuleCondition {
   op: '=' | '!=' | '>' | '>=' | '<' | '<=' | 'in' | 'contains' | 'region_match';
   value: Primitive | Primitive[];
   message?: string;
+  /** true = 객관적 조건 (취업상태 등), false = 주관적/확인필요 조건 (서류심사, 소득 등) */
+  verifiable?: boolean;
 }
 
 export interface RuleGroup {

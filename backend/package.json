@@ -10,7 +10,8 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test": "jest"
+    "test": "jest",
+    "collect": "curl -s -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp && echo"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

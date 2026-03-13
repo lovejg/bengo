@@ -68,6 +68,9 @@ export class Policy {
   @Column({ type: 'date', nullable: true })
   endsAt!: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  isAlwaysOpen!: boolean;
+
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   extraMeta!: Record<string, unknown>;
 
