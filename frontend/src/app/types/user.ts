@@ -1,10 +1,6 @@
 export type Gender = 'male' | 'female' | 'other' | 'unspecified';
 
-export type RegionCode =
-  | 'seoul'
-  | 'seoul_gangnam'
-  | 'seoul_mapo'
-  | 'seoul_songpa';
+export type RegionCode = 'seoul';
 
 export type InterestCategory = 'youth_policy' | 'childcare_policy';
 

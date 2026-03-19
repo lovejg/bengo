@@ -21,7 +21,7 @@ interface ProfileEditDialogProps {
   onSave: (value: string) => void;
 }
 
-const REGION_OPTIONS = ['서울', '서울 강남구', '서울 마포구', '서울 송파구'];
+const REGION_OPTIONS = ['서울'];
 
 const INTEREST_OPTIONS = [
   { value: 'youth_policy', label: '청년정책' },

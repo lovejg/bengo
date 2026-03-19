@@ -4,9 +4,10 @@ export interface PolicyMetaRowProps {
   agency?: string;
   region?: string;
   period?: string;
+  periodClassName?: string;
 }
 
-export function PolicyMetaRow({ agency, region, period }: PolicyMetaRowProps) {
+export function PolicyMetaRow({ agency, region, period, periodClassName }: PolicyMetaRowProps) {
   return (
     <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--muted-foreground)]">
       {agency && (
@@ -22,7 +23,7 @@ export function PolicyMetaRow({ agency, region, period }: PolicyMetaRowProps) {
         </div>
       )}
       {period && (
-        <div className="flex items-center gap-1.5">
+        <div className={`flex items-center gap-1.5${periodClassName ? ` ${periodClassName}` : ''}`}>
           <Calendar className="h-4 w-4" />
           <span>{period}</span>
         </div>
