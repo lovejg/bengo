@@ -20,10 +20,7 @@ interface ExpandableFiltersProps {
 
 const regionOptions = [
   { id: 'all', label: '전체' },
-  { id: 'seoul', label: '서울 전체' },
-  { id: 'seoul_gangnam', label: '서울 강남구' },
-  { id: 'seoul_mapo', label: '서울 마포구' },
-  { id: 'seoul_songpa', label: '서울 송파구' },
+  { id: 'seoul', label: '서울' },
 ];
 
 const ageOptions = [

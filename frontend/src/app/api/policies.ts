@@ -27,6 +27,13 @@ export function getPoliciesRecommended(params: GetPoliciesParams = {}) {
 export function getPolicyDetail(id: string) {
   return apiRequest<PolicyDetail>(`/policies/${id}`, {
     method: 'GET',
+    auth: false,
+  });
+}
+
+export function getPolicyDetailWithUser(id: string) {
+  return apiRequest<PolicyDetail>(`/policies/${id}/my`, {
+    method: 'GET',
     auth: true,
   });
 }

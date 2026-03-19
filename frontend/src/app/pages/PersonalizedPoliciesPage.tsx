@@ -45,7 +45,6 @@ export function PersonalizedPoliciesPage() {
 
       try {
         const response = await getPoliciesRecommended({
-          regionCode: currentUser.regionCode,
           interest: currentUser.interests.length > 0 ? currentUser.interests[0] : undefined,
           sortBy: 'relevance',
           order: 'desc',
