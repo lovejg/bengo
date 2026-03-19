@@ -35,6 +35,9 @@ export function Footer() {
         </div>
         
         <div className="mt-8 pt-8 border-t border-[var(--border)]">
+          <p className="text-xs text-[var(--muted-foreground)] leading-relaxed mb-3">
+            벵고에서 제공하는 정책 정보는 참고용이에요. 신청 전에는 반드시 공식 기관에서 최신 내용을 확인해 주세요.
+          </p>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs text-[var(--muted-foreground)]">
             <p className="leading-relaxed">
               데이터 출처: SSIS, 온통청년, 서울청년몽땅, 각 지자체 웹사이트

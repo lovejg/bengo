@@ -8,6 +8,7 @@ import { MockSeoulCollector } from './collectors/mock-seoul.collector';
 import { SeoulOpenApiCollector } from './collectors/seoul-open-api.collector';
 import { YouthcenterCenterCollector } from './collectors/youthcenter-center.collector';
 import { YouthcenterPolicyCollector } from './collectors/youthcenter-policy.collector';
+import { YouthSeoulCollector } from './collectors/youth-seoul.collector';
 import { PolicyCollector } from './interfaces/policy-collector.interface';
 import { RawPolicyDocument } from './interfaces/raw-policy.interface';
 
@@ -42,6 +43,7 @@ export class PipelineCollectionService {
     private readonly youthcenterPolicyCollector: YouthcenterPolicyCollector,
     private readonly youthcenterCenterCollector: YouthcenterCenterCollector,
     private readonly seoulOpenApiCollector: SeoulOpenApiCollector,
+    private readonly youthSeoulCollector: YouthSeoulCollector,
   ) {
     this.collectors = [
       this.mockSeoulCollector,
@@ -49,6 +51,7 @@ export class PipelineCollectionService {
       this.youthcenterPolicyCollector,
       this.youthcenterCenterCollector,
       this.seoulOpenApiCollector,
+      this.youthSeoulCollector,
     ];
   }
 

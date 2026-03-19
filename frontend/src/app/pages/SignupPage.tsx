@@ -7,15 +7,10 @@ import { ApiClientError } from '../api/client';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import { Chip } from '../components/atoms/Chip';
-import type { Gender, InterestCategory, RegionCode } from '../types';
+import type { Gender, InterestCategory } from '../types';
 
 const CURRENT_YEAR = 2026;
 
-const regionCodeMap: Record<string, RegionCode> = {
-  강남: 'seoul_gangnam',
-  마포: 'seoul_mapo',
-  송파: 'seoul_songpa',
-};
 
 const interestCategoryMap: Record<string, InterestCategory> = {
   청년정책: 'youth_policy',
@@ -33,17 +28,11 @@ export function SignupPage() {
     gender: '',
     email: '',
     password: '',
-    region: '',
+    region: 'seoul',
     interests: ['청년정책'],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const regions = [
-    { id: '강남', label: '강남구' },
-    { id: '마포', label: '마포구' },
-    { id: '송파', label: '송파구' },
-  ];
 
   const interests = [
     { id: '청년정책', label: '청년정책', enabled: true },
@@ -75,17 +64,6 @@ export function SignupPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const validateStep2 = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.region) {
-      newErrors.region = '지역을 선택해주세요';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleNext = () => {
     if (validateStep1()) {
       setStep(2);
@@ -94,33 +72,31 @@ export function SignupPage() {
   };
 
   const handleSubmit = async () => {
-    if (validateStep2()) {
-      setLoading(true);
-      try {
-        const birthYear = parseInt(formData.birthYear, 10);
-        const regionCode = regionCodeMap[formData.region];
-        const interests = formData.interests
-          .map((interest) => interestCategoryMap[interest])
-          .filter(Boolean) as InterestCategory[];
-        const age = Math.max(0, CURRENT_YEAR - birthYear);
+    setLoading(true);
+    try {
+      const birthYear = parseInt(formData.birthYear, 10);
+      const regionCode = 'seoul' as const;
+      const interestList = formData.interests
+        .map((interest) => interestCategoryMap[interest])
+        .filter(Boolean) as InterestCategory[];
+      const age = Math.max(0, CURRENT_YEAR - birthYear);
 
-        await signup({
-          email: formData.email,
-          password: formData.password,
-          age,
-          gender: (formData.gender || 'unspecified') as Gender,
-          regionCode,
-          interests,
-        });
+      await signup({
+        email: formData.email,
+        password: formData.password,
+        age,
+        gender: (formData.gender || 'unspecified') as Gender,
+        regionCode,
+        interests: interestList,
+      });
 
-        toast.success('회원가입이 완료되었습니다.');
-        navigate('/policies');
-      } catch (error) {
-        const message = error instanceof ApiClientError ? error.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
-        toast.error(message);
-      } finally {
-        setLoading(false);
-      }
+      toast.success('회원가입이 완료되었습니다.');
+      navigate('/policies');
+    } catch (error) {
+      const message = error instanceof ApiClientError ? error.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -237,20 +213,7 @@ export function SignupPage() {
             <div className="space-y-6">
               <div>
                 <label className="block mb-3">거주 지역</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {regions.map((region) => (
-                    <Chip
-                      key={region.id}
-                      selected={formData.region === region.id}
-                      onClick={() => setFormData({ ...formData, region: region.id })}
-                    >
-                      {region.label}
-                    </Chip>
-                  ))}
-                </div>
-                {errors.region && (
-                  <p className="mt-2 text-sm text-[var(--destructive)]">{errors.region}</p>
-                )}
+                <Chip selected>서울</Chip>
               </div>
 
               <div>

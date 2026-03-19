@@ -26,6 +26,7 @@ export interface PolicyListItem {
   maxAge: number | null;
   startsAt: string | null;
   endsAt: string | null;
+  isAlwaysOpen: boolean;
   fitScore?: number | null;
   userState?: UserPolicyState | null;
 }
@@ -66,6 +67,7 @@ export interface PolicyDetail {
   sourceUrl?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  isAlwaysOpen?: boolean;
   minAge?: number | null;
   maxAge?: number | null;
   requirements?: PolicyRequirement[];
@@ -91,7 +93,6 @@ export interface EligibilityResponse {
   reasons: string[];
   explanation: string;
   policy: EligibilityPolicySummary;
-  unverifiedConditions: string[];
   checkedAt: string;
 }
 

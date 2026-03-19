@@ -16,6 +16,8 @@ export interface LlmExtractedCondition {
   op: RuleCondition['op'];
   value: RuleCondition['value'];
   message: string;
+  /** true = 객관적 조건 (취업상태 선택 등), false = 주관적/확인필요 (서류심사, 소득확인 등) */
+  verifiable: boolean;
 }
 
 /** LLM 추출 결과 전체 */
@@ -28,7 +30,7 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
 
 ## 규칙
 
-1. 정책 텍스트에서 **사용자에게 질문하여 판별 가능한 자격 조건**만 추출하세요.
+1. 정책 텍스트에서 **모든 자격 조건**을 추출하세요. 사용자에게 질문하여 판별할 수 있는 조건이면 전부 포함합니다.
 2. 나이(age), 거주지역(region), 성별(gender)은 이미 별도 시스템에서 처리하므로 **절대 추출하지 마세요**.
 3. 각 조건을 아래 JSON 형식으로 구조화하세요.
 
@@ -43,9 +45,14 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
   "fact": "answers.{key} (예: answers.employmentStatus)",
   "op": "= | != | > | >= | < | <= | in",
   "value": "조건 값 (op이 in이면 배열)",
-  "message": "조건 미충족 시 사용자에게 보여줄 메시지"
+  "message": "조건 미충족 시 사용자에게 보여줄 메시지",
+  "verifiable": true 또는 false
 }
 \`\`\`
+
+## verifiable 기준
+- \`true\`: 사용자 답변만으로 명확히 판별 가능한 객관적 조건 (예: 취업 상태, 학력, 대학 재학 여부)
+- \`false\`: 사용자가 "예"라고 답해도 최종적으로 기관 심사/서류 확인이 필요한 주관적 조건 (예: 소득 기준, 서류 심사, 자산 기준, 가점 항목)
 
 ## op 설명
 - \`=\`: 정확히 일치
@@ -54,7 +61,7 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
 - \`>\`, \`>=\`, \`<\`, \`<=\`: 숫자 비교
 
 ## conditionalHints
-자동 판별이 불가능한 조건(서류 심사, 면접, 선착순, 주관적 기준 등)은 conditionalHints 배열에 한국어 텍스트로 넣으세요.
+어떤 조건으로도 구조화할 수 없는 안내사항(선착순, 면접 필수 등)만 넣으세요. 가능하면 conditions로 추출하고, 정말 질문으로 만들 수 없는 것만 여기에 넣으세요.
 
 ## 출력 형식 (반드시 이 JSON만 출력)
 
@@ -239,6 +246,8 @@ export class LlmRuleExtractorService {
         ? obj.options.filter((o): o is string => typeof o === 'string')
         : null;
 
+    const verifiable = obj.verifiable !== false;
+
     return {
       key,
       label,
@@ -248,6 +257,7 @@ export class LlmRuleExtractorService {
       op: op as RuleCondition['op'],
       value: obj.value as RuleCondition['value'],
       message,
+      verifiable,
     };
   }
 }

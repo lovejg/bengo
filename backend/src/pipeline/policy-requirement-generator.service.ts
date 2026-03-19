@@ -124,6 +124,7 @@ export class PolicyRequirementGeneratorService {
             op: c.op,
             value: c.value,
             message: c.message,
+            verifiable: c.verifiable,
           })),
         },
         conditionalHints: llmResult.conditionalHints,

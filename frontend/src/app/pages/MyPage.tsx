@@ -34,9 +34,6 @@ interface EditFormState {
 
 const REGION_OPTIONS: { value: string; label: string }[] = [
   { value: 'seoul', label: '서울' },
-  { value: 'seoul_gangnam', label: '서울 강남구' },
-  { value: 'seoul_mapo', label: '서울 마포구' },
-  { value: 'seoul_songpa', label: '서울 송파구' },
 ];
 
 const INTEREST_OPTIONS: { value: string; label: string }[] = [
@@ -46,9 +43,6 @@ const INTEREST_OPTIONS: { value: string; label: string }[] = [
 
 const regionLabels: Record<string, string> = {
   seoul: '서울',
-  seoul_gangnam: '서울 강남구',
-  seoul_mapo: '서울 마포구',
-  seoul_songpa: '서울 송파구',
 };
 
 const interestLabels: Record<string, string> = {
@@ -82,6 +76,7 @@ function mapSavedPolicy(item: MyPolicyItem, detail: PolicyDetail): SavedPolicy {
     maxAge: detail.maxAge ?? null,
     startsAt: detail.startsAt ?? null,
     endsAt: detail.endsAt ?? null,
+    isAlwaysOpen: detail.isAlwaysOpen ?? false,
     fitScore: null,
     userState: item.state,
     bookmarked: item.state === 'saved',

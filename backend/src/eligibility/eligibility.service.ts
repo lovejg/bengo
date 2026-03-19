@@ -9,13 +9,12 @@ interface EligibilityEvalInput {
   profile: UserProfile;
   answers: Record<string, unknown>;
   rule?: RuleDefinition;
-  /** 자동 판별 불가능한 조건 텍스트 목록 (예: "선정기준: ...", "취업상태 조건: ...") */
-  unverifiedConditions?: string[];
 }
 
 interface RuleEvalResult {
   passed: boolean;
   reasons: string[];
+  hasUnverifiable: boolean;
 }
 
 export interface EligibilityEvaluation {
@@ -39,6 +38,8 @@ export class EligibilityService {
         explanation: this.makeExplanation(EligibilityResult.INELIGIBLE, reasons),
       };
     }
+
+    let hasUnverifiable = false;
 
     if (input.rule) {
       const facts = {
@@ -66,29 +67,11 @@ export class EligibilityService {
         };
       }
 
-      if (input.rule.conditionalHints && input.rule.conditionalHints.length > 0) {
-        return {
-          result: EligibilityResult.CONDITIONAL,
-          reasons: input.rule.conditionalHints,
-          explanation: this.makeExplanation(
-            EligibilityResult.CONDITIONAL,
-            input.rule.conditionalHints,
-          ),
-        };
-      }
-    }
+      hasUnverifiable = ruleResult.hasUnverifiable;
 
-    const unverified = input.unverifiedConditions ?? [];
-    if (unverified.length > 0) {
-      const conditionalReasons = [
-        '아래 조건은 자동 확인이 불가하여 공식 공고문에서 직접 확인이 필요합니다.',
-        ...unverified,
-      ];
-      return {
-        result: EligibilityResult.CONDITIONAL,
-        reasons: conditionalReasons,
-        explanation: this.makeExplanation(EligibilityResult.CONDITIONAL, conditionalReasons),
-      };
+      if (input.rule.conditionalHints && input.rule.conditionalHints.length > 0) {
+        hasUnverifiable = true;
+      }
     }
 
     const hasAnyVerifiableData =
@@ -98,21 +81,26 @@ export class EligibilityService {
       input.rule != null;
 
     if (!hasAnyVerifiableData) {
-      const limitedReasons = [
-        '이 정책의 상세 자격 조건을 자동으로 확인할 수 없습니다. 공식 공고문에서 직접 확인해주세요.',
-      ];
       return {
         result: EligibilityResult.CONDITIONAL,
-        reasons: limitedReasons,
-        explanation: this.makeExplanation(EligibilityResult.CONDITIONAL, limitedReasons),
+        reasons: [
+          '이 정책의 상세 자격 조건을 자동으로 확인할 수 없습니다. 공식 공고문에서 직접 확인해주세요.',
+        ],
+        explanation: this.makeExplanation(EligibilityResult.CONDITIONAL, [
+          '이 정책의 상세 자격 조건을 자동으로 확인할 수 없습니다. 공식 공고문에서 직접 확인해주세요.',
+        ]),
       };
     }
 
-    if (reasons.length > 0) {
+    if (hasUnverifiable) {
+      const conditionalReasons =
+        input.rule?.conditionalHints && input.rule.conditionalHints.length > 0
+          ? input.rule.conditionalHints
+          : ['일부 조건은 최종 심사를 통해 확인됩니다.'];
       return {
         result: EligibilityResult.CONDITIONAL,
-        reasons,
-        explanation: this.makeExplanation(EligibilityResult.CONDITIONAL, reasons),
+        reasons: conditionalReasons,
+        explanation: this.makeExplanation(EligibilityResult.CONDITIONAL, conditionalReasons),
       };
     }
 
@@ -153,6 +141,7 @@ export class EligibilityService {
     return {
       passed: reasons.length === 0,
       reasons,
+      hasUnverifiable: false,
     };
   }
 
@@ -162,9 +151,11 @@ export class EligibilityService {
   ): RuleEvalResult {
     if (this.isCondition(node)) {
       const passed = this.evaluateCondition(node, facts);
+      const isUnverifiable = node.verifiable === false;
       return {
         passed,
         reasons: passed ? [] : [node.message ?? `${node.fact} 조건을 충족하지 못했습니다.`],
+        hasUnverifiable: passed && isUnverifiable,
       };
     }
 
@@ -174,6 +165,7 @@ export class EligibilityService {
       return {
         passed: failed.length === 0,
         reasons: failed.flatMap((item) => item.reasons),
+        hasUnverifiable: evaluated.some((item) => item.hasUnverifiable),
       };
     }
 
@@ -183,12 +175,14 @@ export class EligibilityService {
       return {
         passed,
         reasons: passed ? [] : evaluated.flatMap((item) => item.reasons),
+        hasUnverifiable: passed && evaluated.some((item) => item.hasUnverifiable),
       };
     }
 
     return {
       passed: true,
       reasons: [],
+      hasUnverifiable: false,
     };
   }
 
@@ -220,7 +214,6 @@ export class EligibilityService {
         if (!Array.isArray(actual)) return false;
         return actual.some((value) => value === expected);
       }
-      // region_match: SEOUL 정책이 서울 내 모든 구 사용자에게 매칭되도록 처리
       case 'region_match': {
         const userRegion = String(actual) as RegionCode;
         const policyRegions = Array.isArray(expected) ? expected : [expected];
@@ -255,7 +248,7 @@ export class EligibilityService {
     }
 
     if (result === EligibilityResult.CONDITIONAL) {
-      return `기본 조건(나이/지역)은 충족하지만, 직접 확인이 필요한 조건이 있습니다. ${reasons.join(' ')}`;
+      return `기본 조건은 충족하지만, 최종 심사를 통해 확인되는 조건이 있습니다. ${reasons.join(' ')}`;
     }
 
     return `현재 입력 정보로는 신청이 어렵습니다. 사유: ${reasons.join(' ')}`;

@@ -139,6 +139,16 @@ export class PipelineController {
     return this.enrichmentService.enrichActivePolicies();
   }
 
+  @Post('deactivate-expired')
+  @ApiOperation({
+    summary: '마감된 정책 비활성화',
+    description: 'endsAt이 오늘 이전인 활성 정책을 INACTIVE로 변경합니다.',
+  })
+  @ApiOkResponse({ description: '비활성화 결과' })
+  deactivateExpired() {
+    return this.ingestionService.deactivateExpiredPolicies();
+  }
+
   @Post('collect-and-ingest/:source')
   @ApiOperation({
     summary: '수집기 실행 후 배치 적재',

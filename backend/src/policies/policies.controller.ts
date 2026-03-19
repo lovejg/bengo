@@ -52,11 +52,18 @@ export class PoliciesController {
   }
 
   @Get('policies/:id')
+  @ApiOperation({ summary: '정책 상세 조회 (공개, 로그인 불필요)' })
+  @ApiOkResponse({ description: '정책 상세' })
+  getPolicyDetailPublic(@Param('id', ParseUUIDPipe) id: string) {
+    return this.policiesService.getPolicyDetailPublic(id);
+  }
+
+  @Get('policies/:id/my')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '정책 상세 조회' })
-  @ApiOkResponse({ description: '정책 상세' })
-  getPolicyDetail(
+  @ApiOperation({ summary: '정책 상세 + 내 상태/판별이력 조회' })
+  @ApiOkResponse({ description: '정책 상세 (사용자 정보 포함)' })
+  getPolicyDetailWithUser(
     @CurrentUser() user: JwtUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {

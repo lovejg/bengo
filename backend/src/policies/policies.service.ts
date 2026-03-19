@@ -114,6 +114,7 @@ export class PoliciesService {
         maxAge: policy.maxAge,
         startsAt: policy.startsAt,
         endsAt: policy.endsAt,
+        isAlwaysOpen: policy.isAlwaysOpen,
       })),
     };
 
@@ -218,6 +219,59 @@ export class PoliciesService {
     return response;
   }
 
+  async getPolicyDetailPublic(policyId: string) {
+    const policy = await this.policyRepository.findOne({
+      where: { id: policyId, status: PolicyStatus.ACTIVE },
+      relations: ['requirements'],
+    });
+
+    if (!policy) {
+      throw new NotFoundException('정책을 찾을 수 없습니다.');
+    }
+
+    if (!this.isPolicyInMvpScope(policy)) {
+      throw new NotFoundException('정책을 찾을 수 없습니다.');
+    }
+
+    const extra = (policy.extraMeta ?? {}) as Record<string, unknown>;
+
+    return {
+      id: policy.id,
+      code: policy.code,
+      title: policy.title,
+      shortDescription: policy.shortDescription,
+      description: policy.description,
+      providerName: policy.providerName,
+      sourceUrl: policy.sourceUrl,
+      applicationUrl: policy.applicationUrl,
+      applicationMethod: policy.applicationMethod,
+      searchUrl: this.buildSearchUrl(policy),
+      categories: policy.categories,
+      regionCodes: policy.regionCodes,
+      minAge: policy.minAge,
+      maxAge: policy.maxAge,
+      targetGenders: policy.targetGenders,
+      startsAt: policy.startsAt,
+      endsAt: policy.endsAt,
+      isAlwaysOpen: policy.isAlwaysOpen,
+      requirements: policy.requirements
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((requirement) => ({
+          key: requirement.key,
+          label: requirement.label,
+          description: requirement.description,
+          type: requirement.type,
+          isRequired: requirement.isRequired,
+          options: requirement.options,
+        })),
+      eligibilityInfo: {
+        supportContent: (extra.supportContent as string) ?? null,
+        selectionCriteria: (extra.selectionCriteria as string) ?? null,
+        applicationDeadline: (extra.applicationDeadline as string) ?? null,
+      },
+    };
+  }
+
   async getPolicyDetail(userId: string, policyId: string) {
     const policy = await this.policyRepository.findOne({
       where: { id: policyId, status: PolicyStatus.ACTIVE },
@@ -253,6 +307,7 @@ export class PoliciesService {
       sourceUrl: policy.sourceUrl,
       applicationUrl: policy.applicationUrl,
       applicationMethod: policy.applicationMethod,
+      searchUrl: this.buildSearchUrl(policy),
       categories: policy.categories,
       regionCodes: policy.regionCodes,
       minAge: policy.minAge,
@@ -260,6 +315,7 @@ export class PoliciesService {
       targetGenders: policy.targetGenders,
       startsAt: policy.startsAt,
       endsAt: policy.endsAt,
+      isAlwaysOpen: policy.isAlwaysOpen,
       requirements: policy.requirements
         .sort((a, b) => a.displayOrder - b.displayOrder)
         .map((requirement) => ({
@@ -330,25 +386,11 @@ export class PoliciesService {
       order: { version: 'DESC' },
     });
 
-    // 자동 판별 불가능한 조건 수집
-    const unverifiedConditions: string[] = [];
-    const extra = (policy.extraMeta ?? {}) as Record<string, unknown>;
-    if (typeof extra.selectionCriteria === 'string' && extra.selectionCriteria.trim()) {
-      unverifiedConditions.push(`선정기준: ${extra.selectionCriteria.slice(0, 100)}`);
-    }
-    if (typeof extra.employmentStatus === 'string' && extra.employmentStatus.trim()) {
-      unverifiedConditions.push(`취업상태 조건: ${extra.employmentStatus.slice(0, 100)}`);
-    }
-    if (typeof extra.educationReq === 'string' && extra.educationReq.trim()) {
-      unverifiedConditions.push(`학력 조건: ${extra.educationReq.slice(0, 100)}`);
-    }
-
     const evaluated = this.eligibilityService.evaluate({
       policy,
       profile,
       answers,
       rule: activeRule?.definition,
-      unverifiedConditions,
     });
 
     const savedCheck = await this.eligibilityCheckRepository.save(
@@ -373,7 +415,6 @@ export class PoliciesService {
         applicationMethod: policy.applicationMethod,
         sourceUrl: policy.sourceUrl,
       },
-      unverifiedConditions,
       checkedAt: savedCheck.createdAt,
     };
   }
@@ -457,6 +498,11 @@ export class PoliciesService {
       throw new NotFoundException('저장된 정책이 없습니다.');
     }
     await this.userPolicyStateRepository.remove(existing);
+  }
+
+  private buildSearchUrl(policy: Policy): string {
+    const query = encodeURIComponent(`${policy.title} 신청`);
+    return `https://search.naver.com/search.naver?query=${query}`;
   }
 
   private isPolicyAvailableForProfile(

@@ -15,6 +15,7 @@ export const MVP_DEFAULT_BATCH_SOURCES = [
   'data-go-kr',
   'youthcenter-policy',
   'seoul-open-api',
+  'youth-seoul',
 ] as const;
 
 export interface MvpScopeResult {

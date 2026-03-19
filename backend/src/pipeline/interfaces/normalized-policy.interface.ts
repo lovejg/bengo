@@ -16,5 +16,6 @@ export interface NormalizedPolicyDocument {
   maxAge: number | null;
   startsAt: string | null;
   endsAt: string | null;
+  isAlwaysOpen: boolean;
   extraMeta: Record<string, unknown>;
 }

@@ -49,6 +49,7 @@ export class PolicyNormalizationService {
 
     const { minAge, maxAge } = this.extractAgeRange(text, meta);
     const { startsAt, endsAt } = this.extractDateRange(text, meta);
+    const isAlwaysOpen = this.detectAlwaysOpen(text, meta);
     const regionCodes = this.extractRegionCodes(raw, text);
 
     const categories: InterestCategory[] = [];
@@ -83,6 +84,7 @@ export class PolicyNormalizationService {
       maxAge,
       startsAt,
       endsAt,
+      isAlwaysOpen,
       extraMeta: {
         originalSource: raw.source,
         fetchedAt: raw.fetchedAt,
@@ -101,6 +103,29 @@ export class PolicyNormalizationService {
         metadata: meta,
       },
     };
+  }
+
+  private detectAlwaysOpen(
+    text: string,
+    meta: Record<string, unknown>,
+  ): boolean {
+    const candidates = [
+      meta.applicationDeadline,
+      meta.applicationPeriod,
+    ].filter((v): v is string => typeof v === 'string');
+
+    const alwaysOpenPatterns = ['상시', '연중', '수시'];
+    for (const value of candidates) {
+      if (alwaysOpenPatterns.some((p) => value.includes(p))) {
+        return true;
+      }
+    }
+
+    if (alwaysOpenPatterns.some((p) => text.includes(`${p}신청`) || text.includes(`${p}모집`) || text.includes(`${p} 접수`))) {
+      return true;
+    }
+
+    return false;
   }
 
   private extractAgeRange(
