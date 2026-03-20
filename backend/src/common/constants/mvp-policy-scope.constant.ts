@@ -14,7 +14,6 @@ export const MVP_EXCLUDED_SOURCES = ['youthcenter-center'];
 export const MVP_DEFAULT_BATCH_SOURCES = [
   'data-go-kr',
   'youthcenter-policy',
-  'seoul-open-api',
   'youth-seoul',
 ] as const;
 
