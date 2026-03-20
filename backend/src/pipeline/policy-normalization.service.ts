@@ -112,6 +112,7 @@ export class PolicyNormalizationService {
     const candidates = [
       meta.applicationDeadline,
       meta.applicationPeriod,
+      meta.operatingPeriod,
     ].filter((v): v is string => typeof v === 'string');
 
     const alwaysOpenPatterns = ['상시', '연중', '수시'];
@@ -121,7 +122,9 @@ export class PolicyNormalizationService {
       }
     }
 
-    if (alwaysOpenPatterns.some((p) => text.includes(`${p}신청`) || text.includes(`${p}모집`) || text.includes(`${p} 접수`))) {
+    // 본문에서도 상시 관련 키워드 탐지 (조합 없이 단독으로도 매칭)
+    const combined = `${text} ${candidates.join(' ')}`;
+    if (alwaysOpenPatterns.some((p) => combined.includes(p))) {
       return true;
     }
 
@@ -192,47 +195,131 @@ export class PolicyNormalizationService {
     text: string,
     meta: Record<string, unknown>,
   ): { startsAt: string | null; endsAt: string | null } {
-    // 우선순위 1: applicationPeriod (YYYYMMDD ~ YYYYMMDD 형식, 온통청년 aplyYmd)
-    const periodStr = String(meta.applicationPeriod ?? '');
-    const periodMatch = periodStr.match(
-      /(\d{4})(\d{2})(\d{2})\s*[~～\-]\s*(\d{4})(\d{2})(\d{2})/,
-    );
-    if (periodMatch) {
-      return {
-        startsAt: `${periodMatch[1]}-${periodMatch[2]}-${periodMatch[3]}`,
-        endsAt: `${periodMatch[4]}-${periodMatch[5]}-${periodMatch[6]}`,
-      };
+    // 메타데이터 후보 필드들을 순서대로 시도
+    const metaCandidates = [
+      meta.applicationPeriod,
+      meta.applicationDeadline,
+      meta.operatingPeriod,
+    ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+
+    for (const candidate of metaCandidates) {
+      const parsed = this.parseDateRange(candidate);
+      if (parsed) return parsed;
     }
 
-    // 우선순위 2: 본문 텍스트 정규식
-    const patterns = [
-      /(20\d{2}-\d{2}-\d{2})\s*[~～\-]\s*(20\d{2}-\d{2}-\d{2})/,
-      /(20\d{2}\.\d{1,2}\.\d{1,2})\s*[~～\-]\s*(20\d{2}\.\d{1,2}\.\d{1,2})/,
-      /(20\d{2}년\s*\d{1,2}월\s*\d{1,2}일)\s*[~～\-]\s*(20\d{2}년\s*\d{1,2}월\s*\d{1,2}일)/,
-    ];
-
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match) {
-        return {
-          startsAt: this.normalizeDate(match[1]),
-          endsAt: this.normalizeDate(match[2]),
-        };
-      }
-    }
+    // 본문 텍스트에서 시도
+    const textParsed = this.parseDateRange(text);
+    if (textParsed) return textParsed;
 
     return { startsAt: null, endsAt: null };
   }
 
-  private normalizeDate(dateStr: string): string {
-    const cleaned = dateStr
-      .replace(/년\s*/g, '-')
-      .replace(/월\s*/g, '-')
-      .replace(/일/g, '')
-      .replace(/\./g, '-')
-      .trim();
-    const parts = cleaned.split('-').map((p) => p.trim().padStart(2, '0'));
-    return parts.join('-');
+  private parseDateRange(
+    input: string,
+  ): { startsAt: string; endsAt: string } | null {
+    // YYYYMMDD ~ YYYYMMDD (온통청년 aplyYmd)
+    const compactMatch = input.match(
+      /(\d{4})(\d{2})(\d{2})\s*[~～\-]\s*(\d{4})(\d{2})(\d{2})/,
+    );
+    if (compactMatch) {
+      return {
+        startsAt: `${compactMatch[1]}-${compactMatch[2]}-${compactMatch[3]}`,
+        endsAt: `${compactMatch[4]}-${compactMatch[5]}-${compactMatch[6]}`,
+      };
+    }
+
+    // 텍스트 정리: 요일, 시간, 부가 텍스트 제거
+    const cleaned = input
+      .replace(/\([월화수목금토일]\)/g, '')  // (금) 등 제거
+      .replace(/\d{1,2}:\d{2}/g, '')          // 10:00 등 제거
+      .replace(/년\s*/g, '.')                  // 년 → .
+      .replace(/월\s*/g, '.')                  // 월 → .
+      .replace(/일/g, '')                      // 일 제거
+      .replace(/[※(].*$/g, '');               // ※이후, ()이후 부가설명 제거
+
+    // "~" 또는 "～"로 분리
+    const sepMatch = cleaned.match(/(.+?)\s*[~～]\s*(.+)/);
+    if (!sepMatch) return null;
+
+    const startPart = sepMatch[1].trim();
+    const endPart = sepMatch[2].trim();
+
+    const startDate = this.extractDateComponents(startPart);
+    if (!startDate) return null;
+
+    let endDate = this.extractDateComponents(endPart);
+    if (!endDate) return null;
+
+    // 종료일에 연도가 없으면 시작일 연도 사용 (예: "2023.5 ~ 12")
+    if (!endDate.year && startDate.year) {
+      endDate = { ...endDate, year: startDate.year };
+    }
+
+    if (!startDate.year || !endDate.year) return null;
+
+    const startsAt = this.buildDateString(startDate.year, startDate.month, startDate.day, 'start');
+    const endsAt = this.buildDateString(endDate.year, endDate.month, endDate.day, 'end');
+
+    if (!startsAt || !endsAt) return null;
+    return { startsAt, endsAt };
+  }
+
+  private extractDateComponents(
+    text: string,
+  ): { year: string | null; month: string | null; day: string | null } | null {
+    const cleaned = text.replace(/[^0-9.\-/]/g, '').trim();
+    if (!cleaned) return null;
+
+    // 구분자로 분리 (.  -  /)
+    const parts = cleaned
+      .split(/[.\-/]/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    if (parts.length === 0) return null;
+
+    // 4자리 = 연도, 1~2자리 = 월 또는 일
+    if (parts.length >= 3) {
+      return { year: parts[0], month: parts[1], day: parts[2] };
+    }
+    if (parts.length === 2) {
+      if (parts[0].length === 4) {
+        return { year: parts[0], month: parts[1], day: null };
+      }
+      return { year: null, month: parts[0], day: parts[1] };
+    }
+    // 단일 숫자
+    if (parts[0].length === 4) {
+      return { year: parts[0], month: null, day: null };
+    }
+    return { year: null, month: parts[0], day: null };
+  }
+
+  private buildDateString(
+    year: string,
+    month: string | null,
+    day: string | null,
+    position: 'start' | 'end',
+  ): string | null {
+    const y = Number(year);
+    if (!Number.isFinite(y) || y < 2000 || y > 2100) return null;
+
+    if (!month) return null;
+    const m = Number(month);
+    if (!Number.isFinite(m) || m < 1 || m > 12) return null;
+
+    let d: number;
+    if (day) {
+      d = Number(day);
+      if (!Number.isFinite(d) || d < 1 || d > 31) {
+        d = position === 'start' ? 1 : new Date(y, m, 0).getDate();
+      }
+    } else {
+      // 일자 없으면: 시작일은 1일, 종료일은 말일
+      d = position === 'start' ? 1 : new Date(y, m, 0).getDate();
+    }
+
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
 
   private extractRegionCodes(

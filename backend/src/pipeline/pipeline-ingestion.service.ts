@@ -105,6 +105,14 @@ export class PipelineIngestionService {
     const normalized = normalizedResult.normalized;
 
     if (this.isExpired(normalized.endsAt)) {
+      const deactivatedPolicyId = await this.deactivateExistingExpiredPolicy(
+        normalized.code,
+        normalized.endsAt!,
+      );
+      const expiredMessage = deactivatedPolicyId
+        ? `마감된 정책: ${normalized.endsAt} (기존 정책 ${deactivatedPolicyId} 비활성화)`
+        : `마감된 정책: ${normalized.endsAt}`;
+
       const expiredRun = await this.runRepository.save(
         this.runRepository.create({
           rawDocumentId: rawDoc.id,
@@ -113,7 +121,7 @@ export class PipelineIngestionService {
           validation: this.toJsonRecord(validation),
           persisted: false,
           action: 'skipped',
-          message: `마감된 정책: ${normalized.endsAt}`,
+          message: expiredMessage,
         }),
       );
 
@@ -310,6 +318,30 @@ export class PipelineIngestionService {
       pipeline: {
         ...((existing.extraMeta?.pipeline as Record<string, unknown>) ?? {}),
         mvpOutOfScopeAt: new Date().toISOString(),
+      },
+    };
+    const saved = await this.policyRepository.save(existing);
+    return saved.id;
+  }
+
+  private async deactivateExistingExpiredPolicy(
+    code: string,
+    endsAt: string,
+  ): Promise<string | null> {
+    const existing = await this.policyRepository.findOne({
+      where: { code, status: PolicyStatus.ACTIVE },
+    });
+    if (!existing) {
+      return null;
+    }
+
+    existing.status = PolicyStatus.INACTIVE;
+    existing.extraMeta = {
+      ...(existing.extraMeta ?? {}),
+      pipeline: {
+        ...((existing.extraMeta?.pipeline as Record<string, unknown>) ?? {}),
+        expiredAt: endsAt,
+        deactivatedAt: new Date().toISOString(),
       },
     };
     const saved = await this.policyRepository.save(existing);

@@ -190,9 +190,11 @@ export class YouthSeoulCollector implements PolicyCollector {
     const etc = detail.etc;
 
     const providerName = overview['주관 기관'] ?? (item.type === 'ct' ? '서울특별시' : '서울시 자치구');
+    const detailPageUrl = `${BASE_URL}/infoData/plcyInfo/view.do?key=${LIST_KEY}&plcyBizId=${item.id}`;
     const sourceUrl = this.extractUrl(appMethod['신청 사이트'])
       ?? this.extractUrl(etc['참고 사이트1'])
-      ?? this.extractUrl(overview['관련 사이트']);
+      ?? this.extractUrl(overview['관련 사이트'])
+      ?? detailPageUrl;
 
     const bodyParts = [
       overview['정책 소개'],
