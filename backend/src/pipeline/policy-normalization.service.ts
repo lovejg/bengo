@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InterestCategory } from '../common/enums/interest-category.enum';
+import { PolicyType } from '../common/enums/policy-type.enum';
 import { RegionCode } from '../common/enums/region-code.enum';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { RawPolicyDocument } from './interfaces/raw-policy.interface';
@@ -50,7 +51,9 @@ export class PolicyNormalizationService {
     const { minAge, maxAge } = this.extractAgeRange(text, meta);
     const { startsAt, endsAt } = this.extractDateRange(text, meta);
     const isAlwaysOpen = this.detectAlwaysOpen(text, meta);
+    const periodRaw = this.extractPeriodRaw(meta);
     const regionCodes = this.extractRegionCodes(raw, text);
+    const policyType = this.classifyPolicyType(raw.title, raw.body);
 
     const categories: InterestCategory[] = [];
     if (YOUTH_KEYWORDS.some((kw) => text.includes(kw))) {
@@ -85,6 +88,8 @@ export class PolicyNormalizationService {
       startsAt,
       endsAt,
       isAlwaysOpen,
+      periodRaw,
+      policyType,
       extraMeta: {
         originalSource: raw.source,
         fetchedAt: raw.fetchedAt,
@@ -128,7 +133,30 @@ export class PolicyNormalizationService {
       return true;
     }
 
+    // 조건부/개인일정 기반 → 상시로 간주
+    const conditionalPatterns = [
+      /입주\s*\(?\s*예정\s*\)?\s*일/,       // 입주(예정)일 기준
+      /전까지\s*(방문\s*)?신청/,             // ~전까지 방문신청
+      /매년/,                               // 매년상반기, 매년 등
+      /접수기관별\s*상이/,                   // 접수기관별 상이
+    ];
+    for (const value of candidates) {
+      if (conditionalPatterns.some((p) => p.test(value))) {
+        return true;
+      }
+    }
+
     return false;
+  }
+
+  private extractPeriodRaw(meta: Record<string, unknown>): string | null {
+    const candidates = [
+      meta.applicationPeriod,
+      meta.applicationDeadline,
+      meta.operatingPeriod,
+    ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+
+    return candidates[0]?.trim() ?? null;
   }
 
   private extractAgeRange(
@@ -320,6 +348,32 @@ export class PolicyNormalizationService {
     }
 
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  private classifyPolicyType(title: string, body: string): PolicyType {
+    const text = `${title} ${body}`;
+
+    // 안내형(INFO) 키워드: 센터 운영, 시설 운영, 홍보, 제작·배포 등
+    const infoPatterns = [
+      /센터\s*(설치\s*)?운영/,
+      /시설\s*운영/,
+      /카페\s*운영/,
+      /홍보활동/,
+      /제작\s*(및\s*)?배포/,
+      /위원회\s*운영/,
+      /네트워크\s*운영/,
+      /기자단\s*운영/,
+      /정보\s*제공/,
+      /플랫폼\s*운영/,
+    ];
+
+    for (const pattern of infoPatterns) {
+      if (pattern.test(title)) {
+        return PolicyType.INFO;
+      }
+    }
+
+    return PolicyType.APPLICATION;
   }
 
   private extractRegionCodes(

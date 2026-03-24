@@ -170,7 +170,12 @@ export class YouthSeoulCollector implements PolicyCollector {
           // 링크가 있으면 href 추출
           const link = td.find('a[href]').first();
           const href = link.length ? link.attr('href') : null;
-          const text = td.text().trim().replace(/\s+/g, ' ');
+          // <br>, <p>, <li> 등을 줄바꿈으로 변환 후 텍스트 추출
+          td.find('br').replaceWith('\n');
+          td.find('p, li, div').each((_, el) => {
+            $(el).prepend('\n');
+          });
+          const text = td.text().trim().replace(/[^\S\n]+/g, ' ').replace(/\n\s*\n/g, '\n');
 
           if (text || href) {
             sections[sectionKey][key] =

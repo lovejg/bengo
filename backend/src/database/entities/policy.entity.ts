@@ -9,6 +9,7 @@ import {
 import { Gender } from '../../common/enums/gender.enum';
 import { InterestCategory } from '../../common/enums/interest-category.enum';
 import { PolicyStatus } from '../../common/enums/policy-status.enum';
+import { PolicyType } from '../../common/enums/policy-type.enum';
 import { RegionCode } from '../../common/enums/region-code.enum';
 import { EligibilityCheck } from './eligibility-check.entity';
 import { PolicyRequirement } from './policy-requirement.entity';
@@ -47,6 +48,9 @@ export class Policy {
   @Column({ type: 'enum', enum: PolicyStatus, default: PolicyStatus.ACTIVE })
   status!: PolicyStatus;
 
+  @Column({ type: 'enum', enum: PolicyType, default: PolicyType.APPLICATION })
+  policyType!: PolicyType;
+
   @Column({ type: 'enum', enum: InterestCategory, array: true, default: '{}' })
   categories!: InterestCategory[];
 
@@ -70,6 +74,9 @@ export class Policy {
 
   @Column({ type: 'boolean', default: false })
   isAlwaysOpen!: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  periodRaw!: string | null;
 
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   extraMeta!: Record<string, unknown>;

@@ -199,6 +199,8 @@ export class PipelineIngestionService {
       startsAt: normalized.startsAt,
       endsAt: normalized.endsAt,
       isAlwaysOpen: normalized.isAlwaysOpen,
+      periodRaw: normalized.periodRaw,
+      policyType: normalized.policyType,
       extraMeta: {
         ...(existing?.extraMeta ?? {}),
         ...(normalized.extraMeta ?? {}),
