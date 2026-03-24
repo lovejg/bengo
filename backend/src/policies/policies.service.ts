@@ -115,6 +115,8 @@ export class PoliciesService {
         startsAt: policy.startsAt,
         endsAt: policy.endsAt,
         isAlwaysOpen: policy.isAlwaysOpen,
+        periodRaw: policy.periodRaw,
+        policyType: policy.policyType,
       })),
     };
 

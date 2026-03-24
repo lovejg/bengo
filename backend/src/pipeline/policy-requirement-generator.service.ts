@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuestionType } from '../common/enums/question-type.enum';
+import { PolicyType } from '../common/enums/policy-type.enum';
 import { RuleDefinition } from '../common/interfaces/rule-expression.interface';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
@@ -12,6 +13,8 @@ export class PolicyRequirementGeneratorService {
   private readonly logger = new Logger(PolicyRequirementGeneratorService.name);
 
   constructor(
+    @InjectRepository(Policy)
+    private readonly policyRepository: Repository<Policy>,
     @InjectRepository(PolicyRequirement)
     private readonly requirementRepository: Repository<PolicyRequirement>,
     @InjectRepository(PolicyRule)
@@ -49,7 +52,7 @@ export class PolicyRequirementGeneratorService {
     }
 
     const employmentStatus = normalized.extraMeta?.employmentStatus;
-    if (typeof employmentStatus === 'string' && employmentStatus.trim()) {
+    if (typeof employmentStatus === 'string' && employmentStatus.trim() && !this.isUnrestricted(employmentStatus)) {
       displayOrder += 1;
       requirements.push({
         policyId: policy.id,
@@ -64,7 +67,7 @@ export class PolicyRequirementGeneratorService {
     }
 
     const educationReq = normalized.extraMeta?.educationReq;
-    if (typeof educationReq === 'string' && educationReq.trim()) {
+    if (typeof educationReq === 'string' && educationReq.trim() && !this.isUnrestricted(educationReq)) {
       displayOrder += 1;
       requirements.push({
         policyId: policy.id,
@@ -79,7 +82,7 @@ export class PolicyRequirementGeneratorService {
     }
 
     const selectionCriteria = normalized.extraMeta?.selectionCriteria;
-    if (typeof selectionCriteria === 'string' && selectionCriteria.trim()) {
+    if (typeof selectionCriteria === 'string' && selectionCriteria.trim() && !this.isUnrestricted(selectionCriteria)) {
       displayOrder += 1;
       requirements.push({
         policyId: policy.id,
@@ -93,9 +96,15 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
-    const llmResult = await this.llmExtractor.extractRules(policy, normalized);
+    // INFO 타입 정책은 자격 조건 추출 불필요 (summary만 생성)
+    const isInfoPolicy = normalized.policyType === PolicyType.INFO;
+    const llmResult = await this.llmExtractor.extractRules(
+      policy,
+      normalized,
+      isInfoPolicy,
+    );
 
-    if (llmResult && llmResult.conditions.length > 0) {
+    if (!isInfoPolicy && llmResult && llmResult.conditions.length > 0) {
       const existingKeys = new Set(requirements.map((r) => r.key));
 
       for (const condition of llmResult.conditions) {
@@ -145,6 +154,27 @@ export class PolicyRequirementGeneratorService {
       );
     }
 
+    // LLM이 감지한 나이 정보로 보완 (수집기가 나이를 못 가져온 경우)
+    if (llmResult?.detectedAge && (policy.minAge === null && policy.maxAge === null)) {
+      const { minAge, maxAge } = llmResult.detectedAge;
+      if (minAge !== null || maxAge !== null) {
+        policy.minAge = minAge;
+        policy.maxAge = maxAge;
+        this.logger.log(
+          `Policy ${policy.code}: LLM detected age ${minAge}~${maxAge} (collector missed)`,
+        );
+      }
+    }
+
+    if (llmResult?.summary) {
+      policy.shortDescription = llmResult.summary;
+    }
+
+    // 나이 또는 summary가 변경된 경우 한 번만 저장
+    if (llmResult?.summary || llmResult?.detectedAge) {
+      await this.policyRepository.save(policy);
+    }
+
     if (requirements.length === 0) {
       return;
     }
@@ -152,6 +182,12 @@ export class PolicyRequirementGeneratorService {
     await this.requirementRepository.save(
       requirements.map((r) => this.requirementRepository.create(r)),
     );
+  }
+
+  private isUnrestricted(value: string): boolean {
+    const normalized = value.trim().replace(/\s+/g, '');
+    const patterns = ['제한없음', '무관', '제한없는', '-', '해당없음'];
+    return patterns.some((p) => normalized === p);
   }
 
   private buildAgeDescription(

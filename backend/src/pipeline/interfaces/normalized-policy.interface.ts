@@ -1,4 +1,5 @@
 import { InterestCategory } from '../../common/enums/interest-category.enum';
+import { PolicyType } from '../../common/enums/policy-type.enum';
 import { RegionCode } from '../../common/enums/region-code.enum';
 
 export interface NormalizedPolicyDocument {
@@ -17,5 +18,7 @@ export interface NormalizedPolicyDocument {
   startsAt: string | null;
   endsAt: string | null;
   isAlwaysOpen: boolean;
+  periodRaw: string | null;
+  policyType: PolicyType;
   extraMeta: Record<string, unknown>;
 }
