@@ -3,8 +3,13 @@
 
 curl -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp
 청년 몽땅 때문에 따로 쓰는 명령어인데 나중에 합치고 그럴 예정
+정확히 설명하자면 정책 데이터를 새롭게 크롤링(크롤러 수정되거나 했을 때 하면 되는 것)
 LLM rule 추출 때문에 시간이 좀 걸리니까(길면 5~10분...?) 서버 키고 명령어 입력해두고 대기하다가 프론트 확인해보면 됨
 
 
-이거는 이제 코드 로직 수정됐을 때 씀. 아마 이거만 해도 될건데 깔끔하게 두 개 다 하는 게 나을 듯...
 curl -X POST http://localhost:4000/pipeline/regenerate-rules
+이거는 이제 코드 로직 수정됐을 때 씀.
+정확히 설명하자면 기존 정책 규칙 초기화하고 다시 만들기
+얘도 한 5~10분 정도 걸립니다
+
+순서는 collect-and-ingest-mvp 먼저 하고 regenerate-rules 하는 겁니다(웬만하면 둘 다 하는 게 좋을거 같네요)

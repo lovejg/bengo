@@ -26,6 +26,8 @@ export interface LlmExtractionResult {
   conditionalHints: string[];
   summary: string | null;
   detectedAge: { minAge: number | null; maxAge: number | null } | null;
+  policyType: 'application' | 'info' | null;
+  detectedPeriod: string | null;
 }
 
 const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건을 분석하여 구조화된 JSON으로 추출하는 전문가입니다.
@@ -98,6 +100,17 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
 나이/연령 조건이 본문에 언급되어 있으면 minAge, maxAge를 숫자로 추출하세요. 없으면 null.
 (나이는 conditions에 넣지 말고 이 필드에만 넣으세요)
 
+## policyType
+정책의 유형을 판단하세요:
+- \`"application"\`: **신청형 정책** — 개인이 직접 신청하여 혜택을 받는 정책 (지원금, 장학금, 바우처, 취업지원, 주거지원, 교육프로그램 등)
+- \`"info"\`: **안내형 정보** — 개인이 신청하는 것이 아닌, 시설/센터 운영, 홍보, 행사, 인프라 구축, 위원회 운영, 정보 제공 등
+
+## detectedPeriod
+본문에서 신청/모집/운영 기간 정보를 판단하세요:
+- \`"always"\`: 상시 운영/모집 (연중, 수시, 기간 제한 없음 등)
+- 특정 시기 텍스트: "매년 상반기", "예산 소진 시까지", "3월, 9월 모집", "접수기관별 상이" 등 원문 그대로 짧게 요약
+- \`null\`: 기간 정보를 전혀 판단할 수 없는 경우
+
 ## 출력 형식 (반드시 이 JSON만 출력)
 
 \`\`\`json
@@ -105,7 +118,9 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
   "conditions": [...],
   "conditionalHints": [],
   "summary": "1~2문장 요약",
-  "detectedAge": { "minAge": null, "maxAge": null }
+  "detectedAge": { "minAge": null, "maxAge": null },
+  "policyType": "application" 또는 "info",
+  "detectedPeriod": "always" 또는 "기간 텍스트" 또는 null
 }
 \`\`\`
 
@@ -114,12 +129,23 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
 const SUMMARY_ONLY_PROMPT = `정책의 핵심 내용을 **1~2문장, 80자 이내**로 요약하세요.
 누구를 대상으로 무엇을 지원/제공하는지 간결하게 작성합니다.
 
+policyType을 판단하세요:
+- "application": 개인이 직접 신청하여 혜택을 받는 정책
+- "info": 시설/센터 운영, 홍보, 행사, 인프라 구축, 정보 제공 등
+
+detectedPeriod: 본문에서 기간 정보를 판단하세요:
+- "always": 상시 운영/모집
+- 특정 시기 텍스트 (예: "매년 상반기")
+- null: 판단 불가
+
 출력 형식 (반드시 이 JSON만 출력):
 \`\`\`json
 {
   "conditions": [],
   "conditionalHints": [],
-  "summary": "1~2문장 요약"
+  "summary": "1~2문장 요약",
+  "policyType": "application" 또는 "info",
+  "detectedPeriod": "always" 또는 "기간 텍스트" 또는 null
 }
 \`\`\`
 JSON 외 다른 텍스트는 출력하지 마세요.`;
@@ -244,6 +270,8 @@ export class LlmRuleExtractorService {
         conditionalHints?: unknown[];
         summary?: unknown;
         detectedAge?: unknown;
+        policyType?: unknown;
+        detectedPeriod?: unknown;
       };
 
       const conditions: LlmExtractedCondition[] = [];
@@ -277,7 +305,15 @@ export class LlmRuleExtractorService {
         }
       }
 
-      return { conditions, conditionalHints, summary, detectedAge };
+      const policyType = (parsed.policyType === 'application' || parsed.policyType === 'info')
+        ? parsed.policyType
+        : null;
+
+      const detectedPeriod = typeof parsed.detectedPeriod === 'string'
+        ? parsed.detectedPeriod.trim()
+        : null;
+
+      return { conditions, conditionalHints, summary, detectedAge, policyType, detectedPeriod };
     } catch (error) {
       this.logger.warn(
         `Failed to parse LLM response: ${error instanceof Error ? error.message : String(error)}`,
@@ -300,8 +336,10 @@ export class LlmRuleExtractorService {
     if (!key || !label || !fact || !op) return null;
 
     // age/region/gender는 base conditions에서 처리하므로 제외
-    const excludedKeys = new Set(['age', 'region', 'regionCode', 'gender']);
+    const excludedKeys = new Set(['age', 'region', 'regionCode', 'gender', 'residenceRegion', 'residence']);
     if (excludedKeys.has(key)) return null;
+    // 거주지 관련 key를 다양한 이름으로 우회하는 경우도 제외
+    if (/residen|거주|지역/.test(key.toLowerCase())) return null;
 
     // fact는 answers.{key} 형태여야 함
     if (!fact.startsWith('answers.')) return null;

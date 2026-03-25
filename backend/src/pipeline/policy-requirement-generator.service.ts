@@ -8,7 +8,6 @@ import { RuleDefinition } from '../common/interfaces/rule-expression.interface';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { LlmRuleExtractorService } from './llm-rule-extractor.service';
-import { PolicyNormalizationService } from './policy-normalization.service';
 
 @Injectable()
 export class PolicyRequirementGeneratorService {
@@ -22,7 +21,6 @@ export class PolicyRequirementGeneratorService {
     @InjectRepository(PolicyRule)
     private readonly ruleRepository: Repository<PolicyRule>,
     private readonly llmExtractor: LlmRuleExtractorService,
-    private readonly normalizationService: PolicyNormalizationService,
   ) {}
 
   async regenerateAll(): Promise<{ total: number; processed: number; failed: number }> {
@@ -51,17 +49,29 @@ export class PolicyRequirementGeneratorService {
 
     for (const policy of policies) {
       try {
-        // RawPolicyDocument 형태로 변환하여 normalization 재수행
-        const normalized = this.normalizationService.normalize({
-          source: (policy.extraMeta?.pipeline as Record<string, unknown>)?.source as string ?? 'unknown',
-          sourceUrl: policy.sourceUrl ?? undefined,
+        // DB에 저장된 policy 데이터로 NormalizedPolicyDocument 구성
+        const normalized: NormalizedPolicyDocument = {
+          code: policy.code,
           title: policy.title,
-          body: policy.description ?? '',
-          fetchedAt: new Date().toISOString(),
-          metadata: policy.extraMeta ?? {},
-        });
+          shortDescription: policy.shortDescription ?? '',
+          description: policy.description ?? '',
+          providerName: policy.providerName ?? '',
+          sourceUrl: policy.sourceUrl ?? null,
+          applicationUrl: policy.applicationUrl ?? null,
+          applicationMethod: policy.applicationMethod ?? null,
+          categories: policy.categories ?? [],
+          regionCodes: policy.regionCodes ?? [],
+          minAge: policy.minAge,
+          maxAge: policy.maxAge,
+          startsAt: policy.startsAt,
+          endsAt: policy.endsAt,
+          isAlwaysOpen: policy.isAlwaysOpen,
+          periodRaw: policy.periodRaw ?? null,
+          policyType: policy.policyType,
+          extraMeta: policy.extraMeta ?? {},
+        };
 
-        await this.generateForPolicy(policy, normalized.normalized);
+        await this.generateForPolicy(policy, normalized);
         processed++;
       } catch (error) {
         failed++;
@@ -88,6 +98,18 @@ export class PolicyRequirementGeneratorService {
         const summaryResult = await this.llmExtractor.extractRules(policy, normalized, true);
         if (summaryResult?.summary) {
           policy.shortDescription = summaryResult.summary;
+        }
+        if (summaryResult?.policyType) {
+          policy.policyType = summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+        }
+        if (summaryResult?.detectedPeriod && !policy.isAlwaysOpen && !policy.startsAt && !policy.endsAt) {
+          if (summaryResult.detectedPeriod === 'always') {
+            policy.isAlwaysOpen = true;
+          } else {
+            policy.periodRaw = summaryResult.detectedPeriod;
+          }
+        }
+        if (summaryResult?.summary || summaryResult?.policyType || summaryResult?.detectedPeriod) {
           await this.policyRepository.save(policy);
         }
       }
@@ -230,8 +252,21 @@ export class PolicyRequirementGeneratorService {
       policy.shortDescription = llmResult.summary;
     }
 
-    // 나이 또는 summary가 변경된 경우 한 번만 저장
-    if (llmResult?.summary || llmResult?.detectedAge) {
+    if (llmResult?.policyType) {
+      policy.policyType = llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+    }
+
+    // 기간 정보가 없는 경우에만 LLM 결과로 보완
+    if (llmResult?.detectedPeriod && !policy.isAlwaysOpen && !policy.startsAt && !policy.endsAt) {
+      if (llmResult.detectedPeriod === 'always') {
+        policy.isAlwaysOpen = true;
+      } else {
+        policy.periodRaw = llmResult.detectedPeriod;
+      }
+    }
+
+    // 변경된 필드가 있으면 한 번만 저장
+    if (llmResult?.summary || llmResult?.detectedAge || llmResult?.policyType || llmResult?.detectedPeriod) {
       await this.policyRepository.save(policy);
     }
 
