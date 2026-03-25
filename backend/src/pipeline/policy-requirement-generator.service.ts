@@ -3,10 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuestionType } from '../common/enums/question-type.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
+import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RuleDefinition } from '../common/interfaces/rule-expression.interface';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { LlmRuleExtractorService } from './llm-rule-extractor.service';
+import { PolicyNormalizationService } from './policy-normalization.service';
 
 @Injectable()
 export class PolicyRequirementGeneratorService {
@@ -20,7 +22,55 @@ export class PolicyRequirementGeneratorService {
     @InjectRepository(PolicyRule)
     private readonly ruleRepository: Repository<PolicyRule>,
     private readonly llmExtractor: LlmRuleExtractorService,
+    private readonly normalizationService: PolicyNormalizationService,
   ) {}
+
+  async regenerateAll(): Promise<{ total: number; processed: number; failed: number }> {
+    // 1. 기존 requirements + LLM rules 전부 삭제
+    const deletedReqs = await this.requirementRepository.delete({});
+    const deletedRules = await this.ruleRepository.delete({ notes: 'LLM auto-extracted' });
+    this.logger.log(
+      `Cleared ${deletedReqs.affected} requirements, ${deletedRules.affected} LLM rules`,
+    );
+
+    // 2. 모든 활성 정책에 대해 재생성
+    const policies = await this.policyRepository.find({
+      where: { status: PolicyStatus.ACTIVE },
+    });
+
+    // shortDescription도 초기화 (LLM 요약 재생성을 위해)
+    for (const p of policies) {
+      p.shortDescription = p.description?.slice(0, 120) ?? '';
+    }
+    await this.policyRepository.save(policies);
+
+    let processed = 0;
+    let failed = 0;
+
+    for (const policy of policies) {
+      try {
+        // RawPolicyDocument 형태로 변환하여 normalization 재수행
+        const normalized = this.normalizationService.normalize({
+          source: (policy.extraMeta?.pipeline as Record<string, unknown>)?.source as string ?? 'unknown',
+          sourceUrl: policy.sourceUrl ?? undefined,
+          title: policy.title,
+          body: policy.description ?? '',
+          fetchedAt: new Date().toISOString(),
+          metadata: policy.extraMeta ?? {},
+        });
+
+        await this.generateForPolicy(policy, normalized.normalized);
+        processed++;
+      } catch (error) {
+        failed++;
+        this.logger.error(
+          `Failed to regenerate for ${policy.code}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return { total: policies.length, processed, failed };
+  }
 
   async generateForPolicy(
     policy: Policy,
@@ -31,6 +81,14 @@ export class PolicyRequirementGeneratorService {
       where: { policyId: policy.id },
     });
     if (existingCount > 0) {
+      // summary가 없으면 LLM summaryOnly 호출
+      if (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120)) {
+        const summaryResult = await this.llmExtractor.extractRules(policy, normalized, true);
+        if (summaryResult?.summary) {
+          policy.shortDescription = summaryResult.summary;
+          await this.policyRepository.save(policy);
+        }
+      }
       return;
     }
 

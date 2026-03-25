@@ -4,3 +4,7 @@
 curl -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp
 청년 몽땅 때문에 따로 쓰는 명령어인데 나중에 합치고 그럴 예정
 LLM rule 추출 때문에 시간이 좀 걸리니까(길면 5~10분...?) 서버 키고 명령어 입력해두고 대기하다가 프론트 확인해보면 됨
+
+
+이거는 이제 코드 로직 수정됐을 때 씀. 아마 이거만 해도 될건데 깔끔하게 두 개 다 하는 게 나을 듯...
+curl -X POST http://localhost:4000/pipeline/regenerate-rules

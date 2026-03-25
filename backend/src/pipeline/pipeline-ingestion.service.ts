@@ -184,7 +184,9 @@ export class PipelineIngestionService {
       id: existing?.id,
       code: normalized.code,
       title: normalized.title,
-      shortDescription: normalized.shortDescription,
+      shortDescription: (existing?.shortDescription && existing.shortDescription !== existing.description?.slice(0, 120))
+        ? existing.shortDescription
+        : normalized.shortDescription,
       description: normalized.description,
       providerName: normalized.providerName,
       sourceUrl: normalized.sourceUrl,
