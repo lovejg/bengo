@@ -103,7 +103,7 @@ export function Header() {
           </div>
           {isAuthenticated ? (
             <>
-              <Link to="/me" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
+              <Link to="/profile" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
                 <User className="h-4 w-4" aria-hidden="true" />
                 {userName}
               </Link>

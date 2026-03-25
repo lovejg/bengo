@@ -6,6 +6,7 @@ import { PolicyDetailPage } from './pages/PolicyDetailPage';
 import { MyPage } from './pages/MyPage';
 import { HomePage } from './pages/HomePage';
 import { PersonalizedPoliciesPage } from './pages/PersonalizedPoliciesPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 export const router = createBrowserRouter([
   {
@@ -35,5 +36,9 @@ export const router = createBrowserRouter([
   {
     path: '/me',
     Component: MyPage,
+  },
+  {
+    path: '/profile',
+    Component: ProfilePage,
   },
 ]);
