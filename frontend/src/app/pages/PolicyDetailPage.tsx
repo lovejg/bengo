@@ -3,6 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const remarkGfmNoSingleTilde = [remarkGfm, { singleTilde: false }] as any;
 import {
   Bookmark,
   ExternalLink,
@@ -36,6 +39,7 @@ import { EmptyState } from '../components/molecules/EmptyState';
 import { PolicyCard } from '../components/organisms/PolicyCard';
 import type { EligibilityResponse, PolicyDetail as ApiPolicyDetail, PolicyListItem } from '../types';
 import { cn } from '../lib/utils';
+import { CustomSelect } from '../components/atoms/CustomSelect';
 
 const statusLabels: Record<string, string> = {
   recruiting: '모집중',
@@ -129,6 +133,13 @@ export function PolicyDetailPage() {
   const mockViews = useMemo(() => Math.floor(Math.random() * 1500) + 500, []);
 
   useEffect(() => {
+    setEligibilityResult(null);
+    setShowEligibilityForm(false);
+    setEligibilityAnswers({});
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [id]);
+
+  useEffect(() => {
     const loadPolicy = async () => {
       if (!id) { setHasError(true); setIsLoading(false); return; }
       setIsLoading(true);
@@ -193,7 +204,6 @@ export function PolicyDetailPage() {
       const response = await checkEligibility(id, { answers });
       setEligibilityResult(response);
       toast.success('자격 확인이 완료되었습니다');
-      setTimeout(() => { document.getElementById('evidence')?.scrollIntoView({ behavior: 'smooth' }); }, 300);
     } catch (error) {
       const message = error instanceof ApiClientError ? error.message : '자격 확인에 실패했습니다';
       toast.error(message);
@@ -315,6 +325,7 @@ export function PolicyDetailPage() {
               region={policy.regionCodes?.map((code) => regionLabels[code] ?? code).join(', ')}
               period={formatPolicyPeriod(policy.startsAt, policy.endsAt, policy.isAlwaysOpen)}
               periodClassName={!policy.isAlwaysOpen && !(policy.startsAt && policy.endsAt) ? 'text-red-500' : undefined}
+              className="flex-wrap overflow-visible"
             />
 
             {/* 혜택 하이라이트 */}
@@ -324,7 +335,7 @@ export function PolicyDetailPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-blue-500 mb-0.5">지원 혜택</p>
                   <div className="prose prose-sm max-w-none text-blue-900 text-sm">
-                    <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{supportContent}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{supportContent}</ReactMarkdown>
                   </div>
                 </div>
               </div>
@@ -381,7 +392,7 @@ export function PolicyDetailPage() {
                 <h2 className="text-xl font-semibold">요약</h2>
               </div>
               <div className="prose prose-sm max-w-none text-[var(--muted-foreground)]">
-                <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{policy.shortDescription ?? policy.description ?? '요약 정보가 없습니다.'}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{policy.shortDescription ?? policy.description ?? '요약 정보가 없습니다.'}</ReactMarkdown>
               </div>
             </motion.section>
 
@@ -400,7 +411,7 @@ export function PolicyDetailPage() {
                 <h2 className="text-xl font-semibold">지원대상</h2>
               </div>
               <div className="prose prose-sm max-w-none text-[var(--muted-foreground)]">
-                <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{getTargetText(policy)}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{getTargetText(policy)}</ReactMarkdown>
               </div>
             </motion.section>
 
@@ -420,7 +431,7 @@ export function PolicyDetailPage() {
                   <h2 className="text-xl font-semibold">선정기준</h2>
                 </div>
                 <div className="prose prose-sm max-w-none text-[var(--foreground)]">
-                  <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{selectionCriteria}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{selectionCriteria}</ReactMarkdown>
                 </div>
               </motion.section>
             )}
@@ -502,15 +513,11 @@ export function PolicyDetailPage() {
                             {req.isRequired && <span className="text-[var(--destructive)] ml-1">*</span>}
                           </label>
                           {req.type === 'select' && req.options ? (
-                            <select
-                              id={`req-${req.key}`}
-                              className="w-full border border-[var(--border)] rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            <CustomSelect
                               value={eligibilityAnswers[req.key] ?? ''}
-                              onChange={(e) => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: e.target.value }))}
-                            >
-                              <option value="">선택하세요</option>
-                              {req.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
+                              onChange={(v) => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: v }))}
+                              options={req.options.map((opt) => ({ value: opt, label: opt }))}
+                            />
                           ) : req.type === 'boolean' ? (
                             <div className="flex gap-2">
                               {(['true', 'false'] as const).map((val) => (
@@ -625,7 +632,7 @@ export function PolicyDetailPage() {
                     className="bg-[var(--muted)] rounded-xl p-4 hover:bg-amber-50 transition-colors duration-200 border border-transparent hover:border-amber-200"
                   >
                     <div className="prose prose-sm max-w-none mb-2">
-                      <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfm]}>{item.text}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{item.text}</ReactMarkdown>
                     </div>
                     <p className="text-sm text-[var(--muted-foreground)] flex items-center gap-1.5">
                       <FileText className="h-3.5 w-3.5" />출처: {item.source}

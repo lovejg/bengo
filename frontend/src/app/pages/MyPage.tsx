@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { User, MapPin, Sparkles, Edit, Trash2, X } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { getPolicyDetail } from '../api/policies';
 import { ApiClientError, getStoredUserProfile, setStoredUserProfile } from '../api/client';
@@ -10,6 +10,7 @@ import { Button } from '../components/atoms/Button';
 import { Badge } from '../components/atoms/Badge';
 import { Input } from '../components/atoms/Input';
 import { PolicyCard, PolicyCardProps } from '../components/organisms/PolicyCard';
+import { CustomSelect } from '../components/atoms/CustomSelect';
 import { EmptyState } from '../components/molecules/EmptyState';
 import type { MyPolicyItem, PolicyDetail, UserProfileSummary } from '../types';
 
@@ -97,8 +98,17 @@ function mapStoredUserToView(user: UserProfileSummary | null): UserProfileView |
   };
 }
 
+const PAGE_SIZE = 12;
+
 export function MyPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
+
+  const setCurrentPage = (page: number) => {
+    setSearchParams((prev) => { prev.set('page', String(page)); return prev; }, { replace: true });
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [policyToDelete, setPolicyToDelete] = useState<string | null>(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
@@ -265,7 +275,7 @@ export function MyPage() {
 
           <div className="bg-white rounded-xl p-2 mb-6 flex flex-wrap gap-2">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'all' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
@@ -273,7 +283,7 @@ export function MyPage() {
               전체 ({statusCounts.all})
             </button>
             <button
-              onClick={() => setStatusFilter('upcoming')}
+              onClick={() => { setStatusFilter('upcoming'); setCurrentPage(1); }}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'upcoming' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
@@ -281,7 +291,7 @@ export function MyPage() {
               예정 ({statusCounts.upcoming})
             </button>
             <button
-              onClick={() => setStatusFilter('recruiting')}
+              onClick={() => { setStatusFilter('recruiting'); setCurrentPage(1); }}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'recruiting' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
@@ -289,7 +299,7 @@ export function MyPage() {
               모집중 ({statusCounts.recruiting})
             </button>
             <button
-              onClick={() => setStatusFilter('closed')}
+              onClick={() => { setStatusFilter('closed'); setCurrentPage(1); }}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'closed' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
@@ -310,10 +320,11 @@ export function MyPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {filteredPolicies.map((policy) => (
+            <div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {filteredPolicies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((policy) => (
                 <div key={policy.id} className="relative">
-                  <PolicyCard {...policy} />
+                  <PolicyCard {...policy} applicationStatus={!policy.startsAt && !policy.endsAt && !policy.isAlwaysOpen ? undefined : policy.applicationStatus} />
                   <div className="absolute bottom-4 right-4 z-10">
                     <button
                       className="p-2 bg-white/95 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 rounded-xl shadow-sm transition-all duration-200 active:scale-95 backdrop-blur-sm"
@@ -328,25 +339,42 @@ export function MyPage() {
                       <Trash2 className="h-4 w-4 text-gray-500" />
                     </button>
                   </div>
-                  <div className="absolute top-4 right-4 z-10">
-                    <Badge
-                      variant={
-                        policy.applicationStatus === 'closed'
-                          ? 'ineligible'
-                          : policy.applicationStatus === 'recruiting'
-                          ? 'recruiting'
-                          : 'default'
-                      }
-                    >
-                      {policy.applicationStatus === 'upcoming'
-                        ? '예정'
-                        : policy.applicationStatus === 'recruiting'
-                        ? '모집중'
-                        : '마감'}
-                    </Badge>
-                  </div>
+                  {(() => {
+                    const s = policy.isAlwaysOpen ? 'always'
+                      : !policy.endsAt ? null
+                      : new Date(policy.endsAt).getTime() < Date.now() ? 'closed'
+                      : 'recruiting';
+                    const labels = { recruiting: '모집중', always: '상시', closed: '마감' } as const;
+                    return s ? (
+                      <div className="absolute top-4 right-4 z-10">
+                        <Badge variant={s}>{labels[s]}</Badge>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
-              ))}
+                ))}
+              </div>
+              {Math.ceil(filteredPolicies.length / PAGE_SIZE) > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-10">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    이전
+                  </Button>
+                  <span className="text-sm text-[var(--muted-foreground)] px-2">
+                    {currentPage} / {Math.ceil(filteredPolicies.length / PAGE_SIZE)}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setCurrentPage(Math.min(Math.ceil(filteredPolicies.length / PAGE_SIZE), currentPage + 1))}
+                    disabled={currentPage === Math.ceil(filteredPolicies.length / PAGE_SIZE)}
+                  >
+                    다음
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -409,16 +437,11 @@ export function MyPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">지역</label>
-                <select
-                  className="w-full border border-[var(--border)] rounded-xl px-3 py-2 text-sm bg-white"
+                <CustomSelect
                   value={editForm.regionCode}
-                  onChange={(e) => setEditForm((current) => ({ ...current, regionCode: e.target.value }))}
-                >
-                  <option value="">선택하세요</option>
-                  {REGION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setEditForm((current) => ({ ...current, regionCode: v }))}
+                  options={REGION_OPTIONS}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">관심사</label>
