@@ -27,8 +27,10 @@ export class PolicyRequirementGeneratorService {
 
   async regenerateAll(): Promise<{ total: number; processed: number; failed: number }> {
     // 1. 기존 requirements + LLM rules 전부 삭제
-    const deletedReqs = await this.requirementRepository.delete({});
-    const deletedRules = await this.ruleRepository.delete({ notes: 'LLM auto-extracted' });
+    const deletedReqs = await this.requirementRepository.createQueryBuilder()
+      .delete().execute();
+    const deletedRules = await this.ruleRepository.createQueryBuilder()
+      .delete().where('notes = :notes', { notes: 'LLM auto-extracted' }).execute();
     this.logger.log(
       `Cleared ${deletedReqs.affected} requirements, ${deletedRules.affected} LLM rules`,
     );

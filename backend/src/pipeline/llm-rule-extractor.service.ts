@@ -323,7 +323,14 @@ export class LlmRuleExtractorService {
         ? obj.options.filter((o): o is string => typeof o === 'string')
         : null;
 
-    const verifiable = obj.verifiable !== false;
+    // 사용자가 본인 상황을 명확히 알 수 있는 key는 항상 verifiable
+    const alwaysVerifiableKeys = new Set([
+      'householdType', 'employmentStatus', 'educationLevel',
+      'enrollmentStatus', 'isBusinessOwner', 'maritalStatus',
+      'hasDisability', 'militaryStatus', 'numberOfChildren',
+      'housingStatus', 'isStartup',
+    ]);
+    const verifiable = alwaysVerifiableKeys.has(key) || obj.verifiable !== false;
 
     return {
       key,
