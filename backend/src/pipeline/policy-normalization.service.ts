@@ -133,18 +133,19 @@ export class PolicyNormalizationService {
       return true;
     }
 
-    // 조건부/개인일정 기반 → 상시로 간주
-    const conditionalPatterns = [
+    // 조건부/개인일정 기반 → 날짜 없지만 신청 자체는 가능 → 상시로 간주
+    const alwaysOpenConditionalPatterns = [
       /입주\s*\(?\s*예정\s*\)?\s*일/,       // 입주(예정)일 기준
       /전까지\s*(방문\s*)?신청/,             // ~전까지 방문신청
-      /매년/,                               // 매년상반기, 매년 등
-      /접수기관별\s*상이/,                   // 접수기관별 상이
     ];
     for (const value of candidates) {
-      if (conditionalPatterns.some((p) => p.test(value))) {
+      if (alwaysOpenConditionalPatterns.some((p) => p.test(value))) {
         return true;
       }
     }
+
+    // "매년 상반기", "12월중", "접수기관별 상이" 등은 상시가 아님
+    // → isAlwaysOpen=false, periodRaw에 원문 보존하여 프론트에서 그대로 표시
 
     return false;
   }
@@ -156,7 +157,10 @@ export class PolicyNormalizationService {
       meta.operatingPeriod,
     ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
 
-    return candidates[0]?.trim() ?? null;
+    const raw = candidates[0]?.trim() ?? null;
+    // '-'는 의미 없는 값이므로 null 처리
+    if (raw === '-') return null;
+    return raw;
   }
 
   private extractAgeRange(

@@ -212,6 +212,8 @@ export class PoliciesService {
         maxAge: policy.maxAge,
         startsAt: policy.startsAt,
         endsAt: policy.endsAt,
+        isAlwaysOpen: policy.isAlwaysOpen,
+        periodRaw: policy.periodRaw,
         fitScore: policy.fitScore,
         userState: stateMap.get(policy.id)?.state ?? null,
       })),
@@ -256,6 +258,7 @@ export class PoliciesService {
       startsAt: policy.startsAt,
       endsAt: policy.endsAt,
       isAlwaysOpen: policy.isAlwaysOpen,
+      periodRaw: policy.periodRaw,
       requirements: policy.requirements
         .sort((a, b) => a.displayOrder - b.displayOrder)
         .map((requirement) => ({
@@ -318,6 +321,7 @@ export class PoliciesService {
       startsAt: policy.startsAt,
       endsAt: policy.endsAt,
       isAlwaysOpen: policy.isAlwaysOpen,
+      periodRaw: policy.periodRaw,
       requirements: policy.requirements
         .sort((a, b) => a.displayOrder - b.displayOrder)
         .map((requirement) => ({
@@ -484,6 +488,10 @@ export class PoliciesService {
         shortDescription: s.policy.shortDescription,
         providerName: s.policy.providerName,
         categories: s.policy.categories,
+        startsAt: s.policy.startsAt,
+        endsAt: s.policy.endsAt,
+        isAlwaysOpen: s.policy.isAlwaysOpen,
+        periodRaw: s.policy.periodRaw,
         state: s.state,
         note: s.note,
         appliedAt: s.appliedAt,

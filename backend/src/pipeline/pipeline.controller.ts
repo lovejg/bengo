@@ -14,6 +14,7 @@ import {
   PipelineQualityService,
 } from './pipeline-quality.service';
 import { PolicyEnrichmentService } from './policy-enrichment.service';
+import { PolicyRequirementGeneratorService } from './policy-requirement-generator.service';
 
 interface CollectAndIngestMvpResult {
   mode: 'mvp';
@@ -41,6 +42,7 @@ export class PipelineController {
     private readonly collectionService: PipelineCollectionService,
     private readonly qualityService: PipelineQualityService,
     private readonly enrichmentService: PolicyEnrichmentService,
+    private readonly requirementGenerator: PolicyRequirementGeneratorService,
   ) {}
 
   @Get('sources')
@@ -147,6 +149,17 @@ export class PipelineController {
   @ApiOkResponse({ description: '비활성화 결과' })
   deactivateExpired() {
     return this.ingestionService.deactivateExpiredPolicies();
+  }
+
+  @Post('regenerate-rules')
+  @ApiOperation({
+    summary: '모든 활성 정책의 requirements/rules 재생성',
+    description:
+      '기존 requirements와 LLM rules를 삭제하고 현재 로직으로 재생성합니다. shortDescription도 LLM으로 재생성됩니다.',
+  })
+  @ApiOkResponse({ description: '재생성 결과' })
+  async regenerateRules() {
+    return this.requirementGenerator.regenerateAll();
   }
 
   @Post('collect-and-ingest/:source')

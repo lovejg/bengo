@@ -104,6 +104,40 @@ export class PipelineIngestionService {
 
     const normalized = normalizedResult.normalized;
 
+    // 제목에 전전년도 이하 연도가 포함된 정책은 필터링
+    if (this.hasPastYearInTitle(normalized.title)) {
+      const deactivatedPolicyId = await this.deactivateExistingOutOfScopePolicy(normalized.code);
+      const msg = deactivatedPolicyId
+        ? `제목에 과거 연도 포함 (기존 정책 ${deactivatedPolicyId} 비활성화)`
+        : '제목에 과거 연도 포함';
+
+      const skippedRun = await this.runRepository.save(
+        this.runRepository.create({
+          rawDocumentId: rawDoc.id,
+          policyId: null,
+          normalized: this.toJsonRecord(normalized),
+          validation: this.toJsonRecord(validation),
+          persisted: false,
+          action: 'skipped',
+          message: msg,
+        }),
+      );
+
+      return {
+        rawDocumentId: rawDoc.id,
+        runId: skippedRun.id,
+        persisted: false,
+        action: 'skipped',
+        message: msg,
+        policy: null,
+        validation,
+        normalizationMeta: {
+          confidence: normalizedResult.confidence,
+          usedLlmFallback: normalizedResult.usedLlmFallback,
+        },
+      };
+    }
+
     if (this.isExpired(normalized.endsAt)) {
       const deactivatedPolicyId = await this.deactivateExistingExpiredPolicy(
         normalized.code,
@@ -131,6 +165,36 @@ export class PipelineIngestionService {
         persisted: false,
         action: 'skipped',
         message: expiredRun.message,
+        policy: null,
+        validation,
+        normalizationMeta: {
+          confidence: normalizedResult.confidence,
+          usedLlmFallback: normalizedResult.usedLlmFallback,
+        },
+      };
+    }
+
+    // 제목에 과거 연도(전년도 제외)가 포함되면 오래된 정책으로 판단하여 제외
+    const outdatedYear = this.detectOutdatedYear(normalized.title);
+    if (outdatedYear) {
+      const outdatedRun = await this.runRepository.save(
+        this.runRepository.create({
+          rawDocumentId: rawDoc.id,
+          policyId: null,
+          normalized: this.toJsonRecord(normalized),
+          validation: this.toJsonRecord(validation),
+          persisted: false,
+          action: 'skipped',
+          message: `제목에 과거 연도(${outdatedYear}) 포함 — 오래된 정책으로 판단`,
+        }),
+      );
+
+      return {
+        rawDocumentId: rawDoc.id,
+        runId: outdatedRun.id,
+        persisted: false,
+        action: 'skipped',
+        message: outdatedRun.message,
         policy: null,
         validation,
         normalizationMeta: {
@@ -184,7 +248,9 @@ export class PipelineIngestionService {
       id: existing?.id,
       code: normalized.code,
       title: normalized.title,
-      shortDescription: normalized.shortDescription,
+      shortDescription: (existing?.shortDescription && existing.shortDescription !== existing.description?.slice(0, 120))
+        ? existing.shortDescription
+        : normalized.shortDescription,
       description: normalized.description,
       providerName: normalized.providerName,
       sourceUrl: normalized.sourceUrl,
@@ -280,6 +346,28 @@ export class PipelineIngestionService {
     }
 
     return { deactivated };
+  }
+
+  private detectOutdatedYear(title: string): number | null {
+    const currentYear = new Date().getFullYear();
+    const minAllowedYear = currentYear - 1; // 전년도까지 허용
+    const yearMatches = title.match(/\b(20\d{2})\b/g);
+    if (!yearMatches) return null;
+
+    for (const match of yearMatches) {
+      const year = parseInt(match, 10);
+      if (year < minAllowedYear) return year;
+    }
+    return null;
+  }
+
+  private hasPastYearInTitle(title: string): boolean {
+    const currentYear = new Date().getFullYear();
+    const minAllowedYear = currentYear - 1; // 전년도까지 허용
+    const yearMatches = title.match(/\b(20\d{2})\b/g);
+    if (!yearMatches) return false;
+    // 제목에 있는 모든 연도가 전전년도 이하면 필터링
+    return yearMatches.every((y) => parseInt(y, 10) < minAllowedYear);
   }
 
   private isExpired(endsAt: string | null): boolean {

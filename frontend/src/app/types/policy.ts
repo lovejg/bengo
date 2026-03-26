@@ -27,6 +27,7 @@ export interface PolicyListItem {
   startsAt: string | null;
   endsAt: string | null;
   isAlwaysOpen: boolean;
+  periodRaw?: string | null;
   fitScore?: number | null;
   userState?: UserPolicyState | null;
 }
@@ -68,6 +69,7 @@ export interface PolicyDetail {
   startsAt?: string | null;
   endsAt?: string | null;
   isAlwaysOpen?: boolean;
+  periodRaw?: string | null;
   minAge?: number | null;
   maxAge?: number | null;
   requirements?: PolicyRequirement[];

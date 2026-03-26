@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -39,7 +40,33 @@ export function PoliciesPage() {
   const [hasError, setHasError] = useState(false);
   const [policies, setPolicies] = useState<PolicyListItem[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
+  const statusFilter = (searchParams.get('status') as 'recruiting' | 'always' | null) ?? null;
+  const typeFilter = (searchParams.get('type') as 'application' | 'info' | null) ?? null;
+
+  const setStatusFilter = (val: 'recruiting' | 'always' | null | ((prev: 'recruiting' | 'always' | null) => 'recruiting' | 'always' | null)) => {
+    setSearchParams((prev) => {
+      const next = typeof val === 'function' ? val(statusFilter) : val;
+      if (next) prev.set('status', next); else prev.delete('status');
+      prev.set('page', '1');
+      return prev;
+    }, { replace: true });
+  };
+
+  const setTypeFilter = (val: 'application' | 'info' | null | ((prev: 'application' | 'info' | null) => 'application' | 'info' | null)) => {
+    setSearchParams((prev) => {
+      const next = typeof val === 'function' ? val(typeFilter) : val;
+      if (next) prev.set('type', next); else prev.delete('type');
+      prev.set('page', '1');
+      return prev;
+    }, { replace: true });
+  };
+
+  const setCurrentPage = (page: number) => {
+    setSearchParams((prev) => { prev.set('page', String(page)); return prev; }, { replace: true });
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
 
   useEffect(() => {
     const loadPolicies = async () => {
@@ -59,7 +86,6 @@ export function PoliciesPage() {
         });
 
         setPolicies(response.items);
-        setCurrentPage(1);
       } catch (error) {
         setHasError(true);
         const message = error instanceof ApiClientError ? error.message : '정책 목록을 불러오는데 실패했습니다';
@@ -73,10 +99,12 @@ export function PoliciesPage() {
   }, [searchQuery, sortBy, selectedFilters, expandableFilters, reloadKey]);
 
   const handleSearch = async (query: string) => {
+    setCurrentPage(1);
     setSearchQuery(query);
   };
 
   const handleFilterChange = (filters: string[]) => {
+    setCurrentPage(1);
     setSelectedFilters(filters);
     const applied = filters.map((id) => ({
       id,
@@ -174,7 +202,8 @@ export function PoliciesPage() {
       !f.id.startsWith('recruit-')
     );
     setAppliedFilters([...categoryFilters, ...newFilters]);
-    
+    setCurrentPage(1);
+
     if (newFilters.length > 0) {
       toast.success('필터가 적용되었습니다');
     }
@@ -186,6 +215,9 @@ export function PoliciesPage() {
 
   const recruitingCount = policies.filter(p => !p.isAlwaysOpen && p.endsAt && new Date(p.endsAt).getTime() >= Date.now()).length;
   const alwaysOpenCount = policies.filter(p => p.isAlwaysOpen).length;
+  const filteredPolicies = policies
+    .filter(p => !statusFilter || (statusFilter === 'recruiting' ? (!p.isAlwaysOpen && p.endsAt && new Date(p.endsAt).getTime() >= Date.now()) : p.isAlwaysOpen))
+    .filter(p => !typeFilter || (p as any).policyType === typeFilter);
 
   return (
     <MainLayout>
@@ -203,16 +235,16 @@ export function PoliciesPage() {
                 </p>
                 <div className="flex items-center gap-2 text-xs">
                   {recruitingCount > 0 && (
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 font-semibold rounded-full border border-emerald-200">
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'recruiting' ? null : 'recruiting')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'recruiting' ? 'bg-emerald-200 border-emerald-400 text-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                       모집중 {recruitingCount}
-                    </span>
+                    </button>
                   )}
                   {alwaysOpenCount > 0 && (
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 font-semibold rounded-full border border-blue-200">
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'always' ? null : 'always')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'always' ? 'bg-blue-200 border-blue-400 text-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
                       상시 {alwaysOpenCount}
-                    </span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -239,11 +271,27 @@ export function PoliciesPage() {
           </div>
 
           {/* Quick Filters */}
-          <FilterChipGroup
-            filters={quickFilters}
-            selected={selectedFilters}
-            onChange={handleFilterChange}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChipGroup
+              filters={quickFilters}
+              selected={selectedFilters}
+              onChange={handleFilterChange}
+            />
+            <button
+              type="button"
+              onClick={() => setTypeFilter(p => p === 'application' ? null : 'application')}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${typeFilter === 'application' ? 'bg-violet-500 text-white border-violet-500' : 'bg-violet-50 text-violet-700 border-violet-200 hover:opacity-80'}`}
+            >
+              신청형
+            </button>
+            <button
+              type="button"
+              onClick={() => setTypeFilter(p => p === 'info' ? null : 'info')}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${typeFilter === 'info' ? 'bg-orange-500 text-white border-orange-500' : 'bg-orange-50 text-orange-700 border-orange-200 hover:opacity-80'}`}
+            >
+              정보형
+            </button>
+          </div>
 
           {/* Expandable Filters - Toggleable */}
           <AnimatePresence>
@@ -280,9 +328,9 @@ export function PoliciesPage() {
         {!isLoading && !hasError && policies.length > 0 && (
           <div className="mb-6">
             <p className="text-[var(--muted-foreground)]">
-              총 <span className="text-[var(--foreground)] font-semibold">{policies.length}개</span>의 정책
-              {Math.ceil(policies.length / PAGE_SIZE) > 1 && (
-                <span> · {currentPage}/{Math.ceil(policies.length / PAGE_SIZE)} 페이지</span>
+              총 <span className="text-[var(--foreground)] font-semibold">{filteredPolicies.length}개</span>의 정책
+              {Math.ceil(filteredPolicies.length / PAGE_SIZE) > 1 && (
+                <span> · {currentPage}/{Math.ceil(filteredPolicies.length / PAGE_SIZE)} 페이지</span>
               )}
             </p>
           </div>
@@ -319,39 +367,42 @@ export function PoliciesPage() {
             </motion.div>
           )}
 
-          {!isLoading && !hasError && policies.length === 0 && (
+          {!isLoading && !hasError && filteredPolicies.length === 0 && (
             <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
               <EmptyState type="noResult" onAction={handleClearAll} actionLabel="필터 초기화" />
             </motion.div>
           )}
 
-          {!isLoading && !hasError && policies.length > 0 && (
+          {!isLoading && !hasError && filteredPolicies.length > 0 && (
             <motion.div
               key="results"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
+              className="flex flex-col min-h-[800px]"
             >
-              <PolicyList
-                policies={policies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
-                hasMore={false}
-              />
-              {Math.ceil(policies.length / PAGE_SIZE) > 1 && (
+              <div className="flex-1">
+                <PolicyList
+                  policies={filteredPolicies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
+                  hasMore={false}
+                />
+              </div>
+              {Math.ceil(filteredPolicies.length / PAGE_SIZE) > 1 && (
                 <div className="flex items-center justify-center gap-2 mt-10">
                   <Button
                     variant="secondary"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                   >
                     이전
                   </Button>
                   <span className="text-sm text-[var(--muted-foreground)] px-2">
-                    {currentPage} / {Math.ceil(policies.length / PAGE_SIZE)}
+                    {currentPage} / {Math.ceil(filteredPolicies.length / PAGE_SIZE)}
                   </span>
                   <Button
                     variant="secondary"
-                    onClick={() => setCurrentPage((p) => Math.min(Math.ceil(policies.length / PAGE_SIZE), p + 1))}
-                    disabled={currentPage === Math.ceil(policies.length / PAGE_SIZE)}
+                    onClick={() => setCurrentPage(Math.min(Math.ceil(filteredPolicies.length / PAGE_SIZE), currentPage + 1))}
+                    disabled={currentPage === Math.ceil(filteredPolicies.length / PAGE_SIZE)}
                   >
                     다음
                   </Button>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ArrowRight, MapPin, User as UserIcon, LogIn, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPoliciesRecommended } from '../api/policies';
@@ -22,11 +22,20 @@ const regionCodeByLabel: Record<string, string> = Object.fromEntries(
   Object.entries(regionLabels).map(([code, label]) => [label, code]),
 );
 
+const PAGE_SIZE = 12;
+
 export function PersonalizedPoliciesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [personalizedPolicies, setPersonalizedPolicies] = useState<PolicyListItem[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
+
+  const setCurrentPage = (page: number) => {
+    setSearchParams((prev) => { prev.set('page', String(page)); return prev; }, { replace: true });
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
 
   const isAuthenticated = Boolean(getAccessToken() && getStoredUserProfile());
   const user = getStoredUserProfile();
@@ -263,7 +272,35 @@ export function PersonalizedPoliciesPage() {
         )}
 
         {!isLoading && !hasError && personalizedPolicies.length > 0 && (
-          <PolicyList policies={personalizedPolicies} hasMore={false} />
+          <div className="flex flex-col min-h-[800px]">
+            <div className="flex-1">
+              <PolicyList
+                policies={personalizedPolicies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
+                hasMore={false}
+              />
+            </div>
+            {Math.ceil(personalizedPolicies.length / PAGE_SIZE) > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-10">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  이전
+                </Button>
+                <span className="text-sm text-[var(--muted-foreground)] px-2">
+                  {currentPage} / {Math.ceil(personalizedPolicies.length / PAGE_SIZE)}
+                </span>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage(Math.min(Math.ceil(personalizedPolicies.length / PAGE_SIZE), currentPage + 1))}
+                  disabled={currentPage === Math.ceil(personalizedPolicies.length / PAGE_SIZE)}
+                >
+                  다음
+                </Button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </MainLayout>

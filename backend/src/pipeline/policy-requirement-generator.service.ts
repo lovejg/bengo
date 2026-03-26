@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuestionType } from '../common/enums/question-type.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
+import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RuleDefinition } from '../common/interfaces/rule-expression.interface';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
@@ -22,6 +23,70 @@ export class PolicyRequirementGeneratorService {
     private readonly llmExtractor: LlmRuleExtractorService,
   ) {}
 
+  async regenerateAll(): Promise<{ total: number; processed: number; failed: number }> {
+    // 1. 기존 requirements + LLM rules 전부 삭제
+    const deletedReqs = await this.requirementRepository.createQueryBuilder()
+      .delete().execute();
+    const deletedRules = await this.ruleRepository.createQueryBuilder()
+      .delete().where('notes = :notes', { notes: 'LLM auto-extracted' }).execute();
+    this.logger.log(
+      `Cleared ${deletedReqs.affected} requirements, ${deletedRules.affected} LLM rules`,
+    );
+
+    // 2. 모든 활성 정책에 대해 재생성
+    const policies = await this.policyRepository.find({
+      where: { status: PolicyStatus.ACTIVE },
+    });
+
+    // shortDescription 초기화 + periodRaw '-' 정리
+    for (const p of policies) {
+      p.shortDescription = p.description?.slice(0, 120) ?? '';
+      if (p.periodRaw?.trim() === '-') {
+        p.periodRaw = null;
+      }
+    }
+    await this.policyRepository.save(policies);
+
+    let processed = 0;
+    let failed = 0;
+
+    for (const policy of policies) {
+      try {
+        // DB에 저장된 policy 데이터로 NormalizedPolicyDocument 구성
+        const normalized: NormalizedPolicyDocument = {
+          code: policy.code,
+          title: policy.title,
+          shortDescription: policy.shortDescription ?? '',
+          description: policy.description ?? '',
+          providerName: policy.providerName ?? '',
+          sourceUrl: policy.sourceUrl ?? null,
+          applicationUrl: policy.applicationUrl ?? null,
+          applicationMethod: policy.applicationMethod ?? null,
+          categories: policy.categories ?? [],
+          regionCodes: policy.regionCodes ?? [],
+          minAge: policy.minAge,
+          maxAge: policy.maxAge,
+          startsAt: policy.startsAt,
+          endsAt: policy.endsAt,
+          isAlwaysOpen: policy.isAlwaysOpen,
+          periodRaw: policy.periodRaw ?? null,
+          policyType: policy.policyType,
+          extraMeta: policy.extraMeta ?? {},
+        };
+
+        await this.generateForPolicy(policy, normalized);
+        processed++;
+      } catch (error) {
+        failed++;
+        this.logger.error(
+          `Failed to regenerate for ${policy.code}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return { total: policies.length, processed, failed };
+  }
+
   async generateForPolicy(
     policy: Policy,
     normalized: NormalizedPolicyDocument,
@@ -31,6 +96,32 @@ export class PolicyRequirementGeneratorService {
       where: { policyId: policy.id },
     });
     if (existingCount > 0) {
+      // summary가 없으면 LLM summaryOnly 호출
+      if (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120)) {
+        const summaryResult = await this.llmExtractor.extractRules(policy, normalized, true);
+        if (summaryResult?.summary) {
+          policy.shortDescription = summaryResult.summary;
+        }
+        if (summaryResult?.policyType) {
+          policy.policyType = summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+        }
+        const hasPeriod = policy.isAlwaysOpen || policy.startsAt || policy.endsAt;
+        const rawEmpty = !policy.periodRaw || policy.periodRaw.trim() === '-';
+        if (summaryResult?.detectedPeriod && (!hasPeriod || rawEmpty)) {
+          if (summaryResult.detectedPeriod === 'always') {
+            policy.isAlwaysOpen = true;
+            policy.periodRaw = null;
+          } else {
+            policy.periodRaw = summaryResult.detectedPeriod;
+          }
+        }
+        if (policy.isAlwaysOpen && policy.periodRaw?.trim() === '-') {
+          policy.periodRaw = null;
+        }
+        if (summaryResult?.summary || summaryResult?.policyType || summaryResult?.detectedPeriod) {
+          await this.policyRepository.save(policy);
+        }
+      }
       return;
     }
 
@@ -170,8 +261,28 @@ export class PolicyRequirementGeneratorService {
       policy.shortDescription = llmResult.summary;
     }
 
-    // 나이 또는 summary가 변경된 경우 한 번만 저장
-    if (llmResult?.summary || llmResult?.detectedAge) {
+    if (llmResult?.policyType) {
+      policy.policyType = llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+    }
+
+    // 기간 정보가 없거나 '-'인 경우 LLM 결과로 보완
+    const hasMeaningfulPeriod = policy.isAlwaysOpen || policy.startsAt || policy.endsAt;
+    const periodRawIsEmpty = !policy.periodRaw || policy.periodRaw.trim() === '-';
+    if (llmResult?.detectedPeriod && (!hasMeaningfulPeriod || periodRawIsEmpty)) {
+      if (llmResult.detectedPeriod === 'always') {
+        policy.isAlwaysOpen = true;
+        policy.periodRaw = null;
+      } else {
+        policy.periodRaw = llmResult.detectedPeriod;
+      }
+    }
+    // isAlwaysOpen이 true인데 periodRaw가 '-'면 정리
+    if (policy.isAlwaysOpen && policy.periodRaw?.trim() === '-') {
+      policy.periodRaw = null;
+    }
+
+    // 변경된 필드가 있으면 한 번만 저장
+    if (llmResult?.summary || llmResult?.detectedAge || llmResult?.policyType || llmResult?.detectedPeriod) {
       await this.policyRepository.save(policy);
     }
 

@@ -4,8 +4,89 @@ import { Badge } from '../atoms/Badge';
 import { PolicyMetaRow } from '../molecules/PolicyMetaRow';
 import { cn } from '../../lib/utils';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { PolicyListItem } from '../../types';
+
+interface BadgeItem { key: string; label: string; el: React.ReactNode; }
+
+function BadgeRow({ badges }: { badges: BadgeItem[] }) {
+  const measureRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const plusRef = useRef<HTMLSpanElement>(null);
+  const [maxVisible, setMaxVisible] = useState(badges.length);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const container = containerRef.current;
+      const measureEl = measureRef.current;
+      if (!container || !measureEl) return;
+      const spans = Array.from(measureEl.querySelectorAll<HTMLElement>('[data-b]'));
+      const containerW = container.clientWidth;
+      const GAP = 8;
+      const PLUS_W = 28;
+      let w = 0, count = 0;
+      for (let i = 0; i < spans.length; i++) {
+        const sw = spans[i].offsetWidth + (i > 0 ? GAP : 0);
+        if (w + sw + (i === spans.length - 1 ? 0 : PLUS_W + GAP) > containerW) break;
+        w += sw; count++;
+      }
+      setMaxVisible(Math.max(1, count));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [badges.length]);
+
+  const hiddenBadges = badges.slice(maxVisible);
+
+  const showTooltip = () => {
+    const el = plusRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setTooltipPos({ x: rect.right + 8, y: rect.top + rect.height / 2 });
+  };
+
+  const hideTooltip = () => setTooltipPos(null);
+
+  useEffect(() => {
+    const onScroll = () => setTooltipPos(null);
+    window.addEventListener('scroll', onScroll, true);
+    return () => window.removeEventListener('scroll', onScroll, true);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative flex gap-2 mb-3 items-center h-6">
+      <div ref={measureRef} className="absolute invisible flex gap-2 items-center pointer-events-none" aria-hidden="true">
+        {badges.map(b => <span key={b.key} data-b className="flex-shrink-0">{b.el}</span>)}
+      </div>
+      {badges.slice(0, maxVisible).map(b => (
+        <span key={b.key} className="flex-shrink-0">{b.el}</span>
+      ))}
+      {hiddenBadges.length > 0 && (
+        <span
+          ref={plusRef}
+          className="text-xs text-[var(--muted-foreground)] font-medium cursor-default select-none flex-shrink-0"
+          onMouseEnter={showTooltip}
+          onMouseLeave={hideTooltip}
+        >
+          +{hiddenBadges.length}
+        </span>
+      )}
+      {tooltipPos && hiddenBadges.length > 0 && createPortal(
+        <div
+          className="fixed flex flex-col gap-1.5 bg-white border border-[var(--border)] rounded-xl px-3 py-2.5 shadow-lg z-[9999] pointer-events-none whitespace-nowrap"
+          style={{ left: tooltipPos.x, top: tooltipPos.y, transform: 'translateY(-50%)' }}
+        >
+          {hiddenBadges.map(b => <span key={b.key}>{b.el}</span>)}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 export interface PolicyCardProps extends PolicyListItem {
   applicationStatus?: 'upcoming' | 'recruiting' | 'closed';
@@ -21,9 +102,10 @@ const regionLabels: Record<string, string> = {
   seoul_songpa: '서울 송파구',
 };
 
-function formatPolicyPeriod(startsAt: string | null, endsAt: string | null, isAlwaysOpen: boolean): string {
+function formatPolicyPeriod(startsAt: string | null, endsAt: string | null, isAlwaysOpen: boolean, periodRaw?: string | null): string {
   if (isAlwaysOpen) return '상시모집';
   if (startsAt && endsAt) return `${startsAt.slice(0, 10)} ~ ${endsAt.slice(0, 10)}`;
+  if (periodRaw) return periodRaw;
   return '기간확인불가';
 }
 
@@ -67,6 +149,7 @@ export function PolicyCard({
   startsAt,
   endsAt,
   isAlwaysOpen,
+  periodRaw,
   fitScore,
   categories = [],
   bookmarked,
@@ -79,9 +162,9 @@ export function PolicyCard({
   const eligibility = getEligibility(fitScore ?? null);
 
   const borderColors = {
-    recruiting: 'border-emerald-200 hover:border-emerald-400 hover:shadow-emerald-500/15',
-    always: 'border-blue-200 hover:border-blue-400 hover:shadow-blue-500/15',
-    closed: 'border-gray-300 hover:border-gray-400 hover:shadow-gray-500/10',
+    recruiting: 'border-emerald-500 hover:border-emerald-600 hover:shadow-emerald-500/25 bg-emerald-50/40',
+    always: 'border-blue-500 hover:border-blue-600 hover:shadow-blue-500/25 bg-blue-50/40',
+    closed: 'border-gray-500 hover:border-gray-600 hover:shadow-gray-500/20 bg-gray-50/60',
   };
 
   const handleBookmarkClick = (e: React.MouseEvent) => {
@@ -118,9 +201,9 @@ export function PolicyCard({
     <Link to={`/policies/${id}`} className="block h-full">
       <article
         className={cn(
-          'group relative bg-white border rounded-3xl p-6 sm:p-8 h-full flex flex-col',
+          'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col overflow-hidden',
           'shadow-sm hover:shadow-xl',
-          status ? borderColors[status] : 'border-amber-200 hover:border-amber-400 hover:shadow-amber-500/15',
+          status ? borderColors[status] : periodRaw ? 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/40' : 'border-orange-500 hover:border-orange-600 hover:shadow-orange-500/30 bg-orange-100/70',
           'hover:-translate-y-2',
           'transition-all duration-300 ease-out',
           className
@@ -130,35 +213,15 @@ export function PolicyCard({
         <div className="flex-1 flex flex-col">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1">
-            <h3 className="group-hover:text-[var(--accent)] transition-colors duration-200 line-clamp-2 mb-3 leading-snug">
+            <h3 className="group-hover:text-[var(--accent)] transition-colors duration-200 line-clamp-2 leading-snug mb-3 min-h-[2.75em]">
               {title}
             </h3>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {status && (
-                <Badge variant={status} aria-label={`모집 상태: ${statusLabels[status]}`}>
-                  {statusLabels[status]}
-                </Badge>
-              )}
-              {eligibility && (
-                <Badge
-                  variant={eligibilityVariants[eligibility]}
-                  aria-label={`신청 가능성: ${eligibilityLabels[eligibility]}`}
-                >
-                  {eligibilityLabels[eligibility]}
-                </Badge>
-              )}
-              <Badge variant="default" aria-label={`출처: ${providerName}`}>{providerName}</Badge>
-              {categories.map((category) => (
-                <Badge
-                  key={category}
-                  variant="default"
-                  className="bg-blue-50 text-blue-700 border-blue-200"
-                  aria-label={`카테고리: ${categoryLabels[category] || category}`}
-                >
-                  {categoryLabels[category] || category}
-                </Badge>
-              ))}
-            </div>
+            <BadgeRow badges={[
+              ...(status ? [{ key: 'status', label: statusLabels[status], el: <Badge variant={status}>{statusLabels[status]}</Badge> }] : []),
+              { key: 'provider', label: providerName, el: <Badge variant="default"><span className="max-w-[120px] truncate block">{providerName}</span></Badge> },
+              ...categories.map((c) => ({ key: c, label: categoryLabels[c] || c, el: <Badge variant="default" className="bg-blue-50 text-blue-700 border-blue-200">{categoryLabels[c] || c}</Badge> })),
+              ...(eligibility ? [{ key: 'eligibility', label: eligibilityLabels[eligibility], el: <Badge variant={eligibilityVariants[eligibility]}>{eligibilityLabels[eligibility]}</Badge> }] : []),
+            ]} />
           </div>
           {onBookmark && (
             <motion.button
@@ -181,16 +244,15 @@ export function PolicyCard({
           )}
         </div>
 
-        <p className="text-[var(--muted-foreground)] text-sm line-clamp-2 mb-5 leading-relaxed">
+        <p className="text-[var(--muted-foreground)] text-sm line-clamp-2 leading-relaxed mb-5">
           {shortDescription || '요약 정보가 없습니다.'}
         </p>
         </div>
 
         <div className="flex items-end justify-between gap-2">
           <PolicyMetaRow
-            agency={providerName}
             region={regionCodes.map((code) => regionLabels[code] ?? code).join(', ')}
-            period={formatPolicyPeriod(startsAt, endsAt, isAlwaysOpen)}
+            period={formatPolicyPeriod(startsAt, endsAt, isAlwaysOpen, periodRaw)}
             periodClassName={!isAlwaysOpen && !(startsAt && endsAt) ? 'text-red-500' : undefined}
           />
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0" aria-hidden="true">
