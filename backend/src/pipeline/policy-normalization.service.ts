@@ -157,7 +157,10 @@ export class PolicyNormalizationService {
       meta.operatingPeriod,
     ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
 
-    return candidates[0]?.trim() ?? null;
+    const raw = candidates[0]?.trim() ?? null;
+    // '-'는 의미 없는 값이므로 null 처리
+    if (raw === '-') return null;
+    return raw;
   }
 
   private extractAgeRange(

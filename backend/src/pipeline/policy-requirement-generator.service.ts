@@ -38,9 +38,12 @@ export class PolicyRequirementGeneratorService {
       where: { status: PolicyStatus.ACTIVE },
     });
 
-    // shortDescription도 초기화 (LLM 요약 재생성을 위해)
+    // shortDescription 초기화 + periodRaw '-' 정리
     for (const p of policies) {
       p.shortDescription = p.description?.slice(0, 120) ?? '';
+      if (p.periodRaw?.trim() === '-') {
+        p.periodRaw = null;
+      }
     }
     await this.policyRepository.save(policies);
 
@@ -102,12 +105,18 @@ export class PolicyRequirementGeneratorService {
         if (summaryResult?.policyType) {
           policy.policyType = summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
         }
-        if (summaryResult?.detectedPeriod && !policy.isAlwaysOpen && !policy.startsAt && !policy.endsAt) {
+        const hasPeriod = policy.isAlwaysOpen || policy.startsAt || policy.endsAt;
+        const rawEmpty = !policy.periodRaw || policy.periodRaw.trim() === '-';
+        if (summaryResult?.detectedPeriod && (!hasPeriod || rawEmpty)) {
           if (summaryResult.detectedPeriod === 'always') {
             policy.isAlwaysOpen = true;
+            policy.periodRaw = null;
           } else {
             policy.periodRaw = summaryResult.detectedPeriod;
           }
+        }
+        if (policy.isAlwaysOpen && policy.periodRaw?.trim() === '-') {
+          policy.periodRaw = null;
         }
         if (summaryResult?.summary || summaryResult?.policyType || summaryResult?.detectedPeriod) {
           await this.policyRepository.save(policy);
@@ -256,13 +265,20 @@ export class PolicyRequirementGeneratorService {
       policy.policyType = llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
     }
 
-    // 기간 정보가 없는 경우에만 LLM 결과로 보완
-    if (llmResult?.detectedPeriod && !policy.isAlwaysOpen && !policy.startsAt && !policy.endsAt) {
+    // 기간 정보가 없거나 '-'인 경우 LLM 결과로 보완
+    const hasMeaningfulPeriod = policy.isAlwaysOpen || policy.startsAt || policy.endsAt;
+    const periodRawIsEmpty = !policy.periodRaw || policy.periodRaw.trim() === '-';
+    if (llmResult?.detectedPeriod && (!hasMeaningfulPeriod || periodRawIsEmpty)) {
       if (llmResult.detectedPeriod === 'always') {
         policy.isAlwaysOpen = true;
+        policy.periodRaw = null;
       } else {
         policy.periodRaw = llmResult.detectedPeriod;
       }
+    }
+    // isAlwaysOpen이 true인데 periodRaw가 '-'면 정리
+    if (policy.isAlwaysOpen && policy.periodRaw?.trim() === '-') {
+      policy.periodRaw = null;
     }
 
     // 변경된 필드가 있으면 한 번만 저장
