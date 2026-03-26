@@ -40,9 +40,28 @@ export function PoliciesPage() {
   const [hasError, setHasError] = useState(false);
   const [policies, setPolicies] = useState<PolicyListItem[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<'recruiting' | 'always' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
+  const statusFilter = (searchParams.get('status') as 'recruiting' | 'always' | null) ?? null;
+  const typeFilter = (searchParams.get('type') as 'application' | 'info' | null) ?? null;
+
+  const setStatusFilter = (val: 'recruiting' | 'always' | null | ((prev: 'recruiting' | 'always' | null) => 'recruiting' | 'always' | null)) => {
+    setSearchParams((prev) => {
+      const next = typeof val === 'function' ? val(statusFilter) : val;
+      if (next) prev.set('status', next); else prev.delete('status');
+      prev.set('page', '1');
+      return prev;
+    }, { replace: true });
+  };
+
+  const setTypeFilter = (val: 'application' | 'info' | null | ((prev: 'application' | 'info' | null) => 'application' | 'info' | null)) => {
+    setSearchParams((prev) => {
+      const next = typeof val === 'function' ? val(typeFilter) : val;
+      if (next) prev.set('type', next); else prev.delete('type');
+      prev.set('page', '1');
+      return prev;
+    }, { replace: true });
+  };
 
   const setCurrentPage = (page: number) => {
     setSearchParams((prev) => { prev.set('page', String(page)); return prev; }, { replace: true });
@@ -196,11 +215,9 @@ export function PoliciesPage() {
 
   const recruitingCount = policies.filter(p => !p.isAlwaysOpen && p.endsAt && new Date(p.endsAt).getTime() >= Date.now()).length;
   const alwaysOpenCount = policies.filter(p => p.isAlwaysOpen).length;
-  const filteredPolicies = statusFilter === 'recruiting'
-    ? policies.filter(p => !p.isAlwaysOpen && p.endsAt && new Date(p.endsAt).getTime() >= Date.now())
-    : statusFilter === 'always'
-    ? policies.filter(p => p.isAlwaysOpen)
-    : policies;
+  const filteredPolicies = policies
+    .filter(p => !statusFilter || (statusFilter === 'recruiting' ? (!p.isAlwaysOpen && p.endsAt && new Date(p.endsAt).getTime() >= Date.now()) : p.isAlwaysOpen))
+    .filter(p => !typeFilter || (p as any).policyType === typeFilter);
 
   return (
     <MainLayout>
@@ -218,13 +235,13 @@ export function PoliciesPage() {
                 </p>
                 <div className="flex items-center gap-2 text-xs">
                   {recruitingCount > 0 && (
-                    <button type="button" onClick={() => { setStatusFilter(p => p === 'recruiting' ? null : 'recruiting'); setCurrentPage(1); }} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'recruiting' ? 'bg-emerald-200 border-emerald-400 text-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:opacity-80'}`}>
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'recruiting' ? null : 'recruiting')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'recruiting' ? 'bg-emerald-200 border-emerald-400 text-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                       모집중 {recruitingCount}
                     </button>
                   )}
                   {alwaysOpenCount > 0 && (
-                    <button type="button" onClick={() => { setStatusFilter(p => p === 'always' ? null : 'always'); setCurrentPage(1); }} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'always' ? 'bg-blue-200 border-blue-400 text-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200 hover:opacity-80'}`}>
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'always' ? null : 'always')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'always' ? 'bg-blue-200 border-blue-400 text-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
                       상시 {alwaysOpenCount}
                     </button>
@@ -254,11 +271,27 @@ export function PoliciesPage() {
           </div>
 
           {/* Quick Filters */}
-          <FilterChipGroup
-            filters={quickFilters}
-            selected={selectedFilters}
-            onChange={handleFilterChange}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChipGroup
+              filters={quickFilters}
+              selected={selectedFilters}
+              onChange={handleFilterChange}
+            />
+            <button
+              type="button"
+              onClick={() => setTypeFilter(p => p === 'application' ? null : 'application')}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${typeFilter === 'application' ? 'bg-violet-500 text-white border-violet-500' : 'bg-violet-50 text-violet-700 border-violet-200 hover:opacity-80'}`}
+            >
+              신청형
+            </button>
+            <button
+              type="button"
+              onClick={() => setTypeFilter(p => p === 'info' ? null : 'info')}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${typeFilter === 'info' ? 'bg-orange-500 text-white border-orange-500' : 'bg-orange-50 text-orange-700 border-orange-200 hover:opacity-80'}`}
+            >
+              정보형
+            </button>
+          </div>
 
           {/* Expandable Filters - Toggleable */}
           <AnimatePresence>
