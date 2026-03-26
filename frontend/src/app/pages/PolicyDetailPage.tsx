@@ -54,9 +54,10 @@ const regionLabels: Record<string, string> = {
   seoul_songpa: '서울 송파구',
 };
 
-function formatPolicyPeriod(startsAt?: string | null, endsAt?: string | null, isAlwaysOpen?: boolean) {
+function formatPolicyPeriod(startsAt?: string | null, endsAt?: string | null, isAlwaysOpen?: boolean, periodRaw?: string | null) {
   if (isAlwaysOpen) return '상시모집';
   if (startsAt && endsAt) return `${startsAt.slice(0, 10)} ~ ${endsAt.slice(0, 10)}`;
+  if (periodRaw) return periodRaw;
   return '기간확인불가';
 }
 
@@ -323,7 +324,7 @@ export function PolicyDetailPage() {
             <PolicyMetaRow
               agency={policy.providerName}
               region={policy.regionCodes?.map((code) => regionLabels[code] ?? code).join(', ')}
-              period={formatPolicyPeriod(policy.startsAt, policy.endsAt, policy.isAlwaysOpen)}
+              period={formatPolicyPeriod(policy.startsAt, policy.endsAt, policy.isAlwaysOpen, policy.periodRaw)}
               periodClassName={!policy.isAlwaysOpen && !(policy.startsAt && policy.endsAt) ? 'text-red-500' : undefined}
               className="flex-wrap overflow-visible"
             />
@@ -707,6 +708,8 @@ export function PolicyDetailPage() {
                       <span className="font-bold text-sm text-rose-500">D-{daysLeft}</span>
                     ) : policy.isAlwaysOpen ? (
                       <span className="font-semibold text-sm text-emerald-600">상시모집</span>
+                    ) : policy.periodRaw ? (
+                      <span className="font-semibold text-sm text-[var(--muted-foreground)]">{policy.periodRaw}</span>
                     ) : (
                       <span className="font-semibold text-sm text-[var(--muted-foreground)]">기간 미정</span>
                     )}

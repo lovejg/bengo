@@ -78,6 +78,7 @@ function mapSavedPolicy(item: MyPolicyItem, detail: PolicyDetail): SavedPolicy {
     startsAt: detail.startsAt ?? null,
     endsAt: detail.endsAt ?? null,
     isAlwaysOpen: detail.isAlwaysOpen ?? false,
+    periodRaw: detail.periodRaw ?? null,
     fitScore: null,
     userState: item.state,
     bookmarked: item.state === 'saved',
