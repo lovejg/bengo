@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EligibilityResult } from '../common/enums/eligibility-result.enum';
-import { RegionCode, regionMatches } from '../common/enums/region-code.enum';
+import { RegionCode, SEOUL_GU_MAP, regionMatches } from '../common/enums/region-code.enum';
 import { RuleCondition, RuleDefinition, RuleNode } from '../common/interfaces/rule-expression.interface';
 import { Policy, UserProfile } from '../database/entities';
 
@@ -28,7 +28,15 @@ export class EligibilityService {
   evaluate(input: EligibilityEvalInput): EligibilityEvaluation {
     const reasons: string[] = [];
 
-    const baseCheck = this.evaluateBaseConditions(input.policy, input.profile);
+    // answers에 age/regionCode가 있으면 그 값을 우선 사용 (다른 사람 대리 판별 등)
+    const effectiveAge = input.answers.age != null
+      ? Number(input.answers.age)
+      : input.profile.age;
+    const effectiveRegion = input.answers.regionCode != null
+      ? this.resolveRegionCode(String(input.answers.regionCode))
+      : input.profile.regionCode;
+
+    const baseCheck = this.evaluateBaseConditions(input.policy, effectiveAge, effectiveRegion, input.profile);
     reasons.push(...baseCheck.reasons);
 
     if (!baseCheck.passed) {
@@ -44,9 +52,9 @@ export class EligibilityService {
     if (input.rule) {
       const facts = {
         profile: {
-          age: input.profile.age,
+          age: effectiveAge,
           gender: input.profile.gender,
-          regionCode: input.profile.regionCode,
+          regionCode: effectiveRegion,
           interests: input.profile.interests,
         },
         answers: input.answers,
@@ -69,8 +77,14 @@ export class EligibilityService {
 
       hasUnverifiable = ruleResult.hasUnverifiable;
 
+      // 선착순/인원제한/심사 필요한 hint만 CONDITIONAL 유발 (단순 중복혜택 안내 등은 제외)
       if (input.rule.conditionalHints && input.rule.conditionalHints.length > 0) {
-        hasUnverifiable = true;
+        const hasBlockingHint = input.rule.conditionalHints.some((hint) =>
+          /선착순|인원\s*제한|모집\s*마감|심사|면접|위원회\s*평가/.test(hint),
+        );
+        if (hasBlockingHint) {
+          hasUnverifiable = true;
+        }
       }
     }
 
@@ -104,6 +118,19 @@ export class EligibilityService {
       };
     }
 
+    // LLM rule이 없으면 기본 조건(나이/성별/지역)만 확인된 것이므로 CONDITIONAL
+    if (!input.rule) {
+      return {
+        result: EligibilityResult.CONDITIONAL,
+        reasons: [
+          '기본 조건(나이/지역)은 충족하지만, 추가 자격 조건은 공식 공고문에서 확인이 필요합니다.',
+        ],
+        explanation: this.makeExplanation(EligibilityResult.CONDITIONAL, [
+          '기본 조건(나이/지역)은 충족하지만, 추가 자격 조건은 공식 공고문에서 확인이 필요합니다.',
+        ]),
+      };
+    }
+
     return {
       result: EligibilityResult.ELIGIBLE,
       reasons: [],
@@ -111,20 +138,25 @@ export class EligibilityService {
     };
   }
 
-  private evaluateBaseConditions(policy: Policy, profile: UserProfile): RuleEvalResult {
+  private evaluateBaseConditions(
+    policy: Policy,
+    age: number,
+    regionCode: RegionCode,
+    profile: UserProfile,
+  ): RuleEvalResult {
     const reasons: string[] = [];
 
-    if (policy.minAge !== null && profile.age < policy.minAge) {
+    if (policy.minAge !== null && age < policy.minAge) {
       reasons.push(`최소 연령 ${policy.minAge}세 미만입니다.`);
     }
 
-    if (policy.maxAge !== null && profile.age > policy.maxAge) {
+    if (policy.maxAge !== null && age > policy.maxAge) {
       reasons.push(`최대 연령 ${policy.maxAge}세를 초과했습니다.`);
     }
 
     if (policy.regionCodes.length > 0) {
       const isRegionMatch = policy.regionCodes.some((policyRegion) =>
-        regionMatches(policyRegion, profile.regionCode),
+        regionMatches(policyRegion, regionCode),
       );
       if (!isRegionMatch) {
         reasons.push('거주 지역 조건과 일치하지 않습니다.');
@@ -150,12 +182,20 @@ export class EligibilityService {
     facts: Record<string, unknown>,
   ): RuleEvalResult {
     if (this.isCondition(node)) {
-      const passed = this.evaluateCondition(node, facts);
       const isUnverifiable = node.verifiable === false;
+      // verifiable: false인 조건은 자동 판별 불가 → 항상 통과 + hasUnverifiable 플래그
+      if (isUnverifiable) {
+        return {
+          passed: true,
+          reasons: [],
+          hasUnverifiable: true,
+        };
+      }
+      const passed = this.evaluateCondition(node, facts);
       return {
         passed,
         reasons: passed ? [] : [node.message ?? `${node.fact} 조건을 충족하지 못했습니다.`],
-        hasUnverifiable: passed && isUnverifiable,
+        hasUnverifiable: false,
       };
     }
 
@@ -197,6 +237,10 @@ export class EligibilityService {
       case '=':
         return actual === expected;
       case '!=':
+        // value가 배열이면 "not in" 의미로 처리
+        if (Array.isArray(expected)) {
+          return !expected.some((value) => value === actual);
+        }
         return actual !== expected;
       case '>':
         return Number(actual) > Number(expected);
@@ -236,6 +280,23 @@ export class EligibilityService {
 
         return undefined;
       }, facts);
+  }
+
+  /** 구 이름("관악구") 또는 enum 값("seoul_gwanak") → RegionCode 변환 */
+  private resolveRegionCode(input: string): RegionCode {
+    // 이미 enum 값이면 그대로
+    if (Object.values(RegionCode).includes(input as RegionCode)) {
+      return input as RegionCode;
+    }
+    // 구 이름이면 변환
+    if (SEOUL_GU_MAP[input]) {
+      return SEOUL_GU_MAP[input];
+    }
+    // 서울 전체
+    if (input.includes('서울')) {
+      return RegionCode.SEOUL;
+    }
+    return input as RegionCode;
   }
 
   private isCondition(node: RuleNode): node is RuleCondition {

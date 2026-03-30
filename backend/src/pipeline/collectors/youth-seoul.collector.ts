@@ -225,7 +225,7 @@ export class YouthSeoulCollector implements PolicyCollector {
         applicationUrl: sourceUrl,
         applicationMethod: appMethod['신청절차'] ?? null,
         supportContent: overview['지원 내용'] ?? null,
-        selectionCriteria: eligibility['추가단서 사항'] ?? null,
+        selectionCriteria: this.cleanSelectionCriteria(eligibility['추가단서 사항']),
         ageInfo: eligibility['연령'] ?? null,
         employmentStatus: eligibility['취업상태'] ?? null,
         educationReq: eligibility['학력'] ?? null,
@@ -239,6 +239,32 @@ export class YouthSeoulCollector implements PolicyCollector {
         raw: { overview, eligibility, applicationMethod: appMethod, etc },
       },
     };
+  }
+
+  /**
+   * '추가단서 사항' 필드에서 안내사항(위치, 운영시간 등)을 걸러내고
+   * 실제 선정 기준만 반환한다.
+   */
+  private cleanSelectionCriteria(raw: string | undefined): string | null {
+    if (!raw || raw.trim() === '-' || raw.trim() === '') return null;
+    const val = raw.trim();
+
+    // 안내사항 패턴: 위치, 운영시간, 준비사항, 검진장소, 연락처, 이용시간 등
+    const infoPatterns = [
+      /^위\s*치\s*:/,
+      /^-?\s*위\s*치\s*:/,
+      /운영시간/,
+      /이용시간/,
+      /검진장소/,
+      /준비사항/,
+      /방문접수/,
+      /문의가능\s*연락처/,
+      /대여업체\s*소개/,
+      /활동방법/,
+    ];
+    if (infoPatterns.some((p) => p.test(val))) return null;
+
+    return val;
   }
 
   private extractUrl(text: string | undefined): string | null {

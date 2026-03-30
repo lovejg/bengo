@@ -11,10 +11,11 @@ export const MVP_ALLOWED_CATEGORIES: InterestCategory[] = [
 
 export const MVP_EXCLUDED_SOURCES = ['youthcenter-center'];
 
+// 우선순위 높은 소스 먼저 수집 (중복 제거 시 먼저 수집된 쪽이 유지됨)
 export const MVP_DEFAULT_BATCH_SOURCES = [
+  'youth-seoul',
   'data-go-kr',
   'youthcenter-policy',
-  'youth-seoul',
 ] as const;
 
 export interface MvpScopeResult {
@@ -39,7 +40,7 @@ export function evaluateMvpScope(
   }
 
   const hasAllowedRegion = regionCodes.some((r) =>
-    MVP_ALLOWED_REGIONS.includes(r),
+    MVP_ALLOWED_REGIONS.includes(r) || r.startsWith('seoul'),
   );
   if (!hasAllowedRegion) {
     return { inScope: false, reason: 'MVP 지역(서울) 불일치' };

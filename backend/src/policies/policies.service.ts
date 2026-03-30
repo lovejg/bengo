@@ -115,8 +115,9 @@ export class PoliciesService {
         startsAt: policy.startsAt,
         endsAt: policy.endsAt,
         isAlwaysOpen: policy.isAlwaysOpen,
-        periodRaw: policy.periodRaw,
+        periodRaw: this.resolvePeriodRaw(policy),
         policyType: policy.policyType,
+        targetDescription: policy.targetDescription,
       })),
     };
 
@@ -213,7 +214,8 @@ export class PoliciesService {
         startsAt: policy.startsAt,
         endsAt: policy.endsAt,
         isAlwaysOpen: policy.isAlwaysOpen,
-        periodRaw: policy.periodRaw,
+        periodRaw: this.resolvePeriodRaw(policy),
+        targetDescription: policy.targetDescription,
         fitScore: policy.fitScore,
         userState: stateMap.get(policy.id)?.state ?? null,
       })),
@@ -255,6 +257,7 @@ export class PoliciesService {
       minAge: policy.minAge,
       maxAge: policy.maxAge,
       targetGenders: policy.targetGenders,
+      targetDescription: policy.targetDescription,
       startsAt: policy.startsAt,
       endsAt: policy.endsAt,
       isAlwaysOpen: policy.isAlwaysOpen,
@@ -273,6 +276,7 @@ export class PoliciesService {
         supportContent: (extra.supportContent as string) ?? null,
         selectionCriteria: (extra.selectionCriteria as string) ?? null,
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
+        warnBox: (extra.warnBox as string) ?? null,
       },
     };
   }
@@ -318,6 +322,7 @@ export class PoliciesService {
       minAge: policy.minAge,
       maxAge: policy.maxAge,
       targetGenders: policy.targetGenders,
+      targetDescription: policy.targetDescription,
       startsAt: policy.startsAt,
       endsAt: policy.endsAt,
       isAlwaysOpen: policy.isAlwaysOpen,
@@ -336,6 +341,7 @@ export class PoliciesService {
         supportContent: (extra.supportContent as string) ?? null,
         selectionCriteria: (extra.selectionCriteria as string) ?? null,
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
+        warnBox: (extra.warnBox as string) ?? null,
       },
       userState: state?.state ?? null,
       lastEligibility: lastCheck
@@ -369,12 +375,8 @@ export class PoliciesService {
       throw new NotFoundException('정책을 찾을 수 없습니다.');
     }
 
-    // 프로필에서 자동으로 가져오는 키는 answers 검증에서 제외
-    const profileBasedKeys = new Set(['age']);
-
     const missingRequiredFields = policy.requirements
       .filter((requirement) => requirement.isRequired)
-      .filter((requirement) => !profileBasedKeys.has(requirement.key))
       .filter((requirement) => {
         const value = answers[requirement.key];
         return value === undefined || value === null || value === '';
@@ -491,7 +493,8 @@ export class PoliciesService {
         startsAt: s.policy.startsAt,
         endsAt: s.policy.endsAt,
         isAlwaysOpen: s.policy.isAlwaysOpen,
-        periodRaw: s.policy.periodRaw,
+        periodRaw: this.resolvePeriodRaw(s.policy),
+        targetDescription: s.policy.targetDescription,
         state: s.state,
         note: s.note,
         appliedAt: s.appliedAt,
@@ -620,5 +623,11 @@ export class PoliciesService {
     } catch {
       // MVP 단계에서는 캐시 오류로 요청이 실패하지 않도록 무시한다.
     }
+  }
+
+  /** isAlwaysOpen이 true인데 periodRaw가 없으면 "상시"로 채워서 반환 */
+  private resolvePeriodRaw(policy: Pick<Policy, 'isAlwaysOpen' | 'periodRaw'>): string | null {
+    if (policy.isAlwaysOpen && !policy.periodRaw) return '상시';
+    return policy.periodRaw ?? null;
   }
 }

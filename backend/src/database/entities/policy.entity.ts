@@ -78,6 +78,9 @@ export class Policy {
   @Column({ type: 'text', nullable: true })
   periodRaw!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  targetDescription!: string | null;
+
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
   extraMeta!: Record<string, unknown>;
 
