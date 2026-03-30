@@ -244,6 +244,57 @@ export class PipelineIngestionService {
       where: { code: normalized.code },
     });
 
+    // 같은 제목의 정책이 다른 소스에서 이미 수집된 경우, 우선순위 높은 쪽만 유지
+    const duplicateByTitle = await this.policyRepository.findOne({
+      where: { title: normalized.title, status: PolicyStatus.ACTIVE },
+    });
+    if (duplicateByTitle && duplicateByTitle.code !== normalized.code) {
+      const existingSource = (duplicateByTitle.extraMeta as Record<string, unknown>)?.pipeline
+        ? ((duplicateByTitle.extraMeta as Record<string, unknown>).pipeline as Record<string, unknown>).source as string
+        : '';
+      const currentSource = raw.source;
+      // 소스 우선순위: youth-seoul > data-go-kr > youthcenter-policy (크롤링 데이터가 가장 풍부)
+      const priority: Record<string, number> = { 'youth-seoul': 3, 'data-go-kr': 2, 'youthcenter-policy': 1 };
+      const existingPriority = priority[existingSource] ?? 0;
+      const currentPriority = priority[currentSource] ?? 0;
+
+      if (existingPriority >= currentPriority) {
+        // 기존 정책이 우선순위 높거나 같으면 현재 건 스킵 + 자신도 비활성화
+        if (existing) {
+          existing.status = PolicyStatus.INACTIVE;
+          await this.policyRepository.save(existing);
+        }
+        const skipRun = await this.runRepository.save(
+          this.runRepository.create({
+            rawDocumentId: rawDoc.id,
+            policyId: null,
+            normalized: this.toJsonRecord(normalized),
+            validation: this.toJsonRecord(validation),
+            persisted: false,
+            action: 'skipped',
+            message: `중복 정책: "${normalized.title}" (${existingSource} 우선)`,
+          }),
+        );
+        return {
+          rawDocumentId: rawDoc.id,
+          runId: skipRun.id,
+          persisted: false,
+          action: 'skipped',
+          message: `중복 정책: "${normalized.title}" (${existingSource} 우선)`,
+          policy: null,
+          validation,
+          normalizationMeta: {
+            confidence: normalizedResult.confidence,
+            usedLlmFallback: normalizedResult.usedLlmFallback,
+          },
+        };
+      } else {
+        // 현재 소스가 우선순위 높으면 기존 건 비활성화
+        duplicateByTitle.status = PolicyStatus.INACTIVE;
+        await this.policyRepository.save(duplicateByTitle);
+      }
+    }
+
     const nextPolicy = this.policyRepository.create({
       id: existing?.id,
       code: normalized.code,
@@ -363,11 +414,10 @@ export class PipelineIngestionService {
 
   private hasPastYearInTitle(title: string): boolean {
     const currentYear = new Date().getFullYear();
-    const minAllowedYear = currentYear - 1; // 전년도까지 허용
     const yearMatches = title.match(/\b(20\d{2})\b/g);
     if (!yearMatches) return false;
-    // 제목에 있는 모든 연도가 전전년도 이하면 필터링
-    return yearMatches.every((y) => parseInt(y, 10) < minAllowedYear);
+    // 제목에 있는 모든 연도가 전년도 이하면 필터링 (현재년도만 허용)
+    return yearMatches.every((y) => parseInt(y, 10) < currentYear);
   }
 
   private isExpired(endsAt: string | null): boolean {

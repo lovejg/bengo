@@ -5,9 +5,14 @@ import { QuestionType } from '../common/enums/question-type.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RuleDefinition } from '../common/interfaces/rule-expression.interface';
+import { RegionCode, SEOUL_GU_MAP } from '../common/enums/region-code.enum';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { LlmRuleExtractorService } from './llm-rule-extractor.service';
+
+const GU_CODE_TO_NAME = Object.fromEntries(
+  Object.entries(SEOUL_GU_MAP).map(([name, code]) => [code, name]),
+);
 
 @Injectable()
 export class PolicyRequirementGeneratorService {
@@ -33,7 +38,38 @@ export class PolicyRequirementGeneratorService {
       `Cleared ${deletedReqs.affected} requirements, ${deletedRules.affected} LLM rules`,
     );
 
-    // 2. 모든 활성 정책에 대해 재생성
+    // 2. 중복 정책 정리 (같은 제목이 여러 소스에서 active인 경우, 우선순위 낮은 쪽 비활성화)
+    const allActive = await this.policyRepository.find({
+      where: { status: PolicyStatus.ACTIVE },
+    });
+    const priority: Record<string, number> = { 'youth-seoul': 3, 'data-go-kr': 2, 'youthcenter-policy': 1 };
+    const byTitle = new Map<string, typeof allActive>();
+    for (const p of allActive) {
+      const list = byTitle.get(p.title) ?? [];
+      list.push(p);
+      byTitle.set(p.title, list);
+    }
+    let deduped = 0;
+    for (const [, group] of byTitle) {
+      if (group.length <= 1) continue;
+      const getSource = (p: Policy) => {
+        const meta = p.extraMeta as Record<string, unknown>;
+        const pipeline = meta?.pipeline as Record<string, unknown> | undefined;
+        return (pipeline?.source as string) ?? '';
+      };
+      group.sort((a, b) => (priority[getSource(b)] ?? 0) - (priority[getSource(a)] ?? 0));
+      // 첫 번째(우선순위 최고)만 유지, 나머지 비활성화
+      for (let i = 1; i < group.length; i++) {
+        group[i].status = PolicyStatus.INACTIVE;
+        await this.policyRepository.save(group[i]);
+        deduped++;
+      }
+    }
+    if (deduped > 0) {
+      this.logger.log(`Deduped ${deduped} duplicate policies`);
+    }
+
+    // 3. 모든 활성 정책에 대해 재생성
     const policies = await this.policyRepository.find({
       where: { status: PolicyStatus.ACTIVE },
     });
@@ -118,7 +154,10 @@ export class PolicyRequirementGeneratorService {
         if (policy.isAlwaysOpen && policy.periodRaw?.trim() === '-') {
           policy.periodRaw = null;
         }
-        if (summaryResult?.summary || summaryResult?.policyType || summaryResult?.detectedPeriod) {
+        if (summaryResult?.targetDescription) {
+          policy.targetDescription = summaryResult.targetDescription;
+        }
+        if (summaryResult?.summary || summaryResult?.policyType || summaryResult?.detectedPeriod || summaryResult?.targetDescription) {
           await this.policyRepository.save(policy);
         }
       }
@@ -142,6 +181,23 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
+    // 구 단위 정책이면 지역 선택 requirement 자동 추가
+    const hasGuRegion = policy.regionCodes.some((r) => r.startsWith('seoul_'));
+    if (hasGuRegion) {
+      displayOrder += 1;
+      const guLabel = this.getGuLabel(policy.regionCodes);
+      requirements.push({
+        policyId: policy.id,
+        key: 'regionCode',
+        label: '거주 지역',
+        description: `${guLabel} 거주자 대상 정책입니다.`,
+        type: QuestionType.SELECT,
+        options: this.getSeoulGuOptions(),
+        isRequired: false,
+        displayOrder,
+      });
+    }
+
     const employmentStatus = normalized.extraMeta?.employmentStatus;
     if (typeof employmentStatus === 'string' && employmentStatus.trim() && !this.isUnrestricted(employmentStatus)) {
       displayOrder += 1;
@@ -151,7 +207,7 @@ export class PolicyRequirementGeneratorService {
         label: '취업 상태',
         description: employmentStatus.slice(0, 160),
         type: QuestionType.SELECT,
-        options: ['재학', '취준', '재직', '자영업', '기타'],
+        options: ['미취업', '재학', '취준', '재직', '자영업', '기타'],
         isRequired: false,
         displayOrder,
       });
@@ -196,11 +252,40 @@ export class PolicyRequirementGeneratorService {
     );
 
     if (!isInfoPolicy && llmResult && llmResult.conditions.length > 0) {
-      const existingKeys = new Set(requirements.map((r) => r.key));
+      // 의미적으로 같은 키 그룹 (LLM이 다른 이름으로 추출할 수 있음)
+      const KEY_ALIASES: Record<string, string[]> = {
+        employmentStatus: ['employmentStatus', 'jobStatus', 'workStatus'],
+        educationRequirement: ['educationRequirement', 'educationLevel', 'education'],
+      };
+      const resolveKeyGroup = (key: string): string => {
+        for (const [group, aliases] of Object.entries(KEY_ALIASES)) {
+          if (aliases.includes(key)) return group;
+        }
+        return key;
+      };
+
+      const existingKeyGroups = new Set(requirements.map((r) => resolveKeyGroup(r.key!)));
 
       for (const condition of llmResult.conditions) {
-        if (existingKeys.has(condition.key)) continue;
-        existingKeys.add(condition.key);
+        const group = resolveKeyGroup(condition.key);
+
+        if (existingKeyGroups.has(group)) {
+          // LLM이 더 정확한 options/value를 가지므로 기존 규칙 기반 것을 교체
+          const existingIdx = requirements.findIndex((r) => resolveKeyGroup(r.key!) === group);
+          if (existingIdx >= 0) {
+            requirements[existingIdx] = {
+              ...requirements[existingIdx],
+              key: condition.key,
+              label: condition.label,
+              description: condition.message || condition.label,
+              type: condition.type,
+              options: condition.options,
+              isRequired: true,
+            };
+          }
+          continue;
+        }
+        existingKeyGroups.add(group);
 
         displayOrder += 1;
         requirements.push({
@@ -218,7 +303,8 @@ export class PolicyRequirementGeneratorService {
       const ruleDefinition: RuleDefinition = {
         id: `rule-${policy.code}-llm-v1`,
         name: `${policy.title} LLM 추출 규칙`,
-        root: {
+        // LLM이 중첩 트리를 제공한 경우 그대로 사용, 아니면 flat conditions로 구성
+        root: llmResult.root ?? {
           all: llmResult.conditions.map((c) => ({
             fact: c.fact,
             op: c.op,
@@ -227,7 +313,12 @@ export class PolicyRequirementGeneratorService {
             verifiable: c.verifiable,
           })),
         },
-        conditionalHints: llmResult.conditionalHints,
+        conditionalHints: [
+          ...llmResult.conditionalHints,
+          ...this.extractWarnBoxHints(normalized.extraMeta),
+          ...this.extractCapacityHints(normalized.description),
+          ...this.extractFirstComeHints(normalized.extraMeta),
+        ],
       };
 
       await this.ruleRepository.save(
@@ -281,8 +372,12 @@ export class PolicyRequirementGeneratorService {
       policy.periodRaw = null;
     }
 
+    if (llmResult?.targetDescription) {
+      policy.targetDescription = llmResult.targetDescription;
+    }
+
     // 변경된 필드가 있으면 한 번만 저장
-    if (llmResult?.summary || llmResult?.detectedAge || llmResult?.policyType || llmResult?.detectedPeriod) {
+    if (llmResult?.summary || llmResult?.detectedAge || llmResult?.policyType || llmResult?.detectedPeriod || llmResult?.targetDescription) {
       await this.policyRepository.save(policy);
     }
 
@@ -296,8 +391,8 @@ export class PolicyRequirementGeneratorService {
   }
 
   private isUnrestricted(value: string): boolean {
-    const normalized = value.trim().replace(/\s+/g, '');
-    const patterns = ['제한없음', '무관', '제한없는', '-', '해당없음'];
+    const normalized = value.trim().replace(/^[-·\s]+/, '').replace(/\s+/g, '');
+    const patterns = ['제한없음', '무관', '제한없는', '-', '해당없음', ''];
     return patterns.some((p) => normalized === p);
   }
 
@@ -315,5 +410,51 @@ export class PolicyRequirementGeneratorService {
       return `만 ${maxAge}세 이하`;
     }
     return '';
+  }
+
+  private getGuLabel(regionCodes: RegionCode[]): string {
+    return regionCodes
+      .filter((r) => r.startsWith('seoul_'))
+      .map((r) => GU_CODE_TO_NAME[r] ?? r)
+      .join(', ');
+  }
+
+  private getSeoulGuOptions(): string[] {
+    return Object.keys(SEOUL_GU_MAP);
+  }
+
+  private extractWarnBoxHints(extraMeta: Record<string, unknown>): string[] {
+    const warnBox = extraMeta?.warnBox;
+    if (typeof warnBox !== 'string' || !warnBox.trim()) return [];
+    return [warnBox.trim()];
+  }
+
+  private extractFirstComeHints(extraMeta: Record<string, unknown>): string[] {
+    const hints: string[] = [];
+    if (extraMeta?.isFirstComeFirstServed === true) {
+      hints.push('선착순 접수 정책입니다. 모집 마감 여부를 공식 공고문에서 확인하세요.');
+    }
+    const bizPeriodEtc = extraMeta?.bizPeriodEtc;
+    if (typeof bizPeriodEtc === 'string' && bizPeriodEtc.trim() && /소진|마감|종료/.test(bizPeriodEtc)) {
+      hints.push(`${bizPeriodEtc.trim()} 조기 종료될 수 있습니다.`);
+    }
+    return hints;
+  }
+
+  private extractCapacityHints(description: string): string[] {
+    if (!description) return [];
+    // "선착순 N명", "N명 모집", "총 N명" 등 인원 제한 패턴 감지
+    const patterns = [
+      /선착순\s*\d+\s*명/,
+      /\d+\s*명\s*(?:모집|선발|선정|내외|이내)/,
+      /총\s*\d+\s*명/,
+    ];
+    for (const pattern of patterns) {
+      const match = description.match(pattern);
+      if (match) {
+        return [`선착순/인원 제한이 있는 정책입니다 (${match[0].trim()}). 모집 마감 여부를 공식 공고문에서 확인하세요.`];
+      }
+    }
+    return [];
   }
 }

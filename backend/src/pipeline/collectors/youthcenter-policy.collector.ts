@@ -161,6 +161,10 @@ export class YouthcenterPolicyCollector implements PolicyCollector {
         const applicationPeriod = pickFirstString(item, [
           'aplyYmd', 'rceptBgngYmd',
         ]);
+        // 선착순 여부 (Y/N)
+        const isFirstComeFirstServed = pickFirstString(item, ['sprtArvlSeqYn']) === 'Y';
+        // 사업 기간 기타 (예: "예산 소진시까지")
+        const bizPeriodEtc = pickFirstString(item, ['bizPrdEtcCn']);
         const minAgeRaw = pickFirstString(item, [
           'sprtTrgtMinAge', 'minAge', 'ageMinLmt',
         ]);
@@ -198,6 +202,8 @@ export class YouthcenterPolicyCollector implements PolicyCollector {
             minAge: minAgeRaw ? Number(minAgeRaw) : null,
             maxAge: maxAgeRaw ? Number(maxAgeRaw) : null,
             applicationPeriod,
+            isFirstComeFirstServed,
+            bizPeriodEtc,
             regionCodes,
             raw: item,
           },

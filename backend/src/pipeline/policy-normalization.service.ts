@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
-import { RegionCode } from '../common/enums/region-code.enum';
+import { RegionCode, SEOUL_GU_MAP } from '../common/enums/region-code.enum';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { RawPolicyDocument } from './interfaces/raw-policy.interface';
 
@@ -45,13 +45,16 @@ export class PolicyNormalizationService {
   }
 
   private ruleBasedNormalize(raw: RawPolicyDocument): NormalizedPolicyDocument {
-    const text = `${raw.title} ${raw.body}`;
     const meta = (raw.metadata ?? {}) as Record<string, unknown>;
+    // supportContent는 youthcenter-policy에서 상세 사업 내용(기간, 소득, 자산 등)이 담기는 필드
+    const supportContent = typeof meta.supportContent === 'string' ? meta.supportContent : '';
+    const extendedBody = supportContent ? `${raw.body}\n${supportContent}` : raw.body;
+    const text = `${raw.title} ${extendedBody}`;
 
     const { minAge, maxAge } = this.extractAgeRange(text, meta);
     const { startsAt, endsAt } = this.extractDateRange(text, meta);
     const isAlwaysOpen = this.detectAlwaysOpen(text, meta);
-    const periodRaw = this.extractPeriodRaw(meta);
+    const periodRaw = this.extractPeriodRaw(meta, extendedBody);
     const regionCodes = this.extractRegionCodes(raw, text);
     const policyType = this.classifyPolicyType(raw.title, raw.body);
 
@@ -105,6 +108,7 @@ export class PolicyNormalizationService {
         supportType: (meta.supportType as string | undefined) ?? null,
         applicationDeadline: (meta.applicationDeadline as string | undefined) ?? null,
         specializedReq: (meta.specializedReq as string | undefined) ?? null,
+        warnBox: (meta.warnBox as string | undefined) ?? null,
         metadata: meta,
       },
     };
@@ -120,16 +124,48 @@ export class PolicyNormalizationService {
       meta.operatingPeriod,
     ].filter((v): v is string => typeof v === 'string');
 
-    const alwaysOpenPatterns = ['상시', '연중', '수시'];
+    // 상시가 아닌 것으로 명확히 판단되는 패턴 → 먼저 제외
+    const notAlwaysOpenPatterns = [
+      /접수기관\s*별?\s*상이/,
+      /기관\s*별?\s*상이/,
+      /공고문\s*참고/,
+      /별도\s*공고/,
+      /추후\s*공고/,
+      /홈페이지\s*공고/,
+      /공고\s*\(?\s*게시\s*\)?/,
+      /모집\s*시\s*.{0,20}공고/,
+    ];
     for (const value of candidates) {
-      if (alwaysOpenPatterns.some((p) => value.includes(p))) {
+      if (notAlwaysOpenPatterns.some((p) => p.test(value))) {
+        return false;
+      }
+    }
+
+    const alwaysOpenKeywords = ['상시'];
+    for (const value of candidates) {
+      if (alwaysOpenKeywords.some((p) => value.includes(p))) {
         return true;
       }
     }
 
-    // 본문에서도 상시 관련 키워드 탐지 (조합 없이 단독으로도 매칭)
+    // 본문에서도 상시 관련 키워드 탐지
     const combined = `${text} ${candidates.join(' ')}`;
-    if (alwaysOpenPatterns.some((p) => combined.includes(p))) {
+    if (alwaysOpenKeywords.some((p) => combined.includes(p))) {
+      return true;
+    }
+
+    // "연중"은 "연중 모집/운영/접수" 형태일 때만 상시, "연중 N회"는 제외
+    if (/연중\s*(모집|운영|접수|신청|상시)/.test(combined)) {
+      return true;
+    }
+
+    // "이후~ 계속", "2012년 ~ (계속)", "'19년~" 등 계속/무기한 패턴 → 상시
+    const continuousPattern = /(?:이후|20\d{2}년?\s*[~～\-]|'\d{2}년\s*[~～])\s*[~～]?\s*\(?\s*계속\s*\)?/;
+    if (continuousPattern.test(combined)) {
+      return true;
+    }
+    // "'19년~", "'21년~" 처럼 끝 날짜 없이 ~ 로 끝나는 경우 → 상시
+    if (/'\d{2}년\s*~\s*$/.test(combined.trim()) || /'\d{2}년\s*~\s*\n/.test(combined)) {
       return true;
     }
 
@@ -150,17 +186,40 @@ export class PolicyNormalizationService {
     return false;
   }
 
-  private extractPeriodRaw(meta: Record<string, unknown>): string | null {
-    const candidates = [
+  private extractPeriodRaw(meta: Record<string, unknown>, body: string): string | null {
+    // 1) 메타 필드에서 먼저 시도
+    const uninformativePatterns = /^(-|별도\s*공지|별도\s*공고|추후\s*공고|미정|해당없음|해당\s*없음|접수기관\s*별?\s*상이|기관\s*별?\s*상이)$/;
+    const metaCandidates = [
       meta.applicationPeriod,
       meta.applicationDeadline,
       meta.operatingPeriod,
-    ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+    ].filter(
+      (v): v is string =>
+        typeof v === 'string' &&
+        v.trim().length > 0 &&
+        !uninformativePatterns.test(v.trim()),
+    );
 
-    const raw = candidates[0]?.trim() ?? null;
-    // '-'는 의미 없는 값이므로 null 처리
-    if (raw === '-') return null;
-    return raw;
+    if (metaCandidates.length > 0) return metaCandidates[0].trim();
+
+    // 2) 본문에서 기간 관련 패턴 탐색
+    const periodPatterns = [
+      /사업\s*기간\s*[:：]?\s*([^\n]{3,40})/,
+      /운영\s*기간\s*[:：]?\s*([^\n]{3,40})/,
+      /모집\s*기간\s*[:：]?\s*([^\n]{3,40})/,
+      /신청\s*기간\s*[:：]?\s*([^\n]{3,40})/,
+      /접수\s*기간\s*[:：]?\s*([^\n]{3,40})/,
+    ];
+
+    for (const pattern of periodPatterns) {
+      const match = body.match(pattern);
+      if (match) {
+        const val = match[1].trim();
+        if (val && !uninformativePatterns.test(val)) return val;
+      }
+    }
+
+    return null;
   }
 
   private extractAgeRange(
@@ -387,7 +446,13 @@ export class PolicyNormalizationService {
     // 수집기에서 regionCodes 배열을 넘긴 경우(비어 있어도 포함),
     // 해당 값을 정규화의 우선/확정 값으로 사용한다.
     if (Array.isArray(raw.metadata?.regionCodes)) {
-      return this.extractRegionCodesFromMetadata(raw.metadata?.regionCodes);
+      const fromMeta = this.extractRegionCodesFromMetadata(raw.metadata?.regionCodes);
+      // 메타에서 SEOUL만 온 경우, 본문에서 구 감지 시도
+      if (fromMeta.length === 1 && fromMeta[0] === RegionCode.SEOUL) {
+        const guCode = this.detectGuFromText(raw.title, text);
+        if (guCode) return [guCode];
+      }
+      return fromMeta;
     }
 
     const combined = `${text} ${raw.metadata?.providerName ?? ''} ${raw.sourceUrl ?? ''}`;
@@ -397,10 +462,31 @@ export class PolicyNormalizationService {
       combined.includes('서울') ||
       combined.includes('11000')
     ) {
+      // 구 감지 시도 → 실패하면 SEOUL
+      const guCode = this.detectGuFromText(raw.title, text);
+      if (guCode) return [guCode];
       return [RegionCode.SEOUL];
     }
 
     return [];
+  }
+
+  /**
+   * 제목 우선, 본문 보조로 특정 구 이름 감지.
+   * 하나의 구만 언급된 경우에만 반환 (여러 구 언급 시 서울 전체로 처리).
+   */
+  private detectGuFromText(title: string, fullText: string): RegionCode | null {
+    const guNames = Object.keys(SEOUL_GU_MAP);
+
+    // 제목에서 먼저 감지
+    const titleMatches = guNames.filter((gu) => title.includes(gu));
+    if (titleMatches.length === 1) return SEOUL_GU_MAP[titleMatches[0]];
+
+    // 제목에 없으면 본문 providerName 등에서 감지
+    const textMatches = guNames.filter((gu) => fullText.includes(gu));
+    if (textMatches.length === 1) return SEOUL_GU_MAP[textMatches[0]];
+
+    return null;
   }
 
   private extractRegionCodesFromMetadata(input: unknown): RegionCode[] {
@@ -414,7 +500,7 @@ export class PolicyNormalizationService {
         continue;
       }
 
-      if (MVP_ALLOWED_REGION_CODES.has(item)) {
+      if (MVP_ALLOWED_REGION_CODES.has(item) || item.startsWith('seoul')) {
         unique.add(item as RegionCode);
       }
     }

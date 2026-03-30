@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PolicyCollector } from '../interfaces/policy-collector.interface';
 import { RawPolicyDocument } from '../interfaces/raw-policy.interface';
@@ -12,10 +12,20 @@ import {
   withQuery,
 } from './collector.utils';
 
+interface GovKrDetail {
+  supportTarget: string | null;
+  supportContent: string | null;
+  applicationMethod: string | null;
+  requiredDocuments: string | null;
+  receptionInfo: string | null;
+  warnBox: string | null;
+}
+
 @Injectable()
 export class DataGoKrCollector implements PolicyCollector {
   sourceName = 'data-go-kr';
   description = 'data.go.kr 공공서비스 혜택 API 수집기';
+  private readonly logger = new Logger(DataGoKrCollector.name);
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -85,8 +95,11 @@ export class DataGoKrCollector implements PolicyCollector {
     }
     const now = new Date().toISOString();
 
-    return items
-      .map((item) => {
+    // gov.kr 상세 페이지 크롤링 (지원대상, 지원내용, 신청방법, warn-box 등)
+    const detailCache = new Map<string, GovKrDetail | null>();
+
+    const results: RawPolicyDocument[] = [];
+    for (const item of items) {
         const title =
           pickFirstString(item, ['서비스명', '서비스명칭', 'title', 'svcNm', 'plcyNm']) ??
           '제목 없음';
@@ -131,11 +144,25 @@ export class DataGoKrCollector implements PolicyCollector {
           'aplyYmd', '신청기간',
         ]);
 
-        return {
+        const govDetail = await this.fetchGovKrDetail(sourceUrl ?? null, detailCache);
+
+        // API body + 크롤링 데이터를 합쳐서 LLM이 더 풍부한 정보로 분석할 수 있도록
+        let body = stringifyBody(item);
+        if (govDetail) {
+          const extra: string[] = [];
+          if (govDetail.supportTarget) extra.push(`[지원대상]\n${govDetail.supportTarget}`);
+          if (govDetail.supportContent) extra.push(`[지원내용]\n${govDetail.supportContent}`);
+          if (govDetail.applicationMethod) extra.push(`[신청방법]\n${govDetail.applicationMethod}`);
+          if (govDetail.requiredDocuments) extra.push(`[구비서류]\n${govDetail.requiredDocuments}`);
+          if (govDetail.warnBox) extra.push(`[주의사항]\n${govDetail.warnBox}`);
+          if (extra.length > 0) body += '\n\n--- gov.kr 상세 ---\n' + extra.join('\n\n');
+        }
+
+        results.push({
           source: this.sourceName,
           sourceUrl: sourceUrl ?? undefined,
           title,
-          body: stringifyBody(item),
+          body,
           fetchedAt: now,
           metadata: {
             providerName:
@@ -143,18 +170,122 @@ export class DataGoKrCollector implements PolicyCollector {
               'data.go.kr',
             regionCodes,
             applicationUrl: applicationUrl ?? sourceUrl,
-            applicationMethod,
-            supportContent,
-            selectionCriteria,
+            applicationMethod: govDetail?.applicationMethod ?? applicationMethod,
+            supportContent: govDetail?.supportContent ?? supportContent,
+            selectionCriteria: govDetail?.supportTarget ?? selectionCriteria,
             supportType,
             applicationDeadline,
             targetAgeInfo,
             minAge: minAgeRaw ? Number(minAgeRaw) : null,
             maxAge: maxAgeRaw ? Number(maxAgeRaw) : null,
             applicationPeriod,
+            warnBox: govDetail?.warnBox ?? null,
+            requiredDocuments: govDetail?.requiredDocuments ?? null,
+            receptionInfo: govDetail?.receptionInfo ?? null,
             raw: item,
           },
-        } satisfies RawPolicyDocument;
+        } satisfies RawPolicyDocument);
+    }
+
+    return results;
+  }
+
+  /**
+   * gov.kr 상세 페이지를 크롤링하여 API에 없는 상세 정보를 추출한다.
+   * - 지원대상 (panel2), 지원내용 (panel3), 신청방법 (panel4), 접수/문의 (panel5)
+   * - warn-box (중복혜택 제한 등)
+   */
+  private async fetchGovKrDetail(
+    url: string | null,
+    cache: Map<string, GovKrDetail | null>,
+  ): Promise<GovKrDetail | null> {
+    if (!url || !url.includes('gov.kr')) return null;
+    if (cache.has(url)) return cache.get(url)!;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; BengoBot/1.0)',
+          'Accept': 'text/html',
+          'Accept-Language': 'ko-KR,ko;q=0.9',
+        },
       });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        cache.set(url, null);
+        return null;
+      }
+
+      const html = await res.text();
+      const detail = this.parseGovKrHtml(html);
+      cache.set(url, detail);
+      return detail;
+    } catch {
+      this.logger.warn(`gov.kr 크롤링 실패: ${url}`);
+      cache.set(url, null);
+      return null;
+    }
+  }
+
+  private parseGovKrHtml(html: string): GovKrDetail {
+    const stripTags = (s: string) => s.replace(/<[^>]+>/g, '').trim();
+
+    // 패널별 콘텐츠 추출 헬퍼
+    const extractPanel = (panelId: string): string => {
+      const panelRegex = new RegExp(
+        `id="${panelId}"[^>]*>([\\s\\S]*?)(?=<div[^>]*id="panel|$)`,
+      );
+      const match = html.match(panelRegex);
+      return match ? match[1] : '';
+    };
+
+    // pre.detail-desc 내용 추출
+    const extractPreDesc = (panelHtml: string): string | null => {
+      const matches: string[] = [];
+      const preRegex = /<pre[^>]*class="detail-desc"[^>]*>([\s\S]*?)<\/pre>/g;
+      let m: RegExpExecArray | null;
+      while ((m = preRegex.exec(panelHtml)) !== null) {
+        const text = stripTags(m[1]).trim();
+        if (text && text !== '-') matches.push(text);
+      }
+      return matches.length > 0 ? matches.join('\n\n') : null;
+    };
+
+    // warn-box
+    const warnings: string[] = [];
+    const warnRegex = /<strong[^>]*class="warn-title"[^>]*>([\s\S]*?)<\/strong>\s*<p[^>]*class="warn-desc"[^>]*>([\s\S]*?)<\/p>/g;
+    let wm: RegExpExecArray | null;
+    while ((wm = warnRegex.exec(html)) !== null) {
+      const title = stripTags(wm[1]);
+      const desc = stripTags(wm[2]);
+      if (title || desc) warnings.push(`${title}: ${desc}`);
+    }
+
+    const panel2 = extractPanel('panel2');
+    const panel3 = extractPanel('panel3');
+    const panel4 = extractPanel('panel4');
+    const panel5 = extractPanel('panel5');
+
+    return {
+      supportTarget: extractPreDesc(panel2),
+      supportContent: extractPreDesc(panel3),
+      applicationMethod: extractPreDesc(panel4),
+      requiredDocuments: this.extractRequiredDocuments(panel4),
+      receptionInfo: extractPreDesc(panel5),
+      warnBox: warnings.length > 0 ? warnings.join(' / ') : null,
+    };
+  }
+
+  private extractRequiredDocuments(panel4Html: string): string | null {
+    // 구비서류 섹션만 추출
+    const docMatch = panel4Html.match(
+      /class="detail-title[^"]*document[^"]*"[\s\S]*?<\/strong>([\s\S]*?)(?=<strong|$)/,
+    );
+    if (!docMatch) return null;
+    const text = docMatch[1].replace(/<[^>]+>/g, '').trim();
+    return text && text !== '-' ? text : null;
   }
 }

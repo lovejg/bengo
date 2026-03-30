@@ -4,8 +4,8 @@
 curl -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp
 청년 몽땅 때문에 따로 쓰는 명령어인데 나중에 합치고 그럴 예정
 정확히 설명하자면 정책 데이터를 새롭게 크롤링(크롤러 수정되거나 했을 때 하면 되는 것)
-LLM rule 추출 때문에 시간이 좀 걸리니까(길면 5~10분...?) 서버 키고 명령어 입력해두고 대기하다가 프론트 확인해보면 됨
-
+LLM rule 추출 때문에 시간이 좀 걸리니까(5~10분...?) 서버 키고 명령어 입력해두고 대기하다가 프론트 확인해보면 됨
+이번에 크롤러 추가되면서 거의 10분 넘게 걸릴겁니다!
 
 curl -X POST http://localhost:4000/pipeline/regenerate-rules
 이거는 이제 코드 로직 수정됐을 때 씀.
@@ -13,3 +13,4 @@ curl -X POST http://localhost:4000/pipeline/regenerate-rules
 얘도 한 5~10분 정도 걸립니다
 
 순서는 collect-and-ingest-mvp 먼저 하고 regenerate-rules 하는 겁니다(웬만하면 둘 다 하는 게 좋을거 같네요)
+그리고 둘 다 터미널에 뭔가 출력이 돼야 끝이 난 겁니다. 그전까지는 계속 돌아가는 거에요.
