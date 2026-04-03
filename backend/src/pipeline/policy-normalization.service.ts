@@ -302,6 +302,14 @@ export class PolicyNormalizationService {
     const textParsed = this.parseDateRange(text);
     if (textParsed) return textParsed;
 
+    // 연도만 있는 경우 (예: "2025") → 해당 연도 말일을 endsAt으로
+    for (const candidate of metaCandidates) {
+      const yearOnly = candidate.trim().match(/^(20\d{2})$/);
+      if (yearOnly) {
+        return { startsAt: `${yearOnly[1]}-01-01`, endsAt: `${yearOnly[1]}-12-31` };
+      }
+    }
+
     return { startsAt: null, endsAt: null };
   }
 
@@ -418,7 +426,7 @@ export class PolicyNormalizationService {
 
     // 안내형(INFO) 키워드: 센터 운영, 시설 운영, 홍보, 제작·배포 등
     const infoPatterns = [
-      /센터\s*(설치\s*)?운영/,
+      /청년(?!창업)[가-힣]{0,8}\s*센터\s*(설치\s*)?운영/,
       /시설\s*운영/,
       /카페\s*운영/,
       /홍보활동/,
@@ -436,6 +444,19 @@ export class PolicyNormalizationService {
       }
     }
 
+    // 직권 지급 / 개인 신청절차 없음 → 본문에서 감지
+    const autoGrantPatterns = [
+      /개인\s*신청\s*절차\s*없음/,
+      /직권\s*지급/,
+      /자동\s*지급/,
+      /별도\s*신청\s*(불필요|없음)/,
+    ];
+    for (const pattern of autoGrantPatterns) {
+      if (pattern.test(body)) {
+        return PolicyType.INFO;
+      }
+    }
+
     return PolicyType.APPLICATION;
   }
 
@@ -449,7 +470,7 @@ export class PolicyNormalizationService {
       const fromMeta = this.extractRegionCodesFromMetadata(raw.metadata?.regionCodes);
       // 메타에서 SEOUL만 온 경우, 본문에서 구 감지 시도
       if (fromMeta.length === 1 && fromMeta[0] === RegionCode.SEOUL) {
-        const guCode = this.detectGuFromText(raw.title, text);
+        const guCode = this.detectGuFromText(raw.title, text, raw.metadata?.providerName as string | undefined);
         if (guCode) return [guCode];
       }
       return fromMeta;
@@ -463,7 +484,7 @@ export class PolicyNormalizationService {
       combined.includes('11000')
     ) {
       // 구 감지 시도 → 실패하면 SEOUL
-      const guCode = this.detectGuFromText(raw.title, text);
+      const guCode = this.detectGuFromText(raw.title, text, raw.metadata?.providerName as string | undefined);
       if (guCode) return [guCode];
       return [RegionCode.SEOUL];
     }
@@ -472,18 +493,43 @@ export class PolicyNormalizationService {
   }
 
   /**
-   * 제목 우선, 본문 보조로 특정 구 이름 감지.
+   * 제목 우선, providerName, 본문 보조로 특정 구 이름 감지.
    * 하나의 구만 언급된 경우에만 반환 (여러 구 언급 시 서울 전체로 처리).
    */
-  private detectGuFromText(title: string, fullText: string): RegionCode | null {
+  private detectGuFromText(
+    title: string,
+    fullText: string,
+    providerName?: string,
+  ): RegionCode | null {
     const guNames = Object.keys(SEOUL_GU_MAP);
 
-    // 제목에서 먼저 감지
+    // 1. 제목에서 먼저 감지 ("광진구" 또는 괄호 안 "광진" 형태 모두 처리)
     const titleMatches = guNames.filter((gu) => title.includes(gu));
     if (titleMatches.length === 1) return SEOUL_GU_MAP[titleMatches[0]];
 
-    // 제목에 없으면 본문 providerName 등에서 감지
-    const textMatches = guNames.filter((gu) => fullText.includes(gu));
+    // 제목에 "구" 없는 단축형 감지: "(광진)", "(강남)" 등
+    const shortNameMatch = title.match(/\(([가-힣]{2,4})\)\s*$/);
+    if (shortNameMatch) {
+      const shortName = shortNameMatch[1];
+      const fullGuName = guNames.find((gu) => gu.startsWith(shortName));
+      if (fullGuName) return SEOUL_GU_MAP[fullGuName];
+    }
+
+    // 2. providerName에서 감지 ("서울시 광진구청", "광진구" 등) — 본문보다 신뢰도 높음
+    if (providerName) {
+      const providerMatches = guNames.filter((gu) => providerName.includes(gu));
+      if (providerMatches.length === 1) return SEOUL_GU_MAP[providerMatches[0]];
+    }
+
+    // 3. 본문 전체에서 감지 (여러 구 언급 시 신뢰도 낮으므로 마지막 수단)
+    // 거주/주민등록 문맥 근처에서만 인정 — 시설 주소 등에서 오탐 방지
+    const residencyPattern = /(?:거주|주민등록|주소지|주거지)/;
+    const textMatches = guNames.filter((gu) => {
+      const idx = fullText.indexOf(gu);
+      if (idx === -1) return false;
+      const context = fullText.slice(Math.max(0, idx - 30), idx + gu.length + 30);
+      return residencyPattern.test(context);
+    });
     if (textMatches.length === 1) return SEOUL_GU_MAP[textMatches[0]];
 
     return null;

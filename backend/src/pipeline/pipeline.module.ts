@@ -23,6 +23,7 @@ import { PolicyRequirementGeneratorService } from './policy-requirement-generato
 import { PolicyValidationService } from './policy-validation.service';
 import { LlmRuleExtractorService } from './llm-rule-extractor.service';
 import { PolicyEnrichmentService } from './policy-enrichment.service';
+import { PolicyUrlValidatorService } from './policy-url-validator.service';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { PolicyEnrichmentService } from './policy-enrichment.service';
     PolicyRequirementGeneratorService,
     LlmRuleExtractorService,
     PolicyEnrichmentService,
+    PolicyUrlValidatorService,
     PipelineQualityService,
   ],
   exports: [

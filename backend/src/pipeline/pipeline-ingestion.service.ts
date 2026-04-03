@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { evaluateMvpScope } from '../common/constants/mvp-policy-scope.constant';
+import { getPolicyManualOverride } from '../common/constants/policy-manual-overrides.constant';
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RegionCode } from '../common/enums/region-code.enum';
@@ -295,6 +296,8 @@ export class PipelineIngestionService {
       }
     }
 
+    const manualOverride = getPolicyManualOverride(normalized.code);
+
     const nextPolicy = this.policyRepository.create({
       id: existing?.id,
       code: normalized.code,
@@ -311,8 +314,8 @@ export class PipelineIngestionService {
       categories: normalized.categories,
       regionCodes: normalized.regionCodes,
       targetGenders: existing?.targetGenders ?? [],
-      minAge: normalized.minAge,
-      maxAge: normalized.maxAge,
+      minAge: manualOverride && 'minAge' in manualOverride ? manualOverride.minAge : normalized.minAge,
+      maxAge: manualOverride && 'maxAge' in manualOverride ? manualOverride.maxAge : normalized.maxAge,
       startsAt: normalized.startsAt,
       endsAt: normalized.endsAt,
       isAlwaysOpen: normalized.isAlwaysOpen,
@@ -331,7 +334,7 @@ export class PipelineIngestionService {
     const savedPolicy = await this.policyRepository.save(nextPolicy);
     const action: 'created' | 'updated' = existing ? 'updated' : 'created';
 
-    await this.requirementGenerator.generateForPolicy(savedPolicy, normalized);
+    await this.requirementGenerator.generateForPolicy(savedPolicy, normalized, manualOverride);
 
     const run = await this.runRepository.save(
       this.runRepository.create({
