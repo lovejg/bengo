@@ -9,6 +9,7 @@ import { RegionCode, SEOUL_GU_MAP } from '../common/enums/region-code.enum';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { LlmRuleExtractorService } from './llm-rule-extractor.service';
+import { getPolicyManualOverride, PolicyManualOverride } from '../common/constants/policy-manual-overrides.constant';
 
 const GU_CODE_TO_NAME = Object.fromEntries(
   Object.entries(SEOUL_GU_MAP).map(([name, code]) => [code, name]),
@@ -110,7 +111,8 @@ export class PolicyRequirementGeneratorService {
           extraMeta: policy.extraMeta ?? {},
         };
 
-        await this.generateForPolicy(policy, normalized);
+        const override = getPolicyManualOverride(policy.code);
+        await this.generateForPolicy(policy, normalized, override);
         processed++;
       } catch (error) {
         failed++;
@@ -126,7 +128,31 @@ export class PolicyRequirementGeneratorService {
   async generateForPolicy(
     policy: Policy,
     normalized: NormalizedPolicyDocument,
+    manualOverride?: PolicyManualOverride,
   ): Promise<void> {
+    // manual override: disableRule 또는 overrideRule이면 기존 rule 비활성화 후 저장
+    if (manualOverride?.disableRule || manualOverride?.overrideRule) {
+      await this.ruleRepository.update(
+        { policyId: policy.id, isActive: true },
+        { isActive: false },
+      );
+      const ruleToSave: RuleDefinition = manualOverride.overrideRule ?? {
+        id: `rule-${policy.code}-manual-override`,
+        name: `${policy.title} 수동 override 규칙`,
+        root: null,
+        conditionalHints: manualOverride.conditionalHints ?? [],
+      };
+      await this.ruleRepository.save(
+        this.ruleRepository.create({
+          policyId: policy.id,
+          version: 1,
+          definition: ruleToSave as unknown as Record<string, unknown>,
+          isActive: true,
+          notes: 'manual-override',
+        }),
+      );
+      return;
+    }
     // 이미 requirements가 있으면 중복 생성하지 않는다 (재수집 시 보호).
     const existingCount = await this.requirementRepository.count({
       where: { policyId: policy.id },
@@ -138,7 +164,8 @@ export class PolicyRequirementGeneratorService {
         if (summaryResult?.summary) {
           policy.shortDescription = summaryResult.summary;
         }
-        if (summaryResult?.policyType) {
+        // 규칙 기반 INFO는 LLM이 APPLICATION으로 뒤집지 못하게 함 (LLM 비결정성 방지)
+        if (summaryResult?.policyType && !(policy.policyType === PolicyType.INFO && summaryResult.policyType === 'application')) {
           policy.policyType = summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
         }
         const hasPeriod = policy.isAlwaysOpen || policy.startsAt || policy.endsAt;
@@ -181,8 +208,9 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
-    // 구 단위 정책이면 지역 선택 requirement 자동 추가
+    // 지역 requirement: 구 단위는 구 선택, 서울 전체는 서울 거주 여부
     const hasGuRegion = policy.regionCodes.some((r) => r.startsWith('seoul_'));
+    const hasSeoulRegion = policy.regionCodes.includes(RegionCode.SEOUL);
     if (hasGuRegion) {
       displayOrder += 1;
       const guLabel = this.getGuLabel(policy.regionCodes);
@@ -193,6 +221,18 @@ export class PolicyRequirementGeneratorService {
         description: `${guLabel} 거주자 대상 정책입니다.`,
         type: QuestionType.SELECT,
         options: this.getSeoulGuOptions(),
+        isRequired: false,
+        displayOrder,
+      });
+    } else if (hasSeoulRegion) {
+      displayOrder += 1;
+      requirements.push({
+        policyId: policy.id,
+        key: 'regionCode',
+        label: '거주 지역',
+        description: '서울시 거주자 대상 정책입니다.',
+        type: QuestionType.BOOLEAN,
+        options: null,
         isRequired: false,
         displayOrder,
       });
@@ -318,6 +358,7 @@ export class PolicyRequirementGeneratorService {
           ...this.extractWarnBoxHints(normalized.extraMeta),
           ...this.extractCapacityHints(normalized.description),
           ...this.extractFirstComeHints(normalized.extraMeta),
+          ...(manualOverride?.appendConditionalHints ?? []),
         ],
       };
 
@@ -352,7 +393,8 @@ export class PolicyRequirementGeneratorService {
       policy.shortDescription = llmResult.summary;
     }
 
-    if (llmResult?.policyType) {
+    // 규칙 기반 INFO는 LLM이 APPLICATION으로 뒤집지 못하게 함 (LLM 비결정성 방지)
+    if (llmResult?.policyType && !(policy.policyType === PolicyType.INFO && llmResult.policyType === 'application')) {
       policy.policyType = llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
     }
 
@@ -443,11 +485,13 @@ export class PolicyRequirementGeneratorService {
 
   private extractCapacityHints(description: string): string[] {
     if (!description) return [];
-    // "선착순 N명", "N명 모집", "총 N명" 등 인원 제한 패턴 감지
+    // "선착순 N명", "N명 모집", "총 N명", "지원규모: N명", "약 N여명" 등 인원 제한 패턴 감지
     const patterns = [
-      /선착순\s*\d+\s*명/,
-      /\d+\s*명\s*(?:모집|선발|선정|내외|이내)/,
-      /총\s*\d+\s*명/,
+      /선착순\s*[\d,]+\s*명/,
+      /[\d,]+\s*명\s*(?:모집|선발|선정|내외|이내)/,
+      /총\s*[\d,]+\s*명/,
+      /지원\s*규모\s*[:\s]\s*[\d,]+\s*명/,
+      /약\s*[\d,]+\s*여?\s*명/,
     ];
     for (const pattern of patterns) {
       const match = description.match(pattern);

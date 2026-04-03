@@ -15,6 +15,7 @@ import {
 } from './pipeline-quality.service';
 import { PolicyEnrichmentService } from './policy-enrichment.service';
 import { PolicyRequirementGeneratorService } from './policy-requirement-generator.service';
+import { PolicyUrlValidatorService, UrlValidationReport } from './policy-url-validator.service';
 
 interface CollectAndIngestMvpResult {
   mode: 'mvp';
@@ -43,6 +44,7 @@ export class PipelineController {
     private readonly qualityService: PipelineQualityService,
     private readonly enrichmentService: PolicyEnrichmentService,
     private readonly requirementGenerator: PolicyRequirementGeneratorService,
+    private readonly urlValidator: PolicyUrlValidatorService,
   ) {}
 
   @Get('sources')
@@ -160,6 +162,16 @@ export class PipelineController {
   @ApiOkResponse({ description: '재생성 결과' })
   async regenerateRules() {
     return this.requirementGenerator.regenerateAll();
+  }
+
+  @Post('validate-urls')
+  @ApiOperation({
+    summary: '모든 활성 정책의 sourceUrl 유효성 검증',
+    description: '404/410 응답이나 접근 불가 URL을 null로 초기화합니다.',
+  })
+  @ApiOkResponse({ description: 'URL 검증 결과' })
+  async validateUrls(): Promise<UrlValidationReport> {
+    return this.urlValidator.validateAll();
   }
 
   @Post('collect-and-ingest/:source')

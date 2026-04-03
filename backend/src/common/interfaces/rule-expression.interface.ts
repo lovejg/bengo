@@ -19,6 +19,6 @@ export type RuleNode = RuleCondition | RuleGroup;
 export interface RuleDefinition {
   id: string;
   name: string;
-  root: RuleNode;
+  root: RuleNode | null;
   conditionalHints?: string[];
 }
