@@ -138,12 +138,15 @@ export function MyPage() {
       try {
         const response = await getMyPolicies();
         const visibleItems = response.items;
-        const details = await Promise.all(
+        const results = await Promise.allSettled(
           visibleItems.map(async (item) => {
             const detail = await getPolicyDetail(item.policyId);
             return mapSavedPolicy(item, detail);
           }),
         );
+        const details = results
+          .filter((r): r is PromiseFulfilledResult<SavedPolicy> => r.status === 'fulfilled')
+          .map((r) => r.value);
 
         setSavedPolicies(details);
       } catch (error) {

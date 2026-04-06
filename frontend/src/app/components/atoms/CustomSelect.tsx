@@ -47,7 +47,9 @@ export function CustomSelect({ value, onChange, options, placeholder = '선택�
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-[var(--border)] rounded-xl shadow-lg overflow-hidden">
+        <div
+          className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-[var(--border)] rounded-xl shadow-lg overflow-y-auto max-h-60 overscroll-contain"
+        >
           {options.map((opt) => (
             <button
               key={opt.value}
