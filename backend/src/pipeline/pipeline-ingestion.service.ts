@@ -312,7 +312,7 @@ export class PipelineIngestionService {
       applicationMethod: normalized.applicationMethod,
       status: PolicyStatus.ACTIVE,
       categories: normalized.categories,
-      regionCodes: normalized.regionCodes,
+      regionCodes: manualOverride?.regionCodes ?? normalized.regionCodes,
       targetGenders: existing?.targetGenders ?? [],
       minAge: manualOverride && 'minAge' in manualOverride ? manualOverride.minAge : normalized.minAge,
       maxAge: manualOverride && 'maxAge' in manualOverride ? manualOverride.maxAge : normalized.maxAge,

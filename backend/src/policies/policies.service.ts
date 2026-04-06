@@ -15,6 +15,7 @@ import {
 import { Gender } from '../common/enums/gender.enum';
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
+import { PolicyType } from '../common/enums/policy-type.enum';
 import { RegionCode, regionMatches } from '../common/enums/region-code.enum';
 import { UserPolicyState as UserPolicyStateEnum } from '../common/enums/user-policy-state.enum';
 import {
@@ -118,6 +119,7 @@ export class PoliciesService {
         periodRaw: this.resolvePeriodRaw(policy),
         policyType: policy.policyType,
         targetDescription: policy.targetDescription,
+        sourceType: this.getSourceType(policy.sourceUrl),
       })),
     };
 
@@ -217,6 +219,7 @@ export class PoliciesService {
         periodRaw: this.resolvePeriodRaw(policy),
         targetDescription: policy.targetDescription,
         fitScore: policy.fitScore,
+        sourceType: this.getSourceType(policy.sourceUrl),
         userState: stateMap.get(policy.id)?.state ?? null,
       })),
     };
@@ -228,7 +231,7 @@ export class PoliciesService {
   async getPolicyDetailPublic(policyId: string) {
     const policy = await this.policyRepository.findOne({
       where: { id: policyId, status: PolicyStatus.ACTIVE },
-      relations: ['requirements'],
+      relations: ['requirements', 'rules'],
     });
 
     if (!policy) {
@@ -249,6 +252,7 @@ export class PoliciesService {
       description: policy.description,
       providerName: policy.providerName,
       sourceUrl: policy.sourceUrl,
+      sourceType: this.getSourceType(policy.sourceUrl),
       applicationUrl: policy.applicationUrl,
       applicationMethod: policy.applicationMethod,
       searchUrl: this.buildSearchUrl(policy),
@@ -278,6 +282,7 @@ export class PoliciesService {
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
         warnBox: (extra.warnBox as string) ?? null,
       },
+      eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
     };
   }
 
@@ -314,6 +319,7 @@ export class PoliciesService {
       description: policy.description,
       providerName: policy.providerName,
       sourceUrl: policy.sourceUrl,
+      sourceType: this.getSourceType(policy.sourceUrl),
       applicationUrl: policy.applicationUrl,
       applicationMethod: policy.applicationMethod,
       searchUrl: this.buildSearchUrl(policy),
@@ -343,6 +349,7 @@ export class PoliciesService {
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
         warnBox: (extra.warnBox as string) ?? null,
       },
+      eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
       userState: state?.state ?? null,
       lastEligibility: lastCheck
         ? {
@@ -629,5 +636,62 @@ export class PoliciesService {
   private resolvePeriodRaw(policy: Pick<Policy, 'isAlwaysOpen' | 'periodRaw'>): string | null {
     if (policy.isAlwaysOpen && !policy.periodRaw) return '상시';
     return policy.periodRaw ?? null;
+  }
+
+  /**
+   * 원문 URL 출처 유형.
+   * - 'official' : 정상적인 공공기관 페이지
+   * - 'blog'     : 블로그/SNS 등 비공식 출처
+   * - 'none'     : sourceUrl 없음 (검색 엔진 폴백)
+   */
+  private getSourceType(url: string | null): 'official' | 'blog' | 'none' {
+    if (!url) return 'none';
+    const BLOG_DOMAINS = [
+      'blog.naver.com',
+      'm.blog.naver.com',
+      'naver.me',
+      'tistory.com',
+      'brunch.co.kr',
+      'velog.io',
+      'blog.daum.net',
+      'cafe.naver.com',
+    ];
+    try {
+      const hostname = new URL(url).hostname;
+      if (BLOG_DOMAINS.some((d) => hostname === d || hostname.endsWith(`.${d}`))) {
+        return 'blog';
+      }
+    } catch {
+      // URL 파싱 실패 → official로 간주
+    }
+    return 'official';
+  }
+
+  /**
+   * 자격 판별 데이터 충실도.
+   * - 'full'    : 나이/지역 외 추가 조건이 있음
+   * - 'partial' : 나이/지역만이지만 심사·선착순 등 CONDITIONAL 힌트 존재
+   * - 'minimal' : 나이/지역만, 힌트도 없음 → 데이터 부족 경고 적합
+   * INFO 정책은 조건이 없는 게 정상이므로 'full' 반환.
+   */
+  private computeEligibilityCompleteness(
+    policy: Policy,
+  ): 'full' | 'partial' | 'minimal' {
+    if (policy.policyType === PolicyType.INFO) return 'full';
+
+    const BASE_KEYS = new Set(['age', 'regionCode']);
+    const hasExtraRequirements = (policy.requirements ?? []).some(
+      (r) => !BASE_KEYS.has(r.key),
+    );
+    if (hasExtraRequirements) return 'full';
+
+    const BLOCKING_PATTERN = /선착순|인원\s*제한|모집\s*마감|심사|면접|위원회\s*평가|중복\s*(혜택|신청)/;
+    const activeRules = (policy.rules ?? []).filter((r) => r.isActive);
+    const hasBlockingHint = activeRules.some((r) =>
+      r.definition?.conditionalHints?.some((h) => BLOCKING_PATTERN.test(h)),
+    );
+    if (hasBlockingHint) return 'partial';
+
+    return 'minimal';
   }
 }

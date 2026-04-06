@@ -224,19 +224,8 @@ export class PolicyRequirementGeneratorService {
         isRequired: false,
         displayOrder,
       });
-    } else if (hasSeoulRegion) {
-      displayOrder += 1;
-      requirements.push({
-        policyId: policy.id,
-        key: 'regionCode',
-        label: '거주 지역',
-        description: '서울시 거주자 대상 정책입니다.',
-        type: QuestionType.BOOLEAN,
-        options: null,
-        isRequired: false,
-        displayOrder,
-      });
     }
+    // 서울 전체 정책(hasSeoulRegion)은 profile.regionCode로 자동 처리 — 질문 불필요
 
     const employmentStatus = normalized.extraMeta?.employmentStatus;
     if (typeof employmentStatus === 'string' && employmentStatus.trim() && !this.isUnrestricted(employmentStatus)) {

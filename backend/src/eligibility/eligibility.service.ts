@@ -34,14 +34,8 @@ export class EligibilityService {
       ? Number(input.answers.age)
       : input.profile.age;
 
-    // regionCode가 boolean(서울 거주 여부)으로 오는 경우 처리
-    // true → SEOUL, false → null(지역 불일치로 처리)
     let effectiveRegion: RegionCode;
-    if (input.answers.regionCode === true) {
-      effectiveRegion = RegionCode.SEOUL;
-    } else if (input.answers.regionCode === false) {
-      effectiveRegion = 'non_seoul' as RegionCode; // 서울 아님 → 지역 불일치
-    } else if (input.answers.regionCode != null) {
+    if (input.answers.regionCode != null) {
       effectiveRegion = this.resolveRegionCode(String(input.answers.regionCode));
     } else {
       effectiveRegion = input.profile.regionCode;
@@ -90,10 +84,10 @@ export class EligibilityService {
 
       hasUnverifiable = ruleResult.hasUnverifiable;
 
-      // 선착순/인원제한/심사/중복혜택 hint만 CONDITIONAL 유발
+      // 선착순/인원제한/심사/중복혜택·신청 hint만 CONDITIONAL 유발
       if (input.rule.conditionalHints && input.rule.conditionalHints.length > 0) {
         const hasBlockingHint = input.rule.conditionalHints.some((hint) =>
-          /선착순|인원\s*제한|모집\s*마감|심사|면접|위원회\s*평가|중복\s*혜택/.test(hint),
+          /선착순|인원\s*제한|모집\s*마감|심사|면접|위원회\s*평가|중복\s*(혜택|신청)/.test(hint),
         );
         if (hasBlockingHint) {
           hasUnverifiable = true;
