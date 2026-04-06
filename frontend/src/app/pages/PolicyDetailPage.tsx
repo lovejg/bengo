@@ -74,10 +74,10 @@ function getDaysLeft(endsAt?: string | null): number | null {
 }
 
 function getTargetText(policy: ApiPolicyDetail) {
+  if (policy.targetDescription) return policy.targetDescription as string;
   const target = [
     policy.minAge !== null && policy.minAge !== undefined ? `최소 ${policy.minAge}세` : null,
     policy.maxAge !== null && policy.maxAge !== undefined ? `최대 ${policy.maxAge}세` : null,
-    policy.regionCodes?.length ? policy.regionCodes.map((code) => regionLabels[code] ?? code).join(', ') : null,
   ]
     .filter(Boolean)
     .join(' / ');
@@ -242,11 +242,16 @@ export function PolicyDetailPage() {
   // 마크다운 기호, 공백, 불릿 제거 후 실제 텍스트가 있을 때만 표시
   const selectionCriteria = rawCriteria && rawCriteria.replace(/[\s\-*•·]/g, '').length > 0 ? rawCriteria : null;
 
+  const hasRequirements = (policy?.requirements ?? [])
+    .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
+    .filter((req) => req.key !== 'selection_criteria' && req.label !== '선정기준')
+    .length > 0;
+
   const sections = [
     { id: 'summary', label: '요약', icon: FileText },
     { id: 'target', label: '지원대상', icon: Target },
     ...(selectionCriteria ? [{ id: 'criteria', label: '선정기준', icon: ClipboardList }] : []),
-    { id: 'evidence', label: '근거', icon: Info },
+    ...(eligibilityResult ? [{ id: 'evidence', label: '근거', icon: Info }] : []),
   ];
 
   if (isLoading) {
@@ -438,7 +443,7 @@ export function PolicyDetailPage() {
             )}
 
             {/* Eligibility Check */}
-            <motion.section
+            {hasRequirements && <motion.section
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
               className={cn(
                 'border rounded-2xl p-6 shadow-sm transition-colors duration-300',
@@ -609,10 +614,10 @@ export function PolicyDetailPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.section>
+            </motion.section>}
 
             {/* Evidence */}
-            <motion.section
+            {eligibilityResult && <motion.section
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
               id="evidence"
               ref={(el) => { sectionRefs.current.evidence = el; }}
@@ -660,7 +665,7 @@ export function PolicyDetailPage() {
                   </div>
                 </div>
               </div>
-            </motion.section>
+            </motion.section>}
 
             {/* 연관 정책 */}
             {relatedPolicies.length > 0 && (
