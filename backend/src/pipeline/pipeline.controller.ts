@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PreviewPipelineDto } from './dto/preview-pipeline.dto';
 import { PipelineCollectionService } from './pipeline-collection.service';
@@ -157,11 +157,12 @@ export class PipelineController {
   @ApiOperation({
     summary: '모든 활성 정책의 requirements/rules 재생성',
     description:
-      '기존 requirements와 LLM rules를 삭제하고 현재 로직으로 재생성합니다. shortDescription도 LLM으로 재생성됩니다.',
+      '기본: 콘텐츠 해시 기반으로 변경된 정책만 LLM 재호출 (빠름). ' +
+      '?force=true: 기존 rules/requirements 전부 삭제 후 전체 재생성 (LLM 프롬프트 수정 시 사용).',
   })
   @ApiOkResponse({ description: '재생성 결과' })
-  async regenerateRules() {
-    return this.requirementGenerator.regenerateAll();
+  async regenerateRules(@Query('force') force?: string) {
+    return this.requirementGenerator.regenerateAll(force === 'true');
   }
 
   @Post('validate-urls')

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +16,23 @@ const GU_CODE_TO_NAME = Object.fromEntries(
   Object.entries(SEOUL_GU_MAP).map(([name, code]) => [code, name]),
 );
 
+/** 정책 콘텐츠 해시 — LLM 입력이 되는 필드만 포함 */
+function computePolicyContentHash(policy: Policy): string {
+  const extra = (policy.extraMeta ?? {}) as Record<string, unknown>;
+  const content = [
+    policy.title,
+    policy.description,
+    policy.policyType,
+    policy.regionCodes.join(','),
+    String(extra.selectionCriteria ?? ''),
+    String(extra.supportContent ?? ''),
+    String(extra.warnBox ?? ''),
+    String(extra.targetInfo ?? ''),
+    String(extra.employmentStatus ?? ''),
+  ].join('\x00');
+  return createHash('md5').update(content).digest('hex');
+}
+
 @Injectable()
 export class PolicyRequirementGeneratorService {
   private readonly logger = new Logger(PolicyRequirementGeneratorService.name);
@@ -29,15 +47,19 @@ export class PolicyRequirementGeneratorService {
     private readonly llmExtractor: LlmRuleExtractorService,
   ) {}
 
-  async regenerateAll(): Promise<{ total: number; processed: number; failed: number }> {
-    // 1. 기존 requirements + LLM rules 전부 삭제
-    const deletedReqs = await this.requirementRepository.createQueryBuilder()
-      .delete().execute();
-    const deletedRules = await this.ruleRepository.createQueryBuilder()
-      .delete().where('notes = :notes', { notes: 'LLM auto-extracted' }).execute();
-    this.logger.log(
-      `Cleared ${deletedReqs.affected} requirements, ${deletedRules.affected} LLM rules`,
-    );
+  async regenerateAll(force = false): Promise<{ total: number; processed: number; skipped: number; failed: number }> {
+    if (force) {
+      // force 모드: 기존 requirements + LLM rules 전부 삭제 후 재생성
+      const deletedReqs = await this.requirementRepository.createQueryBuilder()
+        .delete().execute();
+      const deletedRules = await this.ruleRepository.createQueryBuilder()
+        .delete().where('notes = :notes', { notes: 'LLM auto-extracted' }).execute();
+      this.logger.log(
+        `[force] Cleared ${deletedReqs.affected} requirements, ${deletedRules.affected} LLM rules`,
+      );
+    } else {
+      this.logger.log('regenerateAll: hash-based skip mode (변경된 정책만 재생성). 전체 재생성은 ?force=true');
+    }
 
     // 2. 중복 정책 정리 (같은 제목이 여러 소스에서 active인 경우, 우선순위 낮은 쪽 비활성화)
     const allActive = await this.policyRepository.find({
@@ -84,52 +106,67 @@ export class PolicyRequirementGeneratorService {
     }
     await this.policyRepository.save(policies);
 
+    const total = policies.length;
     let processed = 0;
+    let skipped = 0;
     let failed = 0;
+    const CHUNK_SIZE = 20;
 
-    for (const policy of policies) {
-      try {
-        // DB에 저장된 policy 데이터로 NormalizedPolicyDocument 구성
-        const normalized: NormalizedPolicyDocument = {
-          code: policy.code,
-          title: policy.title,
-          shortDescription: policy.shortDescription ?? '',
-          description: policy.description ?? '',
-          providerName: policy.providerName ?? '',
-          sourceUrl: policy.sourceUrl ?? null,
-          applicationUrl: policy.applicationUrl ?? null,
-          applicationMethod: policy.applicationMethod ?? null,
-          categories: policy.categories ?? [],
-          regionCodes: policy.regionCodes ?? [],
-          minAge: policy.minAge,
-          maxAge: policy.maxAge,
-          startsAt: policy.startsAt,
-          endsAt: policy.endsAt,
-          isAlwaysOpen: policy.isAlwaysOpen,
-          periodRaw: policy.periodRaw ?? null,
-          policyType: policy.policyType,
-          extraMeta: policy.extraMeta ?? {},
-        };
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = policies.slice(i, i + CHUNK_SIZE);
+      for (const policy of chunk) {
+        try {
+          const normalized: NormalizedPolicyDocument = {
+            code: policy.code,
+            title: policy.title,
+            shortDescription: policy.shortDescription ?? '',
+            description: policy.description ?? '',
+            providerName: policy.providerName ?? '',
+            sourceUrl: policy.sourceUrl ?? null,
+            applicationUrl: policy.applicationUrl ?? null,
+            applicationMethod: policy.applicationMethod ?? null,
+            categories: policy.categories ?? [],
+            regionCodes: policy.regionCodes ?? [],
+            minAge: policy.minAge,
+            maxAge: policy.maxAge,
+            startsAt: policy.startsAt,
+            endsAt: policy.endsAt,
+            isAlwaysOpen: policy.isAlwaysOpen,
+            periodRaw: policy.periodRaw ?? null,
+            policyType: policy.policyType,
+            extraMeta: policy.extraMeta ?? {},
+          };
 
-        const override = getPolicyManualOverride(policy.code);
-        await this.generateForPolicy(policy, normalized, override);
-        processed++;
-      } catch (error) {
-        failed++;
-        this.logger.error(
-          `Failed to regenerate for ${policy.code}: ${error instanceof Error ? error.message : String(error)}`,
-        );
+          const override = getPolicyManualOverride(policy.code);
+          const wasSkipped = await this.generateForPolicy(policy, normalized, override, force);
+          if (wasSkipped) skipped++; else processed++;
+        } catch (error) {
+          failed++;
+          this.logger.error(
+            `Failed to regenerate for ${policy.code}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
       }
+      // 청크 처리 후 event loop 양보 → V8 GC 실행 기회 부여
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      this.logger.log(
+        `regenerateAll progress: ${Math.min(i + CHUNK_SIZE, total)}/${total}` +
+        ` (processed=${processed} skipped=${skipped} failed=${failed})`,
+      );
     }
 
-    return { total: policies.length, processed, failed };
+    return { total, processed, skipped, failed };
   }
 
+  /**
+   * @returns true = 해시 동일로 스킵됨, false = 정상 처리됨
+   */
   async generateForPolicy(
     policy: Policy,
     normalized: NormalizedPolicyDocument,
     manualOverride?: PolicyManualOverride,
-  ): Promise<void> {
+    force = false,
+  ): Promise<boolean> {
     // manual override: disableRule 또는 overrideRule이면 기존 rule 비활성화 후 저장
     if (manualOverride?.disableRule || manualOverride?.overrideRule) {
       await this.ruleRepository.update(
@@ -151,8 +188,21 @@ export class PolicyRequirementGeneratorService {
           notes: 'manual-override',
         }),
       );
-      return;
+      return false;
     }
+
+    // 해시 기반 스킵: force=false이면 콘텐츠가 변경되지 않은 정책은 LLM 재호출 안 함
+    const currentHash = computePolicyContentHash(policy);
+    if (!force) {
+      const existingRule = await this.ruleRepository.findOne({
+        where: { policyId: policy.id, isActive: true },
+        order: { createdAt: 'DESC' },
+      });
+      if (existingRule?.contentHash === currentHash) {
+        return true; // 변경 없음, 스킵
+      }
+    }
+
     // 이미 requirements가 있으면 중복 생성하지 않는다 (재수집 시 보호).
     const existingCount = await this.requirementRepository.count({
       where: { policyId: policy.id },
@@ -188,7 +238,7 @@ export class PolicyRequirementGeneratorService {
           await this.policyRepository.save(policy);
         }
       }
-      return;
+      return false;
     }
 
     const requirements: Array<Partial<PolicyRequirement>> = [];
@@ -358,6 +408,7 @@ export class PolicyRequirementGeneratorService {
           definition: ruleDefinition,
           isActive: true,
           notes: 'LLM auto-extracted',
+          contentHash: currentHash,
         }),
       );
 
@@ -413,12 +464,13 @@ export class PolicyRequirementGeneratorService {
     }
 
     if (requirements.length === 0) {
-      return;
+      return false;
     }
 
     await this.requirementRepository.save(
       requirements.map((r) => this.requirementRepository.create(r)),
     );
+    return false;
   }
 
   private isUnrestricted(value: string): boolean {
