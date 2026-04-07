@@ -26,6 +26,10 @@ export interface MvpBatchPlan {
     source: string;
     reason: string;
   }>;
+  failedCollections?: Array<{
+    source: string;
+    message: string;
+  }>;
 }
 
 export interface MvpCollectedSource {
@@ -113,14 +117,23 @@ export class PipelineCollectionService {
   async collectMvpBatchSources(): Promise<MvpBatchPlan & { collected: MvpCollectedSource[] }> {
     const plan = this.getMvpBatchPlan();
     const collected: MvpCollectedSource[] = [];
+    const failedCollections: Array<{ source: string; message: string }> = [];
 
     for (const source of plan.targets) {
-      const items = await this.collect(source);
-      collected.push({ source, items });
+      try {
+        const items = await this.collect(source);
+        collected.push({ source, items });
+      } catch (error) {
+        failedCollections.push({
+          source,
+          message: error instanceof Error ? error.message : '수집 중 알 수 없는 오류',
+        });
+      }
     }
 
     return {
       ...plan,
+      failedCollections,
       collected,
     };
   }

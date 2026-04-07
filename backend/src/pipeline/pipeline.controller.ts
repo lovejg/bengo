@@ -24,6 +24,10 @@ interface CollectAndIngestMvpResult {
     source: string;
     reason: string;
   }>;
+  failedCollections: Array<{
+    source: string;
+    message: string;
+  }>;
   results: Array<{
     source: string;
     ingest: IngestBatchResult;
@@ -127,6 +131,7 @@ export class PipelineController {
       mode: 'mvp',
       targets: batch.targets,
       skipped: batch.skipped,
+      failedCollections: batch.failedCollections ?? [],
       results,
       failedSources,
     };
