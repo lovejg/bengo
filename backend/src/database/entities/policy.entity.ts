@@ -24,7 +24,7 @@ export class Policy {
   @Column({ type: 'varchar', length: 64, unique: true })
   code!: string;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'varchar', length: 500 })
   title!: string;
 
   @Column({ type: 'text' })
@@ -33,13 +33,13 @@ export class Policy {
   @Column({ type: 'text' })
   description!: string;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'varchar', length: 300 })
   providerName!: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'varchar', length: 2000, nullable: true })
   sourceUrl!: string | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'varchar', length: 2000, nullable: true })
   applicationUrl!: string | null;
 
   @Column({ type: 'text', nullable: true })

@@ -382,10 +382,26 @@ export class PipelineIngestionService {
     for (let i = 0; i < total; i += chunkSize) {
       const chunk = rawDocuments.slice(i, i + chunkSize);
       for (const raw of chunk) {
-        const result = await this.ingestOne(raw);
-        if (result.persisted) persisted++;
-        if (result.action === 'failed') { failed++; failedItems.push(result); }
-        if (result.action === 'skipped') skipped++;
+        try {
+          const result = await this.ingestOne(raw);
+          if (result.persisted) persisted++;
+          if (result.action === 'failed') { failed++; failedItems.push(result); }
+          if (result.action === 'skipped') skipped++;
+        } catch (error) {
+          failed++;
+          const message = error instanceof Error ? error.message : '적재 중 알 수 없는 오류';
+          this.logger.error(`ingestOne 실패 — "${raw.title}": ${message}`);
+          failedItems.push({
+            rawDocumentId: 'error',
+            runId: 'error',
+            persisted: false,
+            action: 'failed',
+            message,
+            policy: null,
+            validation: { isValid: false, errors: [message], warnings: [] },
+            normalizationMeta: { confidence: 0, usedLlmFallback: false },
+          });
+        }
       }
       // 청크 처리 후 event loop 양보 → V8 GC 실행 기회 부여
       await new Promise<void>((resolve) => setImmediate(resolve));

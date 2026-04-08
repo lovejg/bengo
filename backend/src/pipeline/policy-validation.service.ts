@@ -22,7 +22,7 @@ export class PolicyValidationService {
     }
 
     if (policy.minAge !== null && policy.maxAge !== null && policy.minAge > policy.maxAge) {
-      errors.push('minAge는 maxAge보다 작거나 같아야 합니다.');
+      [policy.minAge, policy.maxAge] = [policy.maxAge, policy.minAge];
     }
 
     if (!policy.sourceUrl) {

@@ -12,6 +12,22 @@ npm run dev
 
 ---
 
+## DB 초기화 (처음 세팅 또는 데이터 전체 리셋)
+
+**서버를 먼저 종료(Ctrl+C)한 뒤** 실행하세요.
+
+```bash
+# backend/ 디렉토리에서
+npm run db:reset
+```
+
+완료 메시지가 뜨면 `npm run start:dev`로 서버를 다시 시작합니다.  
+서버가 뜨면서 TypeORM이 테이블을 자동으로 새로 만듭니다.
+
+> `.env`의 `POSTGRES_PASSWORD` 값이 본인 DB 비밀번호와 일치하는지 확인하세요.
+
+---
+
 ## 파이프라인 명령어
 
 파이프라인은 정책 데이터를 수집·가공하는 백엔드 프로세스입니다.  
@@ -35,8 +51,14 @@ curl -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp
 - 수집기 코드(`collectors/`)가 수정됐을 때
 - 정규화 로직(`policy-normalization.service.ts`)이 수정됐을 때
 
-**소요 시간:** 약 10~20분  
-(수집된 정책 수가 많을수록 오래 걸립니다. 현재 온통청년 기준 약 400개 이상)
+**소요 시간:** 약 5~10분
+
+**응답에서 확인할 것:**
+- `failedCollections` — 수집 자체가 실패한 소스 (외부 API 장애 시 여기에 표시됨)
+- `failedSources` — 수집은 됐지만 DB 적재가 실패한 소스
+- 두 항목 모두 비어있으면 정상
+
+> 외부 API 장애로 일부 소스가 `failedCollections`에 뜨더라도 나머지 소스는 정상 수집됩니다.
 
 ---
 
@@ -52,7 +74,6 @@ DB에 있는 정책을 대상으로 LLM이 자격 조건 규칙을 다시 생성
 
 **언제 실행하나요?**
 - 수동 오버라이드(`policy-manual-overrides.constant.ts`)를 수정했을 때
-- 적격성 판단 로직(`eligibility.service.ts`)이 수정됐을 때
 - 데이터 재수집 없이 규칙만 업데이트하고 싶을 때
 
 **소요 시간:** 약 5~10분 (스킵된 정책이 많으면 더 빠름)
@@ -122,14 +143,37 @@ curl -X POST http://localhost:4000/pipeline/deactivate-expired
 
 ---
 
-### 전체 초기화 (처음 세팅 또는 대규모 리셋)
+### 전체 초기화 후 재수집 (DB 리셋 포함)
 
 ```bash
-# 순서대로 실행, 각 명령어가 끝난 후 다음 명령어 실행
+# 1. 서버 종료 (Ctrl+C)
+
+# 2. DB 초기화 (backend/ 디렉토리에서)
+npm run db:reset
+
+# 3. 서버 재시작
+npm run start:dev
+
+# 4. 서버가 완전히 뜨면 수집 시작
 curl -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp
-curl -X POST "http://localhost:4000/pipeline/regenerate-rules?force=true"
+
+# 5. 만료 정책 정리
 curl -X POST http://localhost:4000/pipeline/deactivate-expired
 ```
+
+---
+
+## DB 스키마 변경 시 주의사항
+
+엔티티 파일(`*.entity.ts`)의 컬럼 타입/길이를 변경한 경우, **반드시 서버를 종료하고 `db:reset` 후 재시작**해야 합니다.
+
+```bash
+# 서버 종료 (Ctrl+C) 후
+npm run db:reset
+npm run start:dev
+```
+
+서버가 실행 중인 채로 엔티티를 수정하면 TypeORM이 기존 데이터가 있는 테이블에 마이그레이션을 시도하다 실패합니다.
 
 ---
 
@@ -139,3 +183,4 @@ curl -X POST http://localhost:4000/pipeline/deactivate-expired
 - 터미널에 JSON 결과가 출력되면 완료입니다. 그 전까지는 계속 실행 중입니다.
 - 두 명령어를 동시에 실행하면 충돌할 수 있으니 순차적으로 실행하세요.
 - 백엔드 서버 로그(`npm run start:dev` 창)에서 진행 상황을 확인할 수 있습니다.
+- 일부 외부 API가 일시적으로 장애 상태일 수 있습니다. `failedCollections`에 뜨더라도 나머지 소스는 정상 동작합니다.

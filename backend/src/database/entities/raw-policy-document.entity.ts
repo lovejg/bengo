@@ -9,10 +9,10 @@ export class RawPolicyDocumentEntity {
   @Column({ type: 'varchar', length: 120 })
   source!: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 2000, nullable: true })
   sourceUrl!: string | null;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ type: 'varchar', length: 500 })
   title!: string;
 
   @Column({ type: 'text' })

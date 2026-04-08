@@ -6,12 +6,14 @@
   "scripts": {
     "build": "nest build",
     "start": "nest start",
+    "prestart:dev": "bash scripts/db-preflight.sh",
     "start:dev": "node --max-old-space-size=1536 node_modules/.bin/nest start --watch",
     "start:prod": "node --max-old-space-size=1536 dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest",
-    "collect": "curl -s -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp && echo"
+    "collect": "curl -s -X POST http://localhost:4000/pipeline/collect-and-ingest-mvp && echo",
+    "db:reset": "bash scripts/db-reset.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
