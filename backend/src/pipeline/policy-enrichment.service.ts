@@ -21,6 +21,7 @@ interface ParsedGovDetail {
   requiredDocuments?: string;
   contactInfo?: string;
   homepageUrl?: string;
+  warnBox?: string;
 }
 
 @Injectable()
@@ -146,6 +147,11 @@ export class PolicyEnrichmentService {
       updatedFields.push('extraMeta.applicationDeadline');
       changed = true;
     }
+    if (!extra.warnBox && parsed.warnBox) {
+      extra.warnBox = parsed.warnBox.slice(0, 500);
+      updatedFields.push('extraMeta.warnBox');
+      changed = true;
+    }
 
     if (changed) {
       policy.extraMeta = extra;
@@ -185,6 +191,15 @@ export class PolicyEnrichmentService {
         }
       }
     });
+
+    // warn-box: 중복 혜택 불가 등 주의사항 노란 박스
+    const warnParts: string[] = [];
+    $('.warn-box').each((_, el) => {
+      const title = $(el).find('.warn-title').text().trim();
+      const desc = $(el).find('.warn-desc').text().trim();
+      if (title || desc) warnParts.push([title, desc].filter(Boolean).join(': '));
+    });
+    if (warnParts.length > 0) result.warnBox = warnParts.join(' / ');
 
     return result;
   }

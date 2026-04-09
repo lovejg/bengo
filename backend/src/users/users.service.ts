@@ -56,8 +56,12 @@ export class UsersService {
     });
   }
 
+  async findProfile(userId: string): Promise<UserProfile | null> {
+    return this.profileRepository.findOne({ where: { userId } }) ?? null;
+  }
+
   async findProfileOrFail(userId: string): Promise<UserProfile> {
-    const profile = await this.profileRepository.findOne({ where: { userId } });
+    const profile = await this.findProfile(userId);
     if (!profile) {
       throw new NotFoundException('사용자 프로필을 찾을 수 없습니다.');
     }

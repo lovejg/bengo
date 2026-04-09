@@ -282,6 +282,7 @@ export class PoliciesService {
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
         warnBox: (extra.warnBox as string) ?? null,
       },
+      policyType: policy.policyType,
       eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
     };
   }
@@ -367,7 +368,17 @@ export class PoliciesService {
     policyId: string,
     answers: Record<string, unknown>,
   ) {
-    const profile = await this.usersService.findProfileOrFail(userId);
+    // 프로필이 없어도 answers에 age/regionCode가 있으면 자격 판별 가능
+    const profile = await this.usersService.findProfile(userId);
+    if (!profile) {
+      const answerAge = answers.age != null ? Number(answers.age) : null;
+      const answerRegion = answers.regionCode != null ? String(answers.regionCode) : null;
+      if (answerAge === null || answerRegion === null) {
+        throw new BadRequestException(
+          '프로필이 설정되지 않았습니다. 나이(age)와 거주 지역(regionCode)을 입력해주세요.',
+        );
+      }
+    }
 
     const policy = await this.policyRepository.findOne({
       where: { id: policyId, status: PolicyStatus.ACTIVE },
@@ -401,12 +412,24 @@ export class PoliciesService {
       order: { version: 'DESC' },
     });
 
+    const effectiveProfile = profile ?? {
+      age: Number(answers.age),
+      regionCode: String(answers.regionCode) as RegionCode,
+      gender: Gender.UNSPECIFIED,
+      interests: [] as InterestCategory[],
+    };
+
     const evaluated = this.eligibilityService.evaluate({
       policy,
-      profile,
+      profile: effectiveProfile as import('../database/entities').UserProfile,
       answers,
       rule: activeRule?.definition,
     });
+
+    // 프로필 없는 경우(스테일 JWT 등) 판별 결과만 반환하고 이력 저장 스킵
+    if (!profile) {
+      return { result: evaluated.result, reasons: evaluated.reasons, explanation: evaluated.explanation };
+    }
 
     const savedCheck = await this.eligibilityCheckRepository.save(
       this.eligibilityCheckRepository.create({
