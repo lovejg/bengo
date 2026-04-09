@@ -33,6 +33,10 @@ export class PolicyRule {
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
 
+  /** 규칙 생성 시 사용된 정책 콘텐츠의 MD5 해시. 재실행 시 변경 여부 판단에 사용. */
+  @Column({ type: 'text', nullable: true })
+  contentHash!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 }

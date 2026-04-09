@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { evaluateMvpScope } from '../common/constants/mvp-policy-scope.constant';
@@ -48,6 +48,9 @@ export interface IngestBatchResult {
 
 @Injectable()
 export class PipelineIngestionService {
+  private readonly logger = new Logger(PipelineIngestionService.name);
+  private static readonly INGEST_CHUNK_SIZE = 20;
+
   constructor(
     @InjectRepository(RawPolicyDocumentEntity)
     private readonly rawRepository: Repository<RawPolicyDocumentEntity>,
@@ -368,20 +371,47 @@ export class PipelineIngestionService {
   }
 
   async ingestBatch(rawDocuments: RawPolicyDocument[]): Promise<IngestBatchResult> {
-    const results: IngestOneResult[] = [];
+    const chunkSize = PipelineIngestionService.INGEST_CHUNK_SIZE;
+    const total = rawDocuments.length;
+    let persisted = 0;
+    let failed = 0;
+    let skipped = 0;
+    // 실패한 항목만 items에 포함 (전체를 쌓으면 메모리 압박)
+    const failedItems: IngestOneResult[] = [];
 
-    for (const raw of rawDocuments) {
-      const result = await this.ingestOne(raw);
-      results.push(result);
+    for (let i = 0; i < total; i += chunkSize) {
+      const chunk = rawDocuments.slice(i, i + chunkSize);
+      for (const raw of chunk) {
+        try {
+          const result = await this.ingestOne(raw);
+          if (result.persisted) persisted++;
+          if (result.action === 'failed') { failed++; failedItems.push(result); }
+          if (result.action === 'skipped') skipped++;
+        } catch (error) {
+          failed++;
+          const message = error instanceof Error ? error.message : '적재 중 알 수 없는 오류';
+          this.logger.error(`ingestOne 실패 — "${raw.title}": ${message}`);
+          failedItems.push({
+            rawDocumentId: 'error',
+            runId: 'error',
+            persisted: false,
+            action: 'failed',
+            message,
+            policy: null,
+            validation: { isValid: false, errors: [message], warnings: [] },
+            normalizationMeta: { confidence: 0, usedLlmFallback: false },
+          });
+        }
+      }
+      // 청크 처리 후 event loop 양보 → V8 GC 실행 기회 부여
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      this.logger.log(
+        `ingestBatch progress: ${Math.min(i + chunkSize, total)}/${total}` +
+        ` (persisted=${persisted} failed=${failed} skipped=${skipped})`,
+      );
     }
 
-    return {
-      total: results.length,
-      persisted: results.filter((item) => item.persisted).length,
-      failed: results.filter((item) => item.action === 'failed').length,
-      skipped: results.filter((item) => item.action === 'skipped').length,
-      items: results,
-    };
+    return { total, persisted, failed, skipped, items: failedItems };
   }
 
   async deactivateExpiredPolicies(): Promise<{ deactivated: number }> {

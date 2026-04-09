@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   MVP_DEFAULT_BATCH_SOURCES,
   MVP_EXCLUDED_SOURCES,
@@ -26,6 +26,10 @@ export interface MvpBatchPlan {
     source: string;
     reason: string;
   }>;
+  failedCollections?: Array<{
+    source: string;
+    message: string;
+  }>;
 }
 
 export interface MvpCollectedSource {
@@ -35,6 +39,7 @@ export interface MvpCollectedSource {
 
 @Injectable()
 export class PipelineCollectionService {
+  private readonly logger = new Logger(PipelineCollectionService.name);
   private readonly collectors: PolicyCollector[];
 
   constructor(
@@ -112,16 +117,31 @@ export class PipelineCollectionService {
 
   async collectMvpBatchSources(): Promise<MvpBatchPlan & { collected: MvpCollectedSource[] }> {
     const plan = this.getMvpBatchPlan();
-    const collected: MvpCollectedSource[] = [];
 
-    for (const source of plan.targets) {
-      const items = await this.collect(source);
-      collected.push({ source, items });
+    this.logger.log(`수집 시작 — 소스: ${plan.targets.join(', ')}`);
+    const settlements = await Promise.allSettled(
+      plan.targets.map(async (source) => {
+        const items = await this.collect(source);
+        this.logger.log(`[${source}] 수집 완료 — ${items.length}개`);
+        return { source, items };
+      }),
+    );
+
+    const collected: MvpCollectedSource[] = [];
+    const failedCollections: Array<{ source: string; message: string }> = [];
+
+    for (let i = 0; i < plan.targets.length; i++) {
+      const result = settlements[i];
+      const source = plan.targets[i];
+      if (result.status === 'fulfilled') {
+        collected.push(result.value);
+      } else {
+        const message = result.reason instanceof Error ? result.reason.message : '수집 중 알 수 없는 오류';
+        this.logger.error(`[${source}] 수집 실패 — ${message}`);
+        failedCollections.push({ source, message });
+      }
     }
 
-    return {
-      ...plan,
-      collected,
-    };
+    return { ...plan, failedCollections, collected };
   }
 }

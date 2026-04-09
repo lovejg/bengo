@@ -286,9 +286,10 @@ export class LlmRuleExtractorService {
         model: this.model,
         max_tokens: summaryOnly ? 256 : 2048,
         temperature: 0,
-        system: systemPrompt,
+        // system prompt는 모든 호출에서 동일 → Anthropic prompt caching으로 토큰 비용 절감
+        system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: userMessage }],
-      });
+      } as any);
 
       const text = response.content
         .filter((block): block is Anthropic.TextBlock => block.type === 'text')

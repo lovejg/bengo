@@ -203,7 +203,7 @@ export function PolicyCard({
         className={cn(
           'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col overflow-hidden',
           'shadow-sm hover:shadow-xl',
-          status ? borderColors[status] : periodRaw ? 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/40' : 'border-orange-500 hover:border-orange-600 hover:shadow-orange-500/30 bg-orange-100/70',
+          status ? borderColors[status] : periodRaw ? 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/40' : 'border-red-500 hover:border-red-600 hover:shadow-red-500/30 bg-red-100/70',
           'hover:-translate-y-2',
           'transition-all duration-300 ease-out',
           className
