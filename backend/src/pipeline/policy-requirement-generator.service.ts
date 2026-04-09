@@ -168,6 +168,7 @@ export class PolicyRequirementGeneratorService {
     force = false,
   ): Promise<boolean> {
     // manual override: disableRule 또는 overrideRule이면 기존 rule 비활성화 후 저장
+    let isManualOverride = false;
     if (manualOverride?.disableRule || manualOverride?.overrideRule) {
       await this.ruleRepository.update(
         { policyId: policy.id, isActive: true },
@@ -188,7 +189,8 @@ export class PolicyRequirementGeneratorService {
           notes: 'manual-override',
         }),
       );
-      return false;
+      isManualOverride = true;
+      // 규칙 저장 후 requirements도 생성하기 위해 계속 진행
     }
 
     // 해시 기반 스킵: force=false이면 콘텐츠가 변경되지 않은 정책은 LLM 재호출 안 함
@@ -208,8 +210,8 @@ export class PolicyRequirementGeneratorService {
       where: { policyId: policy.id },
     });
     if (existingCount > 0) {
-      // summary가 없으면 LLM summaryOnly 호출
-      if (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120)) {
+      // summary가 없으면 LLM summaryOnly 호출 (manual override는 LLM 스킵)
+      if (!isManualOverride && (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120))) {
         const summaryResult = await this.llmExtractor.extractRules(policy, normalized, true);
         if (summaryResult?.summary) {
           policy.shortDescription = summaryResult.summary;
@@ -322,15 +324,30 @@ export class PolicyRequirementGeneratorService {
       });
     }
 
+    // manual override인 경우 override rule의 answers.* 조건에서 requirements 추출
+    if (isManualOverride && manualOverride?.overrideRule?.root) {
+      const overrideReqs = this.extractRequirementsFromRuleNode(
+        manualOverride.overrideRule.root as Record<string, unknown>,
+        policy.id,
+      );
+      const existingKeys = new Set(requirements.map((r) => r.key));
+      for (const req of overrideReqs) {
+        if (!existingKeys.has(req.key)) {
+          displayOrder += 1;
+          requirements.push({ ...req, displayOrder });
+          existingKeys.add(req.key!);
+        }
+      }
+    }
+
     // INFO 타입 정책은 자격 조건 추출 불필요 (summary만 생성)
     const isInfoPolicy = normalized.policyType === PolicyType.INFO;
-    const llmResult = await this.llmExtractor.extractRules(
-      policy,
-      normalized,
-      isInfoPolicy,
-    );
+    // manual override 정책은 LLM 호출 스킵
+    const llmResult = isManualOverride
+      ? null
+      : await this.llmExtractor.extractRules(policy, normalized, isInfoPolicy);
 
-    if (!isInfoPolicy && llmResult && llmResult.conditions.length > 0) {
+    if (!isInfoPolicy && !isManualOverride && llmResult && llmResult.conditions.length > 0) {
       // 의미적으로 같은 키 그룹 (LLM이 다른 이름으로 추출할 수 있음)
       const KEY_ALIASES: Record<string, string[]> = {
         employmentStatus: ['employmentStatus', 'jobStatus', 'workStatus'],
@@ -433,8 +450,11 @@ export class PolicyRequirementGeneratorService {
       policy.shortDescription = llmResult.summary;
     }
 
-    // 규칙 기반 INFO는 LLM이 APPLICATION으로 뒤집지 못하게 함 (LLM 비결정성 방지)
-    if (llmResult?.policyType && !(policy.policyType === PolicyType.INFO && llmResult.policyType === 'application')) {
+    // manual override policyType이 있으면 LLM 결과 무시하고 강제 고정
+    if (manualOverride?.policyType) {
+      policy.policyType = manualOverride.policyType;
+    } else if (llmResult?.policyType && !(policy.policyType === PolicyType.INFO && llmResult.policyType === 'application')) {
+      // 규칙 기반 INFO는 LLM이 APPLICATION으로 뒤집지 못하게 함 (LLM 비결정성 방지)
       policy.policyType = llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
     }
 
@@ -471,6 +491,72 @@ export class PolicyRequirementGeneratorService {
       requirements.map((r) => this.requirementRepository.create(r)),
     );
     return false;
+  }
+
+  /** override rule 트리에서 answers.* fact를 가진 조건을 requirements로 변환 */
+  private extractRequirementsFromRuleNode(
+    node: Record<string, unknown>,
+    policyId: string,
+  ): Array<Partial<PolicyRequirement>> {
+    const reqs: Array<Partial<PolicyRequirement>> = [];
+    if (!node) return reqs;
+
+    if ('fact' in node && typeof node.fact === 'string' && node.fact.startsWith('answers.')) {
+      const key = node.fact.replace('answers.', '');
+      const message = typeof node.message === 'string' ? node.message : key;
+      const isNumericComparison =
+        typeof node.value === 'number' &&
+        ['<=', '>=', '<', '>'].includes(String(node.op));
+      reqs.push({
+        policyId,
+        key,
+        label: this.formatKeyAsLabel(key, message),
+        description: message,
+        type: typeof node.value === 'boolean'
+          ? QuestionType.BOOLEAN
+          : isNumericComparison
+            ? QuestionType.NUMBER
+            : QuestionType.STRING,
+        options: null,
+        isRequired: true,
+        displayOrder: 0,
+      });
+    }
+
+    for (const branchKey of ['all', 'any']) {
+      const branch = node[branchKey];
+      if (Array.isArray(branch)) {
+        for (const child of branch as Record<string, unknown>[]) {
+          reqs.push(...this.extractRequirementsFromRuleNode(child, policyId));
+        }
+      }
+    }
+
+    return reqs;
+  }
+
+  /** answers 키를 사람이 읽기 좋은 레이블로 변환 */
+  private formatKeyAsLabel(key: string, fallback: string): string {
+    const LABELS: Record<string, string> = {
+      monthlyIncome: '월 가구소득 (만원)',
+      totalAssets: '총 자산 (만원)',
+      militaryService: '제대군인 여부',
+      livingArea: '동대문구 생활권자 여부',
+      applicantStatus: '신청자 상태',
+      generationalFusion: '세대융합 창업 계획 여부',
+      residencyOver1Year: '서초구 1년 이상 거주 여부',
+      receivingNationalEmploymentSupport: '국민취업지원제도 수혜 여부',
+      receivingSeoulYouthAllowance: '서울 청년수당 수혜 여부',
+      qualificationExamTaken: '시험 응시 여부',
+      receivingSimilarAssetProgram: '유사자산형성사업 참여 여부',
+      receivingSimilarGovProgram: '정부·지자체 유사사업 참여 여부',
+      yearsAfterFounding: '창업 후 경과 연수',
+      receivingSimilarTenureProgram: '근속장려금 유사사업 참여 여부',
+      receivingOtherScholarship: '타 장학금 수혜 여부',
+      receivingNationalScholarship: '국가장학금 수혜 여부',
+      receivingYouthIndependenceTransport: '서울시 자립준비청년 교통비 지원 수혜 여부',
+    };
+    return LABELS[key] ?? fallback;
   }
 
   private isUnrestricted(value: string): boolean {
