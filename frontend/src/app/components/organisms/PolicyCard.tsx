@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { Bookmark, ArrowRight } from 'lucide-react';
 import { Badge } from '../atoms/Badge';
 import { PolicyMetaRow } from '../molecules/PolicyMetaRow';
@@ -157,6 +157,7 @@ export function PolicyCard({
   className,
   applicationStatus,
 }: PolicyCardProps) {
+  const location = useLocation();
   const [isBookmarkAnimating, setIsBookmarkAnimating] = useState(false);
   const status = getDisplayStatus(applicationStatus, endsAt, isAlwaysOpen);
   const eligibility = getEligibility(fitScore ?? null);
@@ -172,6 +173,13 @@ export function PolicyCard({
     setIsBookmarkAnimating(true);
     setTimeout(() => setIsBookmarkAnimating(false), 600);
     onBookmark?.();
+  };
+
+  const handleCardClick = () => {
+    if (location.pathname === '/policies') {
+      const key = `scroll:${location.pathname}${location.search}`;
+      window.sessionStorage.setItem(key, String(window.scrollY));
+    }
   };
 
   const statusLabels = {
@@ -198,10 +206,10 @@ export function PolicyCard({
   };
 
   return (
-    <Link to={`/policies/${id}`} className="block h-full">
+    <Link to={`/policies/${id}`} className="block h-full" onClick={handleCardClick}>
       <article
         className={cn(
-          'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col overflow-hidden',
+          'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col',
           'shadow-sm hover:shadow-xl',
           status ? borderColors[status] : periodRaw ? 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/40' : 'border-red-500 hover:border-red-600 hover:shadow-red-500/30 bg-red-100/70',
           'hover:-translate-y-2',
@@ -244,7 +252,7 @@ export function PolicyCard({
           )}
         </div>
 
-        <p className="text-[var(--muted-foreground)] text-sm line-clamp-2 leading-relaxed mb-5">
+        <p className="text-[var(--muted-foreground)] text-sm leading-relaxed mb-5">
           {shortDescription || '요약 정보가 없습니다.'}
         </p>
         </div>

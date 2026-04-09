@@ -1,4 +1,5 @@
-import { createBrowserRouter } from 'react-router';
+import { createElement, Fragment } from 'react';
+import { createBrowserRouter, Outlet, ScrollRestoration } from 'react-router';
 import { SignupPage } from './pages/SignupPage';
 import { LoginPage } from './pages/LoginPage';
 import { PoliciesPage } from './pages/PoliciesPage';
@@ -8,37 +9,51 @@ import { HomePage } from './pages/HomePage';
 import { PersonalizedPoliciesPage } from './pages/PersonalizedPoliciesPage';
 import { ProfilePage } from './pages/ProfilePage';
 
+function RootLayout() {
+  return createElement(
+    Fragment,
+    null,
+    createElement(ScrollRestoration),
+    createElement(Outlet),
+  );
+}
+
 export const router = createBrowserRouter([
   {
-    path: '/',
-    Component: HomePage,
-  },
-  {
-    path: '/signup',
-    Component: SignupPage,
-  },
-  {
-    path: '/login',
-    Component: LoginPage,
-  },
-  {
-    path: '/policies',
-    Component: PoliciesPage,
-  },
-  {
-    path: '/policies/:id',
-    Component: PolicyDetailPage,
-  },
-  {
-    path: '/personalized',
-    Component: PersonalizedPoliciesPage,
-  },
-  {
-    path: '/me',
-    Component: MyPage,
-  },
-  {
-    path: '/profile',
-    Component: ProfilePage,
+    Component: RootLayout,
+    children: [
+      {
+        path: '/',
+        Component: HomePage,
+      },
+      {
+        path: '/signup',
+        Component: SignupPage,
+      },
+      {
+        path: '/login',
+        Component: LoginPage,
+      },
+      {
+        path: '/policies',
+        Component: PoliciesPage,
+      },
+      {
+        path: '/policies/:id',
+        Component: PolicyDetailPage,
+      },
+      {
+        path: '/personalized',
+        Component: PersonalizedPoliciesPage,
+      },
+      {
+        path: '/me',
+        Component: MyPage,
+      },
+      {
+        path: '/profile',
+        Component: ProfilePage,
+      },
+    ],
   },
 ]);

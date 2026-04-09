@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -27,6 +27,8 @@ const quickFilters = [
 type StatusFilter = 'recruiting' | 'always' | 'period_raw' | 'unknown';
 
 export function PoliciesPage() {
+  const location = useLocation();
+  const navigationType = useNavigationType();
   const [sortBy, setSortBy] = useState<SortOption>('latest');
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [appliedFilters, setAppliedFilters] = useState<Array<{ id: string; label: string; value: string }>>([]);
@@ -41,11 +43,15 @@ export function PoliciesPage() {
   const [hasError, setHasError] = useState(false);
   const [policies, setPolicies] = useState<PolicyListItem[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  const [pendingScrollRestore, setPendingScrollRestore] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
   const searchQuery = searchParams.get('search') ?? '';
   const statusFilter = (searchParams.get('status') as StatusFilter | null) ?? null;
   const typeFilter = (searchParams.get('type') as 'application' | 'info' | null) ?? null;
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
 
   const setStatusFilter = (val: StatusFilter | null | ((prev: StatusFilter | null) => StatusFilter | null)) => {
     setSearchParams((prev) => {
@@ -54,6 +60,7 @@ export function PoliciesPage() {
       prev.set('page', '1');
       return prev;
     }, { replace: true });
+    scrollToTop();
   };
 
   const setTypeFilter = (val: 'application' | 'info' | null | ((prev: 'application' | 'info' | null) => 'application' | 'info' | null)) => {
@@ -63,12 +70,56 @@ export function PoliciesPage() {
       prev.set('page', '1');
       return prev;
     }, { replace: true });
+    scrollToTop();
   };
 
   const setCurrentPage = (page: number) => {
     setSearchParams((prev) => { prev.set('page', String(page)); return prev; }, { replace: true });
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
+
+  useEffect(() => {
+    if (navigationType !== 'POP') {
+      return;
+    }
+
+    const key = `scroll:${location.pathname}${location.search}`;
+    const saved = window.sessionStorage.getItem(key);
+    if (!saved) {
+      return;
+    }
+    setPendingScrollRestore(Number(saved));
+  }, [location.pathname, location.search, navigationType]);
+
+  useEffect(() => {
+    if (navigationType !== 'POP' || pendingScrollRestore === null || isLoading) {
+      return;
+    }
+
+    let attempts = 0;
+    let frame = 0;
+
+    const restore = () => {
+      attempts += 1;
+      window.scrollTo({ top: pendingScrollRestore, behavior: 'instant' });
+
+      const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
+      const reached =
+        Math.abs(window.scrollY - pendingScrollRestore) < 4 ||
+        maxScrollTop >= pendingScrollRestore;
+
+      if (reached || attempts >= 20) {
+        setPendingScrollRestore(null);
+        return;
+      }
+
+      frame = window.requestAnimationFrame(restore);
+    };
+
+    frame = window.requestAnimationFrame(restore);
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isLoading, navigationType, pendingScrollRestore]);
 
   useEffect(() => {
     const loadPolicies = async () => {
@@ -106,6 +157,7 @@ export function PoliciesPage() {
       prev.set('page', '1');
       return prev;
     }, { replace: true });
+    scrollToTop();
   };
 
   const handleFilterChange = (filters: string[]) => {
@@ -121,6 +173,8 @@ export function PoliciesPage() {
     if (filters.length > 0) {
       toast.success('필터가 적용되었습니다');
     }
+
+    scrollToTop();
   };
 
   const handleRemoveFilter = (id: string) => {
@@ -138,6 +192,7 @@ export function PoliciesPage() {
       recruitStatuses: [],
     });
     toast.info('모든 필터가 초기화되었습니다');
+    scrollToTop();
   };
 
   const handleExpandableFiltersChange = (filters: ExpandableFiltersState) => {
@@ -212,6 +267,8 @@ export function PoliciesPage() {
     if (newFilters.length > 0) {
       toast.success('필터가 적용되었습니다');
     }
+
+    scrollToTop();
   };
 
   const handleRetry = () => {
