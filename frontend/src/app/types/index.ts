@@ -9,6 +9,7 @@ export interface Policy {
   eligibility?: 'eligible' | 'needsReview' | 'infoLacking';
   source: string;
   sourceUrl?: string;
+  sourceType?: 'official' | 'blog' | 'none';
   details?: {
     target: string;
     criteria: string;

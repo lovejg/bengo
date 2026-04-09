@@ -4,6 +4,9 @@ export type PolicySortBy = 'relevance' | 'deadline' | 'latest';
 export type SortOrder = 'asc' | 'desc';
 export type UserPolicyState = 'saved' | 'applied';
 export type EligibilityResult = 'eligible' | 'conditional' | 'ineligible';
+export type EligibilityCompleteness = 'full' | 'partial' | 'minimal';
+export type SourceType = 'official' | 'blog' | 'none';
+export type PolicyType = 'application' | 'info';
 
 export interface GetPoliciesParams {
   search?: string;
@@ -29,6 +32,7 @@ export interface PolicyListItem {
   isAlwaysOpen: boolean;
   periodRaw?: string | null;
   fitScore?: number | null;
+  sourceType?: SourceType;
   userState?: UserPolicyState | null;
 }
 
@@ -66,6 +70,8 @@ export interface PolicyDetail {
   applicationUrl?: string | null;
   applicationMethod?: string | null;
   sourceUrl?: string | null;
+  sourceType?: SourceType;
+  policyType?: PolicyType;
   startsAt?: string | null;
   endsAt?: string | null;
   isAlwaysOpen?: boolean;
@@ -74,6 +80,7 @@ export interface PolicyDetail {
   maxAge?: number | null;
   requirements?: PolicyRequirement[];
   eligibilityInfo?: PolicyEligibilityInfo | null;
+  eligibilityCompleteness?: EligibilityCompleteness | null;
   userState?: UserPolicyState | null;
   lastEligibility?: LastEligibilitySummary | null;
   [key: string]: unknown;
@@ -88,6 +95,7 @@ export interface EligibilityPolicySummary {
   applicationUrl?: string | null;
   applicationMethod?: string | null;
   sourceUrl?: string | null;
+  sourceType?: SourceType;
 }
 
 export interface EligibilityResponse {
@@ -95,6 +103,7 @@ export interface EligibilityResponse {
   reasons: string[];
   explanation: string;
   policy: EligibilityPolicySummary;
+  eligibilityCompleteness?: EligibilityCompleteness | null;
   checkedAt: string;
 }
 
@@ -109,6 +118,7 @@ export interface MyPolicyItem {
   providerName: string;
   shortDescription?: string;
   categories?: InterestCategory[];
+  sourceType?: SourceType;
   state: UserPolicyState;
   note: string | null;
   appliedAt: string | null;
