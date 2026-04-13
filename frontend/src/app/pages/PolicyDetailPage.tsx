@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router';
+import { useParams, Link, useNavigate, useNavigationType } from 'react-router';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
@@ -37,7 +37,13 @@ import { PolicyMetaRow } from '../components/molecules/PolicyMetaRow';
 import { PolicyDetailSkeleton } from '../components/molecules/PolicyDetailSkeleton';
 import { EmptyState } from '../components/molecules/EmptyState';
 import { PolicyCard } from '../components/organisms/PolicyCard';
-import type { EligibilityResponse, PolicyDetail as ApiPolicyDetail, PolicyListItem } from '../types';
+import type {
+  EligibilityCompleteness,
+  EligibilityResponse,
+  PolicyDetail as ApiPolicyDetail,
+  PolicyListItem,
+  SourceType,
+} from '../types';
 import { cn } from '../lib/utils';
 import { CustomSelect } from '../components/atoms/CustomSelect';
 
@@ -52,6 +58,166 @@ const regionLabels: Record<string, string> = {
   seoul_gangnam: '서울 강남구',
   seoul_mapo: '서울 마포구',
   seoul_songpa: '서울 송파구',
+};
+
+const sourceTypeLabels = {
+  official: '공식 출처',
+  blog: '비공식 출처',
+  none: '출처 정보 없음',
+} as const;
+
+const sourceTypeBadgeClassNames = {
+  official: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  blog: 'bg-amber-50 text-amber-700 border border-amber-200',
+  none: 'bg-slate-50 text-slate-700 border border-slate-200',
+} as const;
+
+type ReliabilityNoticeTone =
+  | 'warning'
+  | 'strong-warning'
+  | 'strongest-warning';
+
+interface ReliabilityNotice {
+  tone: ReliabilityNoticeTone;
+  message: string;
+}
+
+function isSourceType(value: unknown): value is SourceType {
+  return value === 'official' || value === 'blog' || value === 'none';
+}
+
+function isEligibilityCompleteness(
+  value: unknown,
+): value is EligibilityCompleteness {
+  return value === 'full' || value === 'partial' || value === 'minimal';
+}
+
+function getReliabilityNotice(
+  sourceType: SourceType | null,
+  eligibilityCompleteness: EligibilityCompleteness | null,
+): ReliabilityNotice | null {
+  if (!sourceType && !eligibilityCompleteness) {
+    return null;
+  }
+
+  if (sourceType === 'official' && eligibilityCompleteness === 'full') {
+    return null;
+  }
+
+  if (sourceType === 'official' && !eligibilityCompleteness) {
+    return null;
+  }
+
+  if (sourceType === 'blog' && eligibilityCompleteness === 'minimal') {
+    return {
+      tone: 'strong-warning',
+      message:
+        '안내해드리는 원문이 블로그 기반이고 자격 조건 정보도 부족할 수 있어요. 원문을 꼭 다시 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'blog' && eligibilityCompleteness === 'partial') {
+    return {
+      tone: 'warning',
+      message:
+        '기관에서 요구하는 기본 조건은 만족하지만, 안내해드리는 원문이 블로그 기반이라 공고나 안내문에 추가 조건이 있을 수 있어요. 추가 정보를 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'blog' && eligibilityCompleteness === 'full') {
+    return {
+      tone: 'warning',
+      message:
+        '안내해드리는 원문이 블로그 기반이라 최신 정보는 직접 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'none' && eligibilityCompleteness === 'minimal') {
+    return {
+      tone: 'strongest-warning',
+      message:
+        '원문을 찾을 수 없고 자격 조건 정보도 부족할 수 있어요. 직접 검색해 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'none' && eligibilityCompleteness === 'partial') {
+    return {
+      tone: 'strong-warning',
+      message:
+        '기관에서 요구하는 기본 조건은 만족하지만, 원문을 찾을 수 없어 공고나 안내문에 추가 조건이 있는지 직접 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'none' && eligibilityCompleteness === 'full') {
+    return {
+      tone: 'warning',
+      message:
+        '원문을 찾을 수 없어 최신 정보와 세부 조건은 직접 확인이 필요해요.',
+    };
+  }
+
+  if (sourceType === 'official' && eligibilityCompleteness === 'minimal') {
+    return {
+      tone: 'strong-warning',
+      message:
+        '자격 판단에 필요한 조건 정보가 부족할 수 있어요. 원문을 함께 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'official' && eligibilityCompleteness === 'partial') {
+    return {
+      tone: 'warning',
+      message:
+        '기관에서 요구하는 기본 조건은 만족하지만, 공고나 안내문에서 추가로 안내하는 조건이 있을 수 있어요. 추가 정보를 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'blog') {
+    return {
+      tone: 'warning',
+      message:
+        '안내해드리는 원문이 블로그 기반이라 최신 정보는 직접 확인해주세요.',
+    };
+  }
+
+  if (sourceType === 'none') {
+    return {
+      tone: 'warning',
+      message:
+        '원문을 찾을 수 없어 최신 정보와 세부 조건은 직접 확인이 필요해요.',
+    };
+  }
+
+  if (eligibilityCompleteness === 'full') {
+    return null;
+  }
+
+  if (eligibilityCompleteness === 'partial') {
+    return {
+      tone: 'warning',
+      message:
+        '기관에서 요구하는 기본 조건은 만족하지만, 공고나 안내문에서 추가로 안내하는 조건이 있을 수 있어요. 추가 정보를 확인해주세요.',
+    };
+  }
+
+  if (eligibilityCompleteness === 'minimal') {
+    return {
+      tone: 'strong-warning',
+      message:
+        '자격 판단에 필요한 조건 정보가 부족할 수 있어요. 원문을 함께 확인해주세요.',
+    };
+  }
+
+  return null;
+}
+
+const reliabilityNoticeClassNames: Record<ReliabilityNoticeTone, string> = {
+  warning:
+    'mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-amber-950',
+  'strong-warning':
+    'mt-3 rounded-lg border border-orange-300 bg-orange-50 px-3 py-3 text-orange-950',
+  'strongest-warning':
+    'mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-3 text-rose-950',
 };
 
 function formatPolicyPeriod(startsAt?: string | null, endsAt?: string | null, isAlwaysOpen?: boolean, periodRaw?: string | null) {
@@ -120,6 +286,7 @@ function getEvidence(
 export function PolicyDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const [bookmarked, setBookmarked] = useState(false);
   const [showEligibilityForm, setShowEligibilityForm] = useState(false);
   const [eligibilityResult, setEligibilityResult] = useState<EligibilityResponse | null>(null);
@@ -137,8 +304,10 @@ export function PolicyDetailPage() {
     setEligibilityResult(null);
     setShowEligibilityForm(false);
     setEligibilityAnswers({});
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [id]);
+    if (navigationType !== 'POP') {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [id, navigationType]);
 
   useEffect(() => {
     const loadPolicy = async () => {
@@ -246,6 +415,10 @@ export function PolicyDetailPage() {
     .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
     .filter((req) => req.key !== 'selection_criteria' && req.label !== '선정기준')
     .length > 0;
+  // [임시] UI 확인용 — 아동복지시설 보호아동지원 정책을 info처럼 동작하게 처리 (확인 후 아래 한 줄 제거)
+  const TEMP_INFO_POLICY_ID = 'de99e7da-360c-4071-9899-1d6ded895d60';
+  const isInfoPolicy = policy?.policyType === 'info' || policy?.id === TEMP_INFO_POLICY_ID;
+  const canCheckEligibility = hasRequirements && !isInfoPolicy;
 
   const sections = [
     { id: 'summary', label: '요약', icon: FileText },
@@ -296,6 +469,26 @@ export function PolicyDetailPage() {
   const status = mapStatus(policy.endsAt, policy.isAlwaysOpen ?? false);
   const daysLeft = getDaysLeft(policy.endsAt);
   const supportContent = policy.eligibilityInfo?.supportContent ?? policy.description;
+  const responseSourceType = isSourceType(
+    eligibilityResult?.policy?.sourceType,
+  )
+    ? eligibilityResult.policy.sourceType
+    : isSourceType(policy.sourceType)
+      ? policy.sourceType
+      : null;
+  const responseEligibilityCompleteness = isEligibilityCompleteness(
+    eligibilityResult?.eligibilityCompleteness,
+  )
+    ? eligibilityResult.eligibilityCompleteness
+    : isEligibilityCompleteness(policy.eligibilityCompleteness)
+      ? policy.eligibilityCompleteness
+      : null;
+  const reliabilityNotice = eligibilityResult && eligibilityResult.result !== 'ineligible'
+    ? getReliabilityNotice(
+        responseSourceType,
+        responseEligibilityCompleteness,
+      )
+    : null;
 
   return (
     <MainLayout>
@@ -314,6 +507,11 @@ export function PolicyDetailPage() {
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {status && <Badge variant={status}>{statusLabels[status]}</Badge>}
               <Badge>{policy.providerName ?? '공식 출처'}</Badge>
+              {policy.sourceType && (
+                <Badge className={sourceTypeBadgeClassNames[policy.sourceType]}>
+                  {sourceTypeLabels[policy.sourceType]}
+                </Badge>
+              )}
               {daysLeft !== null && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-600 border border-red-200">
                   <Clock className="h-3 w-3" />
@@ -443,40 +641,71 @@ export function PolicyDetailPage() {
             )}
 
             {/* Eligibility Check */}
-            {hasRequirements && <motion.section
+            <motion.section
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
               className={cn(
                 'border rounded-2xl p-6 shadow-sm transition-colors duration-300',
-                eligibilityResult?.result === 'conditional'
-                  ? 'bg-amber-50 border-amber-200'
-                  : eligibilityResult?.result === 'ineligible'
-                    ? 'bg-rose-50 border-rose-200'
-                    : 'bg-emerald-50 border-emerald-200',
+                !canCheckEligibility
+                  ? isInfoPolicy ? 'bg-slate-50 border-slate-200' : 'bg-[#faf8f4] border-[#e8e0d0]'
+                  : eligibilityResult?.result === 'conditional'
+                    ? 'bg-amber-50 border-amber-200'
+                    : eligibilityResult?.result === 'ineligible'
+                      ? 'bg-rose-50 border-rose-200'
+                      : 'bg-emerald-50 border-emerald-200',
               )}
             >
               <div className="flex items-center gap-2.5 mb-4">
                 <div className={cn(
                   'w-8 h-8 rounded-lg flex items-center justify-center',
-                  eligibilityResult?.result === 'conditional' ? 'bg-amber-100' : eligibilityResult?.result === 'ineligible' ? 'bg-rose-100' : 'bg-emerald-100',
+                  !canCheckEligibility ? 'bg-slate-100' : eligibilityResult?.result === 'conditional' ? 'bg-amber-100' : eligibilityResult?.result === 'ineligible' ? 'bg-rose-100' : 'bg-emerald-100',
                 )}>
-                  {eligibilityResult?.result === 'conditional' || eligibilityResult?.result === 'ineligible'
-                    ? <AlertTriangle className={cn('h-4 w-4', eligibilityResult.result === 'conditional' ? 'text-amber-600' : 'text-rose-600')} />
-                    : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                  {!canCheckEligibility
+                    ? <Info className="h-4 w-4 text-slate-500" />
+                    : eligibilityResult?.result === 'conditional' || eligibilityResult?.result === 'ineligible'
+                      ? <AlertTriangle className={cn('h-4 w-4', eligibilityResult.result === 'conditional' ? 'text-amber-600' : 'text-rose-600')} />
+                      : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
                 </div>
                 <div>
                   <h2 className={cn(
                     'text-base font-semibold',
-                    eligibilityResult?.result === 'conditional' ? 'text-amber-900' : eligibilityResult?.result === 'ineligible' ? 'text-rose-900' : 'text-emerald-900',
+                    !canCheckEligibility ? 'text-slate-700' : eligibilityResult?.result === 'conditional' ? 'text-amber-900' : eligibilityResult?.result === 'ineligible' ? 'text-rose-900' : 'text-emerald-900',
                   )}>내가 맞는지 확인하기</h2>
                   <p className={cn(
                     'text-xs',
-                    eligibilityResult?.result === 'conditional' ? 'text-amber-700/70' : eligibilityResult?.result === 'ineligible' ? 'text-rose-700/70' : 'text-emerald-700/70',
+                    !canCheckEligibility ? 'text-slate-500' : eligibilityResult?.result === 'conditional' ? 'text-amber-700/70' : eligibilityResult?.result === 'ineligible' ? 'text-rose-700/70' : 'text-emerald-700/70',
                   )}>간단한 정보를 입력하면 신청 가능 여부를 확인할 수 있어요</p>
                 </div>
               </div>
 
+              {!canCheckEligibility && isInfoPolicy && (
+                <div className="bg-white/70 rounded-xl p-4 border border-slate-200">
+                  <p className="text-sm font-medium text-slate-700 mb-1">자격 확인이 제공되지 않는 정책이에요</p>
+                  <p className="text-xs text-slate-500 mb-3">기관(시설) 정보 또는 정책 소개형 내용으로, 자격 확인 기능을 지원하지 않습니다.</p>
+                  <a
+                    href={getSourceUrl(policy.sourceUrl, policy.title)}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline font-medium"
+                  >
+                    원문 보러가기<ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
+              {!canCheckEligibility && !isInfoPolicy && (
+                <div className="bg-[#faf8f4] rounded-xl p-4 border border-[#e8e0d0]">
+                  <p className="text-sm font-medium text-stone-600 mb-1">자동 자격 확인 정보를 확인할 수 없어요</p>
+                  <p className="text-xs text-stone-400 mb-3">신청형 정책이지만 현재 자동 자격 확인 정보를 제공하지 않습니다. 원문을 통해 신청 조건을 확인해주세요.</p>
+                  <a
+                    href={getSourceUrl(policy.sourceUrl, policy.title)}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline font-medium"
+                  >
+                    원문 보러가기<ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
+
               <AnimatePresence mode="wait">
-                {!showEligibilityForm && !eligibilityResult && (
+                {canCheckEligibility && !showEligibilityForm && !eligibilityResult && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     {getAccessToken() ? (
                       <Button
@@ -503,7 +732,7 @@ export function PolicyDetailPage() {
                   </motion.div>
                 )}
 
-                {showEligibilityForm && !eligibilityResult && (
+                {canCheckEligibility && showEligibilityForm && !eligibilityResult && (
                   <motion.form
                     initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                     onSubmit={handleCheckEligibility}
@@ -558,7 +787,7 @@ export function PolicyDetailPage() {
                   </motion.form>
                 )}
 
-                {eligibilityResult?.result === 'eligible' && (
+                {canCheckEligibility && eligibilityResult?.result === 'eligible' && (
                   <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
                     className="bg-emerald-50 border border-emerald-200 rounded-xl p-4"
                   >
@@ -579,7 +808,7 @@ export function PolicyDetailPage() {
                   </motion.div>
                 )}
 
-                {eligibilityResult?.result === 'conditional' && (
+                {canCheckEligibility && eligibilityResult?.result === 'conditional' && (
                   <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
                     className="bg-amber-50 border border-amber-200 rounded-xl p-4"
                   >
@@ -598,7 +827,7 @@ export function PolicyDetailPage() {
                   </motion.div>
                 )}
 
-                {eligibilityResult?.result === 'ineligible' && (
+                {canCheckEligibility && eligibilityResult?.result === 'ineligible' && (
                   <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
                     className="bg-rose-50 border border-rose-200 rounded-xl p-4"
                   >
@@ -614,7 +843,12 @@ export function PolicyDetailPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.section>}
+              {reliabilityNotice && (
+                <div className={cn(reliabilityNoticeClassNames[reliabilityNotice.tone], 'mt-3')}>
+                  <p className="text-xs leading-relaxed">{reliabilityNotice.message}</p>
+                </div>
+              )}
+            </motion.section>
 
             {/* Evidence */}
             {eligibilityResult && <motion.section
@@ -655,6 +889,13 @@ export function PolicyDetailPage() {
                     <h4 className="font-medium mb-1">원문 확인하기</h4>
                     <p className="text-sm text-[var(--muted-foreground)] mb-1">이 정보는 공공데이터를 바탕으로 정리된 참고 자료예요.</p>
                     <p className="text-sm text-[var(--muted-foreground)] mb-4">실제 신청 전에는 꼭 공식 출처에서 최신 내용을 확인해 주세요.</p>
+                    {policy.sourceType && (
+                      <div className="mb-4">
+                        <Badge className={sourceTypeBadgeClassNames[policy.sourceType]}>
+                          {sourceTypeLabels[policy.sourceType]}
+                        </Badge>
+                      </div>
+                    )}
                     <a
                       href={getSourceUrl(policy.sourceUrl, policy.title)}
                       target="_blank" rel="noopener noreferrer"
