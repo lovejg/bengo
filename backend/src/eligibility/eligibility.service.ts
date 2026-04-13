@@ -27,6 +27,15 @@ export interface EligibilityEvaluation {
 @Injectable()
 export class EligibilityService {
   evaluate(input: EligibilityEvalInput): EligibilityEvaluation {
+    // INFO 정책은 자격판별 자체를 하지 않음
+    if (input.policy.policyType === PolicyType.INFO) {
+      return {
+        result: EligibilityResult.ELIGIBLE,
+        reasons: [],
+        explanation: this.makeExplanation(EligibilityResult.ELIGIBLE, []),
+      };
+    }
+
     const reasons: string[] = [];
 
     // answers에 age/regionCode가 있으면 그 값을 우선 사용 (다른 사람 대리 판별 등)
@@ -125,15 +134,8 @@ export class EligibilityService {
       };
     }
 
-    // LLM rule이 없을 때: INFO 정책은 나이/지역만 맞으면 ELIGIBLE, APPLICATION은 CONDITIONAL
+    // LLM rule이 없을 때: APPLICATION은 CONDITIONAL
     if (!input.rule) {
-      if (input.policy.policyType === PolicyType.INFO) {
-        return {
-          result: EligibilityResult.ELIGIBLE,
-          reasons,
-          explanation: this.makeExplanation(EligibilityResult.ELIGIBLE, reasons),
-        };
-      }
       return {
         result: EligibilityResult.CONDITIONAL,
         reasons: [
