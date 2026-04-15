@@ -63,7 +63,7 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
 \`\`\`json
 {
   "key": "영문 camelCase 키 (예: employmentStatus, educationLevel, incomeLevel)",
-  "label": "한국어 라벨 (예: 취업 상태, 학력, 소득 수준)",
+  "label": "한국어 라벨 — 반드시 간결한 명사형으로 작성 (예: 취업 상태, 학력, 소득 수준, 기준 중위소득 150% 이하 해당 여부). 평서문·의문문 금지.",
   "type": "select | number | boolean | string",
   "options": ["선택지1", "선택지2", ...] (type이 select일 때만, 아니면 null),
   "fact": "answers.{key} (예: answers.employmentStatus)",
@@ -85,9 +85,9 @@ const SYSTEM_PROMPT = `당신은 한국 정부/지자체 정책의 자격 조건
 - **소득/자산에 구체적인 금액이 명시된 경우** → \`number\` 타입으로 사용자에게 금액을 직접 입력받으세요.
   - 예: "연소득 5천만원 이하" → type: "number", label: "연소득 (만원)", op: "<=", value: 5000 (만원 단위)
   - 예: "월 소득 300만원 이하" → type: "number", label: "월 소득 (만원)", op: "<=", value: 300
-- **중위소득 기준, 도시근로자 월평균 소득 기준처럼 가구원 수·연도에 따라 금액이 달라지는 경우** → \`boolean\` 타입을 사용하되, label을 질문 형태로 작성하세요.
-  - 예: "중위소득 150% 이하" → type: "boolean", label: "가구 소득이 기준 중위소득 150% 이하인가요?", op: "=", value: true
-  - 예: "도시근로자 월평균 소득 100% 이하" → type: "boolean", label: "가구 소득이 도시근로자 월평균 소득 100% 이하인가요?", op: "=", value: true
+- **중위소득 기준, 도시근로자 월평균 소득 기준처럼 가구원 수·연도에 따라 금액이 달라지는 경우** → \`boolean\` 타입을 사용하되, label은 명사형으로 작성하세요.
+  - 예: "중위소득 150% 이하" → type: "boolean", label: "기준 중위소득 150% 이하 해당 여부", op: "=", value: true
+  - 예: "도시근로자 월평균 소득 100% 이하" → type: "boolean", label: "도시근로자 월평균 소득 100% 이하 해당 여부", op: "=", value: true
 - **소득 기준이 명시됐지만 금액을 특정할 수 없는 경우**: \`boolean\`으로 처리하고 label에 기준을 명시하세요.
 
 ## options 규칙 (매우 중요)
