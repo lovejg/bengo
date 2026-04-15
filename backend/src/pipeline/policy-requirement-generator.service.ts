@@ -210,15 +210,18 @@ export class PolicyRequirementGeneratorService {
       where: { policyId: policy.id },
     });
     if (existingCount > 0) {
-      // summary가 없으면 LLM summaryOnly 호출 (manual override는 LLM 스킵)
-      if (!isManualOverride && (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120))) {
+      // summary가 없으면 LLM summaryOnly 호출 (manual override도 summary는 생성)
+      if (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120)) {
         const summaryResult = await this.llmExtractor.extractRules(policy, normalized, true);
         if (summaryResult?.summary) {
           policy.shortDescription = summaryResult.summary;
         }
-        // 규칙 기반 INFO는 LLM이 APPLICATION으로 뒤집지 못하게 함 (LLM 비결정성 방지)
-        if (summaryResult?.policyType && !(policy.policyType === PolicyType.INFO && summaryResult.policyType === 'application')) {
+        // manual override의 policyType은 LLM 결과로 덮어쓰지 않음
+        if (!isManualOverride && summaryResult?.policyType && !(policy.policyType === PolicyType.INFO && summaryResult.policyType === 'application')) {
           policy.policyType = summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+        }
+        if (manualOverride?.policyType) {
+          policy.policyType = manualOverride.policyType;
         }
         const hasPeriod = policy.isAlwaysOpen || policy.startsAt || policy.endsAt;
         const rawEmpty = !policy.periodRaw || policy.periodRaw.trim() === '-';
@@ -342,10 +345,18 @@ export class PolicyRequirementGeneratorService {
 
     // INFO 타입 정책은 자격 조건 추출 불필요 (summary만 생성)
     const isInfoPolicy = normalized.policyType === PolicyType.INFO;
-    // manual override 정책은 LLM 호출 스킵
+    // manual override 정책은 조건 추출 LLM 스킵, summary는 별도 생성
     const llmResult = isManualOverride
       ? null
       : await this.llmExtractor.extractRules(policy, normalized, isInfoPolicy);
+
+    // manual override 정책: shortDescription이 raw 상태면 summaryOnly로 요약 생성
+    if (isManualOverride && (!policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120))) {
+      const summaryResult = await this.llmExtractor.extractRules(policy, normalized, true);
+      if (summaryResult?.summary) {
+        policy.shortDescription = summaryResult.summary;
+      }
+    }
 
     if (!isInfoPolicy && !isManualOverride && llmResult && llmResult.conditions.length > 0) {
       // 의미적으로 같은 키 그룹 (LLM이 다른 이름으로 추출할 수 있음)
@@ -507,17 +518,28 @@ export class PolicyRequirementGeneratorService {
       const isNumericComparison =
         typeof node.value === 'number' &&
         ['<=', '>=', '<', '>'].includes(String(node.op));
+      const isInOp = node.op === 'in' && Array.isArray(node.value);
+
+      let type: QuestionType;
+      let options: string[] | null = null;
+      if (typeof node.value === 'boolean') {
+        type = QuestionType.BOOLEAN;
+      } else if (isNumericComparison) {
+        type = QuestionType.NUMBER;
+      } else if (isInOp) {
+        type = QuestionType.SELECT;
+        options = (node.value as unknown[]).filter((v) => typeof v === 'string') as string[];
+      } else {
+        type = QuestionType.STRING;
+      }
+
       reqs.push({
         policyId,
         key,
         label: this.formatKeyAsLabel(key, message),
         description: message,
-        type: typeof node.value === 'boolean'
-          ? QuestionType.BOOLEAN
-          : isNumericComparison
-            ? QuestionType.NUMBER
-            : QuestionType.STRING,
-        options: null,
+        type,
+        options,
         isRequired: true,
         displayOrder: 0,
       });
@@ -555,6 +577,22 @@ export class PolicyRequirementGeneratorService {
       receivingOtherScholarship: '타 장학금 수혜 여부',
       receivingNationalScholarship: '국가장학금 수혜 여부',
       receivingYouthIndependenceTransport: '서울시 자립준비청년 교통비 지원 수혜 여부',
+      previousRecipient: '기선정자 여부 (2023~2025년)',
+      continuousResidencySeongbuk: '성북구 계속 거주 여부 (2026.1.1. 이전부터)',
+      applicantType: '신청자 유형',
+      housingStatus: '입주(예정) 유형',
+      isUnemployed: '미취업 여부',
+      isEmployed: '근로 여부',
+      isYouthLeavingCare: '자립준비청년(보호종료아동) 여부',
+      isEnrolled: '대학교 재학 여부',
+      isPreFounder: '예비창업자 여부',
+      isBusinessActive: '사업체 정상 운영 여부',
+      isSmallCompany: '중소기업 근무 여부',
+      tenantType: '신청자 유형',
+      isHomeless: '무주택자 여부',
+      annualIncome: '연소득 (만원)',
+      depositAmount: '임차보증금 (만원)',
+      guaranteeAgencyMember: '보증기관 가입 여부',
     };
     return LABELS[key] ?? fallback;
   }
@@ -600,10 +638,13 @@ export class PolicyRequirementGeneratorService {
 
   private extractFirstComeHints(extraMeta: Record<string, unknown>): string[] {
     const hints: string[] = [];
-    if (extraMeta?.isFirstComeFirstServed === true) {
+    // youthcenter 소스는 metadata 서브키에 중첩되어 있을 수 있음
+    const meta = (extraMeta?.metadata as Record<string, unknown> | undefined) ?? {};
+    const isFirstCome = extraMeta?.isFirstComeFirstServed === true || meta?.isFirstComeFirstServed === true;
+    if (isFirstCome) {
       hints.push('선착순 접수 정책입니다. 모집 마감 여부를 공식 공고문에서 확인하세요.');
     }
-    const bizPeriodEtc = extraMeta?.bizPeriodEtc;
+    const bizPeriodEtc = (extraMeta?.bizPeriodEtc ?? meta?.bizPeriodEtc) as string | undefined;
     if (typeof bizPeriodEtc === 'string' && bizPeriodEtc.trim() && /소진|마감|종료/.test(bizPeriodEtc)) {
       hints.push(`${bizPeriodEtc.trim()} 조기 종료될 수 있습니다.`);
     }

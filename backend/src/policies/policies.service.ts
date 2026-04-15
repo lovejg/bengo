@@ -350,6 +350,7 @@ export class PoliciesService {
         applicationDeadline: (extra.applicationDeadline as string) ?? null,
         warnBox: (extra.warnBox as string) ?? null,
       },
+      policyType: policy.policyType,
       eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
       userState: state?.state ?? null,
       lastEligibility: lastCheck
