@@ -11,7 +11,7 @@ interface FilterOptionGridProps {
   selected?: string[];
   onChange: (selected: string[]) => void;
   multiSelect?: boolean;
-  variant?: 'glass' | 'tag' | 'neo';
+  variant?: 'glass' | 'tag' | 'neo' | 'pill' | 'figma';
 }
 
 export function FilterOptionGrid({
@@ -32,15 +32,46 @@ export function FilterOptionGrid({
     }
   };
 
-  // 옵션 개수에 따라 동적으로 컬럼 수 결정
   const getGridCols = () => {
     const count = options.length;
+    if (count === 2) return 'grid-cols-2';
     if (count === 3) return 'grid-cols-3';
-    if (count === 4) return 'grid-cols-2'; // 4개는 2x2 그리드
+    if (count === 4) return 'grid-cols-2';
     return 'grid-cols-2 sm:grid-cols-3';
   };
 
-  // GLASSMORPHISM - 투명하고 블러 처리된 유리 느낌
+  // PILL - 피그마 기준 스타일 (rounded-full, 그리드 셀 채움)
+  if (variant === 'pill') {
+    return (
+      <div className={`grid ${getGridCols()} gap-3`}>
+        {options.map((option) => {
+          const isSelected = selected.includes(option.id);
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => handleToggle(option.id)}
+              className={`
+                w-full flex items-center justify-center gap-2
+                px-4 py-3 rounded-full text-sm font-medium
+                border transition-all duration-150
+                ${isSelected
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                  : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5'
+                }
+              `}
+              aria-pressed={isSelected}
+            >
+              <span>{option.label}</span>
+              {isSelected && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // GLASSMORPHISM
   if (variant === 'glass') {
     return (
       <div className={`grid ${getGridCols()} gap-3`}>
@@ -56,10 +87,9 @@ export function FilterOptionGrid({
               className={`
                 relative px-4 py-3.5 rounded-[12px] text-sm font-medium
                 border transition-all duration-200
-                ${
-                  isSelected
-                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
-                    : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
+                ${isSelected
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
+                  : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
                 }
               `}
               aria-pressed={isSelected}
@@ -86,13 +116,12 @@ export function FilterOptionGrid({
     );
   }
 
-  // TAG/CHIP STYLE - 작고 귀여운 태그 느낌
+  // TAG/CHIP STYLE
   if (variant === 'tag') {
     return (
       <div className={`grid ${getGridCols()} gap-2`}>
         {options.map((option) => {
           const isSelected = selected.includes(option.id);
-          
           return (
             <motion.button
               key={option.id}
@@ -103,10 +132,9 @@ export function FilterOptionGrid({
               className={`
                 relative px-4 py-2.5 rounded-[12px] text-sm font-medium
                 border transition-all duration-200
-                ${
-                  isSelected
-                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
-                    : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
+                ${isSelected
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
+                  : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
                 }
               `}
               aria-pressed={isSelected}
@@ -131,7 +159,7 @@ export function FilterOptionGrid({
     );
   }
 
-  // NEO BRUTALISM - 강한 테두리, 오프셋 그림자
+  // NEO BRUTALISM
   if (variant === 'neo') {
     return (
       <div className={`grid ${getGridCols()} gap-3`}>
@@ -147,18 +175,15 @@ export function FilterOptionGrid({
               className={`
                 relative px-4 py-3 text-sm font-medium rounded-[12px]
                 border transition-all duration-200
-                ${
-                  isSelected
-                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
-                    : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
+                ${isSelected
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
+                  : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
                 }
               `}
               aria-pressed={isSelected}
             >
               <div className="flex items-center justify-center gap-2">
                 <span>{option.label}</span>
-                
-                {/* Checkmark */}
                 <AnimatePresence>
                   {isSelected && (
                     <motion.div
@@ -173,6 +198,39 @@ export function FilterOptionGrid({
                 </AnimatePresence>
               </div>
             </motion.button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // FIGMA — 나이대(3개) 기준 고정 크기: 항상 3열 그리드
+  // 2개여도 3열 그리드에 2개만 배치 → 버튼 크기 동일 유지
+  if (variant === 'figma') {
+    return (
+      <div className="grid grid-cols-3 gap-3">
+        {options.map((option) => {
+          const isSelected = selected.includes(option.id);
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => handleToggle(option.id)}
+              className={`
+                flex items-center justify-center gap-2
+                px-4 py-2.5 w-full rounded-xl
+                border text-sm font-medium
+                transition-all duration-150
+                ${isSelected
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                  : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/50'
+                }
+              `}
+              aria-pressed={isSelected}
+            >
+              <span>{option.label}</span>
+              {isSelected && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />}
+            </button>
           );
         })}
       </div>
