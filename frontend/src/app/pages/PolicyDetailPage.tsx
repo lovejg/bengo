@@ -641,12 +641,32 @@ export function PolicyDetailPage() {
             )}
 
             {/* Eligibility Check */}
+            {isInfoPolicy ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="border rounded-2xl p-6 shadow-sm transition-colors duration-300 bg-slate-50 border-slate-200"
+              >
+                <div className="bg-white/70 rounded-xl p-4 border border-slate-200">
+                  <p className="text-sm font-medium text-slate-700 mb-1">자격 확인이 제공되지 않는 정책이에요</p>
+                  <p className="text-xs text-slate-500 mb-3">기관(시설) 정보 또는 정책 소개형 내용으로, 자격 확인 기능을 지원하지 않습니다.</p>
+                  <a
+                    href={getSourceUrl(policy.sourceUrl, policy.title)}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline font-medium"
+                  >
+                    원문 보러가기<ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </motion.div>
+            ) : (
             <motion.section
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
               className={cn(
                 'border rounded-2xl p-6 shadow-sm transition-colors duration-300',
                 !canCheckEligibility
-                  ? isInfoPolicy ? 'bg-slate-50 border-slate-200' : 'bg-[#faf8f4] border-[#e8e0d0]'
+                  ? 'bg-[#faf8f4] border-[#e8e0d0]'
                   : eligibilityResult?.result === 'conditional'
                     ? 'bg-amber-50 border-amber-200'
                     : eligibilityResult?.result === 'ineligible'
@@ -677,19 +697,6 @@ export function PolicyDetailPage() {
                 </div>
               </div>
 
-              {!canCheckEligibility && isInfoPolicy && (
-                <div className="bg-white/70 rounded-xl p-4 border border-slate-200">
-                  <p className="text-sm font-medium text-slate-700 mb-1">자격 확인이 제공되지 않는 정책이에요</p>
-                  <p className="text-xs text-slate-500 mb-3">기관(시설) 정보 또는 정책 소개형 내용으로, 자격 확인 기능을 지원하지 않습니다.</p>
-                  <a
-                    href={getSourceUrl(policy.sourceUrl, policy.title)}
-                    target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline font-medium"
-                  >
-                    원문 보러가기<ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              )}
               {!canCheckEligibility && !isInfoPolicy && (
                 <div className="bg-[#faf8f4] rounded-xl p-4 border border-[#e8e0d0]">
                   <p className="text-sm font-medium text-stone-600 mb-1">자동 자격 확인 정보를 확인할 수 없어요</p>
@@ -849,6 +856,7 @@ export function PolicyDetailPage() {
                 </div>
               )}
             </motion.section>
+            )}
 
             {/* Evidence */}
             {eligibilityResult && <motion.section
