@@ -17,13 +17,23 @@
 - `POST /pipeline/ingest`: 원문 저장 + 정규화 + 검증 + 정책 업서트
 - `POST /pipeline/collect-and-ingest-mvp`: MVP 대상 소스 일괄 수집/적재
 - `POST /pipeline/collect-and-ingest/:source`: 수집 어댑터 실행 후 배치 적재
+- `POST /pipeline/regenerate-rules?force=true`: 모든 활성 정책의 requirements·LLM rule 재생성
+- `POST /pipeline/enrich-policies`: sourceUrl 보완·제공기관 URL 검증
 - `GET /pipeline/sources`: 소스별 설정 여부 + MVP 대상 포함 여부 확인
 - `GET /pipeline/quality-report`: 소스별 데이터 품질/범위 적합도 점검
 - `POST /pipeline/prune-mvp`: 과거 적재된 범위 밖 활성 정책 일괄 정리
-- MVP 범위(청년정책 + 강남/마포/송파) 밖 데이터는 `skipped` 처리
+- MVP 범위(청년정책 + 서울) 밖 데이터는 `skipped` 처리
 - 이력 테이블:
   - `raw_policy_documents`: 수집 원문 저장
   - `pipeline_ingestion_runs`: 적재 실행 결과/검증 결과 저장
+
+### 수동 Override 시스템
+- `src/common/constants/policy-manual-overrides.constant.ts`에 개별 정책의 예외 처리를 선언한다.
+- 주요 override 유형:
+  - `disableRule`: LLM 규칙 무시 + 힌트만 표시 (복수 신청층 등 단일 규칙 표현 불가한 정책)
+  - `overrideRule`: LLM 규칙을 수동 정의 규칙으로 교체
+  - `appendConditionalHints`: LLM 규칙 유지, 힌트만 추가
+  - `regionCodes`, `minAge`, `maxAge`, `policyType`: 수집기 오류 필드 강제 교정
 
 ## 런타임 플로우
 1. 사용자는 나이/지역/성별/관심 분야로 회원가입한다.
@@ -37,7 +47,14 @@
 - `users`: 사용자 프로필 저장/조회
 - `policies`: 목록/상세/자격 판정/상태 관리
 - `eligibility`: 규칙 평가 및 설명 생성
-- `pipeline`: 수집 어댑터 + 정규화 + 검증 + 적재
+- `pipeline`: 수집 어댑터 + 정규화 + 검증 + 적재 + requirement·rule 생성
+
+### pipeline 파일 구조
+- `policy-normalization.service.ts`: raw 데이터 → 정규화된 문서 (regex 기반)
+- `llm-rule-extractor.service.ts`: Anthropic SDK로 조건 트리·요약 추출
+- `policy-requirement-generator.service.ts`: 정책별 requirement·rule 생성 오케스트레이션
+- `requirement-generator.helper.ts`: 규칙 트리 → requirement 변환, 힌트 추출, 해시 계산
+- `requirement-labels.constant.ts`: answers.* 키 → 한국어 레이블 매핑
 
 ## LLM 안전 장치
 - 정규화 결과는 JSON Schema 제약으로 강제한다.
