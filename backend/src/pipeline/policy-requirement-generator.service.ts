@@ -593,6 +593,12 @@ export class PolicyRequirementGeneratorService {
       annualIncome: '연소득 (만원)',
       depositAmount: '임차보증금 (만원)',
       guaranteeAgencyMember: '보증기관 가입 여부',
+      residencyOver1YearYangcheon: '양천구 1년 이상 거주 여부',
+      educationLevel: '학생 유형',
+      scholarshipType: '신청할 장학금 유형',
+      incomeLevel: '기준중위소득 100% 이내 해당 여부',
+      gradeAverage: '직전학기 평균 등급',
+      competitionAward: '2년 이내 대회 3위권 입상 여부',
     };
     return LABELS[key] ?? fallback;
   }

@@ -134,6 +134,9 @@ export class PolicyNormalizationService {
       /홈페이지\s*공고/,
       /공고\s*\(?\s*게시\s*\)?/,
       /모집\s*시\s*.{0,20}공고/,
+      /수시/,                 // "수시 모집"은 비정기 — 상시 아님
+      /운영시간/,             // 운영시간은 신청기간이 아님
+      /평일\s*\(/,            // "평일(월~금) 09:00~18:00" 같은 운영시간 표기
     ];
     for (const value of candidates) {
       if (notAlwaysOpenPatterns.some((p) => p.test(value))) {
@@ -169,16 +172,7 @@ export class PolicyNormalizationService {
       return true;
     }
 
-    // 조건부/개인일정 기반 → 날짜 없지만 신청 자체는 가능 → 상시로 간주
-    const alwaysOpenConditionalPatterns = [
-      /입주\s*\(?\s*예정\s*\)?\s*일/,       // 입주(예정)일 기준
-      /전까지\s*(방문\s*)?신청/,             // ~전까지 방문신청
-    ];
-    for (const value of candidates) {
-      if (alwaysOpenConditionalPatterns.some((p) => p.test(value))) {
-        return true;
-      }
-    }
+    // 입주일·전까지 등 개인일정 기준은 사용자마다 시점이 달라 실질적 상시가 아님 → false 유지
 
     // "매년 상반기", "12월중", "접수기관별 상이" 등은 상시가 아님
     // → isAlwaysOpen=false, periodRaw에 원문 보존하여 프론트에서 그대로 표시
