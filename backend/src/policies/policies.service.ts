@@ -229,129 +229,23 @@ export class PoliciesService {
   }
 
   async getPolicyDetailPublic(policyId: string) {
-    const policy = await this.policyRepository.findOne({
-      where: { id: policyId, status: PolicyStatus.ACTIVE },
-      relations: ['requirements', 'rules'],
-    });
-
-    if (!policy) {
-      throw new NotFoundException('정책을 찾을 수 없습니다.');
-    }
-
-    if (!this.isPolicyInMvpScope(policy)) {
-      throw new NotFoundException('정책을 찾을 수 없습니다.');
-    }
-
-    const extra = (policy.extraMeta ?? {}) as Record<string, unknown>;
-
-    return {
-      id: policy.id,
-      code: policy.code,
-      title: policy.title,
-      shortDescription: policy.shortDescription,
-      description: policy.description,
-      providerName: policy.providerName,
-      sourceUrl: policy.sourceUrl,
-      sourceType: this.getSourceType(policy.sourceUrl),
-      applicationUrl: policy.applicationUrl,
-      applicationMethod: policy.applicationMethod,
-      searchUrl: this.buildSearchUrl(policy),
-      categories: policy.categories,
-      regionCodes: policy.regionCodes,
-      minAge: policy.minAge,
-      maxAge: policy.maxAge,
-      targetGenders: policy.targetGenders,
-      targetDescription: policy.targetDescription,
-      startsAt: policy.startsAt,
-      endsAt: policy.endsAt,
-      isAlwaysOpen: policy.isAlwaysOpen,
-      periodRaw: policy.periodRaw,
-      requirements: policy.requirements
-        .sort((a, b) => a.displayOrder - b.displayOrder)
-        .map((requirement) => ({
-          key: requirement.key,
-          label: requirement.label,
-          description: requirement.description,
-          type: requirement.type,
-          isRequired: requirement.isRequired,
-          options: requirement.options,
-        })),
-      eligibilityInfo: {
-        supportContent: (extra.supportContent as string) ?? null,
-        selectionCriteria: (extra.selectionCriteria as string) ?? null,
-        applicationDeadline: (extra.applicationDeadline as string) ?? null,
-        warnBox: (extra.warnBox as string) ?? null,
-      },
-      policyType: policy.policyType,
-      eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
-    };
+    const policy = await this.findActivePolicyInScope(policyId);
+    return this.toPolicyDetailBase(policy);
   }
 
   async getPolicyDetail(userId: string, policyId: string) {
-    const policy = await this.policyRepository.findOne({
-      where: { id: policyId, status: PolicyStatus.ACTIVE },
-      relations: ['requirements', 'rules'],
-    });
+    const policy = await this.findActivePolicyInScope(policyId);
 
-    if (!policy) {
-      throw new NotFoundException('정책을 찾을 수 없습니다.');
-    }
-
-    if (!this.isPolicyInMvpScope(policy)) {
-      throw new NotFoundException('정책을 찾을 수 없습니다.');
-    }
-
-    const state = await this.userPolicyStateRepository.findOne({
-      where: { userId, policyId },
-    });
-
-    const lastCheck = await this.eligibilityCheckRepository.findOne({
-      where: { userId, policyId },
-      order: { createdAt: 'DESC' },
-    });
-
-    const extra = (policy.extraMeta ?? {}) as Record<string, unknown>;
+    const [state, lastCheck] = await Promise.all([
+      this.userPolicyStateRepository.findOne({ where: { userId, policyId } }),
+      this.eligibilityCheckRepository.findOne({
+        where: { userId, policyId },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
 
     return {
-      id: policy.id,
-      code: policy.code,
-      title: policy.title,
-      shortDescription: policy.shortDescription,
-      description: policy.description,
-      providerName: policy.providerName,
-      sourceUrl: policy.sourceUrl,
-      sourceType: this.getSourceType(policy.sourceUrl),
-      applicationUrl: policy.applicationUrl,
-      applicationMethod: policy.applicationMethod,
-      searchUrl: this.buildSearchUrl(policy),
-      categories: policy.categories,
-      regionCodes: policy.regionCodes,
-      minAge: policy.minAge,
-      maxAge: policy.maxAge,
-      targetGenders: policy.targetGenders,
-      targetDescription: policy.targetDescription,
-      startsAt: policy.startsAt,
-      endsAt: policy.endsAt,
-      isAlwaysOpen: policy.isAlwaysOpen,
-      periodRaw: policy.periodRaw,
-      requirements: policy.requirements
-        .sort((a, b) => a.displayOrder - b.displayOrder)
-        .map((requirement) => ({
-          key: requirement.key,
-          label: requirement.label,
-          description: requirement.description,
-          type: requirement.type,
-          isRequired: requirement.isRequired,
-          options: requirement.options,
-        })),
-      eligibilityInfo: {
-        supportContent: (extra.supportContent as string) ?? null,
-        selectionCriteria: (extra.selectionCriteria as string) ?? null,
-        applicationDeadline: (extra.applicationDeadline as string) ?? null,
-        warnBox: (extra.warnBox as string) ?? null,
-      },
-      policyType: policy.policyType,
-      eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
+      ...this.toPolicyDetailBase(policy),
       userState: state?.state ?? null,
       lastEligibility: lastCheck
         ? {
@@ -361,6 +255,65 @@ export class PoliciesService {
             checkedAt: lastCheck.createdAt,
           }
         : null,
+    };
+  }
+
+  private async findActivePolicyInScope(policyId: string): Promise<Policy> {
+    const policy = await this.policyRepository.findOne({
+      where: { id: policyId, status: PolicyStatus.ACTIVE },
+      relations: ['requirements', 'rules'],
+    });
+
+    if (!policy || !this.isPolicyInMvpScope(policy)) {
+      throw new NotFoundException('정책을 찾을 수 없습니다.');
+    }
+
+    return policy;
+  }
+
+  private toPolicyDetailBase(policy: Policy) {
+    const extra = (policy.extraMeta ?? {}) as Record<string, unknown>;
+
+    return {
+      id: policy.id,
+      code: policy.code,
+      title: policy.title,
+      shortDescription: policy.shortDescription,
+      description: policy.description,
+      providerName: policy.providerName,
+      sourceUrl: policy.sourceUrl,
+      sourceType: this.getSourceType(policy.sourceUrl),
+      applicationUrl: policy.applicationUrl,
+      applicationMethod: policy.applicationMethod,
+      searchUrl: this.buildSearchUrl(policy),
+      categories: policy.categories,
+      regionCodes: policy.regionCodes,
+      minAge: policy.minAge,
+      maxAge: policy.maxAge,
+      targetGenders: policy.targetGenders,
+      targetDescription: policy.targetDescription,
+      startsAt: policy.startsAt,
+      endsAt: policy.endsAt,
+      isAlwaysOpen: policy.isAlwaysOpen,
+      periodRaw: policy.periodRaw,
+      requirements: policy.requirements
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((requirement) => ({
+          key: requirement.key,
+          label: requirement.label,
+          description: requirement.description,
+          type: requirement.type,
+          isRequired: requirement.isRequired,
+          options: requirement.options,
+        })),
+      eligibilityInfo: {
+        supportContent: (extra.supportContent as string) ?? null,
+        selectionCriteria: (extra.selectionCriteria as string) ?? null,
+        applicationDeadline: (extra.applicationDeadline as string) ?? null,
+        warnBox: (extra.warnBox as string) ?? null,
+      },
+      policyType: policy.policyType,
+      eligibilityCompleteness: this.computeEligibilityCompleteness(policy),
     };
   }
 

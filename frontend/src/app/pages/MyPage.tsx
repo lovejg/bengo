@@ -33,6 +33,19 @@ interface EditFormState {
   interests: string[];
 }
 
+function calculateProfileCompletion(user: UserProfileSummary | null): number {
+  if (!user) {
+    return 0;
+  }
+
+  const completed =
+    (user.age ? 1 : 0) +
+    (user.regionCode ? 1 : 0) +
+    (user.interests.length > 0 ? 1 : 0);
+
+  return Math.round((completed / 3) * 100);
+}
+
 const REGION_OPTIONS: { value: string; label: string }[] = [
   { value: 'seoul', label: '서울' },
 ];
@@ -212,12 +225,18 @@ export function MyPage() {
     setReloadKey((current) => current + 1);
   };
 
+  const storedUser = getStoredUserProfile();
+  const profileCompletion = calculateProfileCompletion(storedUser);
+  const ringRadius = 28;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - profileCompletion / 100);
+
   return (
     <MainLayout>
       <div className="bg-gradient-to-b from-blue-50 to-white py-8 sm:py-10 md:py-12">
         <div className="container mx-auto px-4">
-          <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-6 md:mb-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-100 rounded-2xl shadow-lg p-6 md:p-8 mb-6 md:mb-8">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_auto] gap-6 xl:gap-8 items-center">
               <div className="flex items-start gap-4">
                 <div className="p-4 bg-blue-100 rounded-2xl flex-shrink-0">
                   <User className="h-8 w-8 text-[var(--accent)]" />
@@ -226,6 +245,9 @@ export function MyPage() {
                   <h2 className="mb-2 text-xl sm:text-2xl md:text-3xl break-words">
                     {user ? `${user.name}님` : '내 정보'}
                   </h2>
+                  <p className="text-sm text-[var(--muted-foreground)] mb-3">
+                    저장한 정책과 프로필 정보를 한곳에서 정리하고 관리할 수 있어요.
+                  </p>
                   <div className="flex flex-wrap gap-3 text-sm text-[var(--muted-foreground)]">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 flex-shrink-0" />
@@ -236,79 +258,134 @@ export function MyPage() {
                       <span>{user?.region ?? '지역 정보 없음'}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {(user?.interests ?? []).map((interest) => (
-                      <Badge key={interest}>{interest}</Badge>
-                    ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-white/80 px-4 py-4 shadow-sm">
+                  <p className="text-xs font-medium text-[var(--muted-foreground)] mb-1">저장한 정책</p>
+                  <p className="text-2xl font-semibold text-[var(--foreground)]">{statusCounts.all}</p>
+                  <p className="text-xs text-[var(--muted-foreground)] mt-1">전체 저장 수</p>
+                </div>
+                <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-white/80 px-4 py-4 shadow-sm">
+                  <p className="text-xs font-medium text-[var(--muted-foreground)] mb-1">모집중</p>
+                  <p className="text-2xl font-semibold text-emerald-600">{statusCounts.recruiting}</p>
+                  <p className="text-xs text-[var(--muted-foreground)] mt-1">신청 가능한 정책</p>
+                </div>
+                <div className="rounded-2xl bg-white/70 backdrop-blur-sm border border-white/80 px-4 py-4 shadow-sm">
+                  <p className="text-xs font-medium text-[var(--muted-foreground)] mb-1">관심사</p>
+                  <div className="flex flex-wrap gap-2 mt-3 min-h-[2.5rem]">
+                    {(user?.interests ?? []).length > 0 ? (
+                      (user?.interests ?? []).map((interest) => (
+                        <Badge key={interest}>{interest}</Badge>
+                      ))
+                    ) : (
+                      <p className="text-xs text-[var(--muted-foreground)]">설정된 관심사가 없습니다</p>
+                    )}
                   </div>
                 </div>
               </div>
-              <Button variant="secondary" className="gap-2 w-full md:w-auto" onClick={() => {
-                const stored = getStoredUserProfile();
-                setEditForm({
-                  age: stored ? String(stored.age) : '',
-                  regionCode: stored?.regionCode ?? '',
-                  interests: stored?.interests ?? [],
-                });
-                setEditProfileOpen(true);
-              }}>
-                <Edit className="h-4 w-4" />
-                <span className="whitespace-nowrap">프로필 수정</span>
-              </Button>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 md:mb-8">
-            <div className="bg-white rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-semibold text-[var(--accent)] mb-1">{statusCounts.all}</p>
-              <p className="text-xs sm:text-sm text-[var(--muted-foreground)]">전체 저장</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-semibold text-blue-600 mb-1">{statusCounts.upcoming}</p>
-              <p className="text-xs sm:text-sm text-[var(--muted-foreground)]">예정</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-semibold text-amber-600 mb-1">{statusCounts.recruiting}</p>
-              <p className="text-xs sm:text-sm text-[var(--muted-foreground)]">모집중</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 text-center">
-              <p className="text-xl sm:text-2xl font-semibold text-emerald-600 mb-1">{statusCounts.closed}</p>
-              <p className="text-xs sm:text-sm text-[var(--muted-foreground)]">마감</p>
+              <div className="rounded-2xl bg-white/75 backdrop-blur-sm border border-white/80 p-4 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="relative h-16 w-16 flex-shrink-0">
+                    <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64" aria-hidden="true">
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r={ringRadius}
+                        fill="none"
+                        stroke="rgba(59, 130, 246, 0.14)"
+                        strokeWidth="6"
+                      />
+                      <circle
+                        cx="32"
+                        cy="32"
+                        r={ringRadius}
+                        fill="none"
+                        stroke="url(#my-profile-completion-gradient)"
+                        strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={ringCircumference}
+                        strokeDashoffset={ringOffset}
+                      />
+                      <defs>
+                        <linearGradient id="my-profile-completion-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#2563eb" />
+                          <stop offset="100%" stopColor="#7c3aed" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-semibold text-[var(--foreground)]">{profileCompletion}%</span>
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--foreground)]">프로필 완성도</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-blue-100/80">
+                  <Button variant="secondary" className="gap-2 w-full justify-center bg-white hover:bg-blue-50" onClick={() => {
+                    const stored = getStoredUserProfile();
+                    setEditForm({
+                      age: stored ? String(stored.age) : '',
+                      regionCode: stored?.regionCode ?? '',
+                      interests: stored?.interests ?? [],
+                    });
+                    setEditProfileOpen(true);
+                  }}>
+                    <Edit className="h-4 w-4" />
+                    <span className="whitespace-nowrap">프로필 수정</span>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-2 mb-6 flex flex-wrap gap-2">
             <button
               onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'all' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
-              전체 ({statusCounts.all})
+              <span>전체</span>
+              <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-16 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-16 group-focus-visible:opacity-100">
+                {statusCounts.all}
+              </span>
             </button>
             <button
               onClick={() => { setStatusFilter('upcoming'); setCurrentPage(1); }}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'upcoming' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
-              예정 ({statusCounts.upcoming})
+              <span>예정</span>
+              <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-16 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-16 group-focus-visible:opacity-100">
+                {statusCounts.upcoming}
+              </span>
             </button>
             <button
               onClick={() => { setStatusFilter('recruiting'); setCurrentPage(1); }}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'recruiting' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
-              모집중 ({statusCounts.recruiting})
+              <span>모집중</span>
+              <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-16 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-16 group-focus-visible:opacity-100">
+                {statusCounts.recruiting}
+              </span>
             </button>
             <button
               onClick={() => { setStatusFilter('closed'); setCurrentPage(1); }}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
                 statusFilter === 'closed' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
               }`}
             >
-              마감 ({statusCounts.closed})
+              <span>마감</span>
+              <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-16 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-16 group-focus-visible:opacity-100">
+                {statusCounts.closed}
+              </span>
             </button>
           </div>
 
@@ -327,9 +404,9 @@ export function MyPage() {
             <div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {filteredPolicies.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((policy) => (
-                <div key={policy.id} className="relative">
+                <div key={policy.id} className="group relative">
                   <PolicyCard {...policy} applicationStatus={!policy.startsAt && !policy.endsAt && !policy.isAlwaysOpen ? undefined : policy.applicationStatus} />
-                  <div className="absolute bottom-4 right-4 z-10">
+                  <div className="absolute top-4 right-4 z-10 transition-transform duration-300 ease-out group-hover:-translate-y-2">
                     <button
                       className="p-2 bg-white/95 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 rounded-xl shadow-sm transition-all duration-200 active:scale-95 backdrop-blur-sm"
                       onClick={(e) => {
@@ -343,18 +420,6 @@ export function MyPage() {
                       <Trash2 className="h-4 w-4 text-gray-500" />
                     </button>
                   </div>
-                  {(() => {
-                    const s = policy.isAlwaysOpen ? 'always'
-                      : !policy.endsAt ? null
-                      : new Date(policy.endsAt).getTime() < Date.now() ? 'closed'
-                      : 'recruiting';
-                    const labels = { recruiting: '모집중', always: '상시', closed: '마감' } as const;
-                    return s ? (
-                      <div className="absolute top-4 right-4 z-10">
-                        <Badge variant={s}>{labels[s]}</Badge>
-                      </div>
-                    ) : null;
-                  })()}
                 </div>
                 ))}
               </div>

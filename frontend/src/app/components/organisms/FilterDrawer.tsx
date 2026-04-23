@@ -25,7 +25,6 @@ const ageRanges = [
 ];
 
 const statuses = [
-  { id: 'all', label: '전체' },
   { id: 'student', label: '학생' },
   { id: 'jobseeker', label: '구직자' },
   { id: 'employed', label: '재직자' },

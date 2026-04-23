@@ -433,10 +433,65 @@ export const POLICY_MANUAL_OVERRIDES: PolicyManualOverride[] = [
       ],
     },
   },
+  // 서리풀 희망사다리 자립컨설팅 지원 — "컨설팅" 표현 때문에 LLM이 info로 오분류 (다른 서리풀 정책들은 APPLICATION이라 카테고리 일치 필요)
+  {
+    code: 'data-go-kr-서리풀-희망사다리-프로젝트-자립준비청년보호종료아동-자립컨설팅-지원',
+    policyType: PolicyType.APPLICATION,
+  },
   // 서울시 가족돌봄청년 지원사업 WAY — "자원 안내 및 연결" 표현 때문에 LLM이 info로 오분류 (실제: 별도 공고 통해 생활비·병원비 등 신청형)
   {
     code: 'youth-seoul-서울시-가족돌봄청년-지원사업-way',
     policyType: PolicyType.APPLICATION,
+  },
+  // 양천구 장학금 지원 — 3가지 장학금 유형별 분기 + 중복혜택 불가
+  {
+    code: 'data-go-kr-양천구-장학금-지원',
+    overrideRule: {
+      id: 'manual-양천구-장학금-지원',
+      name: '양천구 장학금 지원 — 학생 유형·장학금 유형 분기',
+      root: {
+        all: [
+          // 공통: 양천구 1년 이상 거주
+          { fact: 'answers.residencyOver1YearYangcheon', op: '=', value: true, message: '공고일 기준 양천구 1년 이상 거주자만 신청 가능합니다.', verifiable: true },
+          // 공통: 학생 유형 SELECT
+          { fact: 'answers.educationLevel', op: 'in', value: ['초등학생', '중학생', '고등학생', '대학생'], message: '초·중·고·대학생만 신청 가능합니다.', verifiable: true },
+          // 장학금 유형 SELECT (top-level 배치)
+          { fact: 'answers.scholarshipType', op: 'in', value: ['일반장학생', '성적우수장학생', '특기장학생'], message: '신청할 장학금 유형을 선택해주세요.', verifiable: true },
+          // 유형별 자격 분기
+          {
+            any: [
+              {
+                all: [
+                  { fact: 'answers.scholarshipType', op: '=', value: '일반장학생', verifiable: true },
+                  { fact: 'answers.educationLevel', op: 'in', value: ['고등학생', '대학생'], verifiable: true },
+                  { fact: 'answers.incomeLevel', op: '=', value: true, message: '일반장학생은 소득인정액이 기준중위소득 100% 이내여야 합니다 (대학생: 한국장학재단 학자금 지원구간 5구간 이내).', verifiable: true },
+                ],
+              },
+              {
+                all: [
+                  { fact: 'answers.scholarshipType', op: '=', value: '성적우수장학생', verifiable: true },
+                  { fact: 'answers.educationLevel', op: '=', value: '고등학생', verifiable: true },
+                  { fact: 'answers.gradeAverage', op: '<=', value: 2.75, message: '성적우수장학생은 직전학기 과목별 석차등급 평균이 2.75등급 이내여야 합니다.', verifiable: true },
+                ],
+              },
+              {
+                all: [
+                  { fact: 'answers.scholarshipType', op: '=', value: '특기장학생', verifiable: true },
+                  { fact: 'answers.educationLevel', op: 'in', value: ['초등학생', '중학생', '고등학생'], verifiable: true },
+                  { fact: 'answers.competitionAward', op: '=', value: true, message: '특기장학생은 2년 이내 광역시·도단위 이상 대회에서 3위권 이내 입상 이력이 있어야 합니다.', verifiable: true },
+                ],
+              },
+            ],
+          },
+          // 중복혜택 불가
+          { fact: 'answers.receivingOtherScholarship', op: '=', value: false, message: '국가·타 지자체·민간단체 장학금 수혜자는 신청할 수 없습니다. (단, 대학생이 등록금에 미달하는 장학금을 받는 경우는 제외)', verifiable: true },
+        ],
+      },
+      conditionalHints: [
+        '대학생이 등록금에 미달하는 장학금을 받는 경우는 중복 수혜 제한에서 제외됩니다.',
+        '중위소득·한부모·다자녀 등을 추가 고려하여 선발하며, 예산 범위 내에서 지급됩니다.',
+      ],
+    },
   },
   // 강서구 사랑의 PC 나눔센터 — "센터" 명칭 때문에 LLM이 info로 오분류 (실제: 선착순 신청형)
   {

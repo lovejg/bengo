@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ArrowRight, User, Menu, X, LogOut } from 'lucide-react';
+import { ArrowRight, User, LogOut } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
@@ -9,7 +9,6 @@ import { getAccessToken, getStoredUserProfile, clearAccessToken, clearStoredUser
 export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -126,91 +125,8 @@ export function Header() {
             </>
           )}
           
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 hover:bg-[var(--muted)] rounded-lg transition-colors duration-150"
-            aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-menu"
-          >
-            {mobileMenuOpen ? (
-              <X className="h-5 w-5" aria-hidden="true" />
-            ) : (
-              <Menu className="h-5 w-5" aria-hidden="true" />
-            )}
-          </button>
         </div>
       </div>
-      
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div id="mobile-menu" className="md:hidden border-t border-[var(--border)] bg-white">
-          <nav className="container mx-auto px-4 py-4 flex flex-col gap-3" aria-label="모바일 메뉴">
-            <Link
-              to="/policies"
-              className={cn(
-                'px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150',
-                isActive('/policies') && 'bg-[var(--muted)]'
-              )}
-              onClick={() => setMobileMenuOpen(false)}
-              aria-current={isActive('/policies') ? 'page' : undefined}
-            >
-              정책찾기
-            </Link>
-            <Link
-              to="/personalized"
-              className={cn(
-                'px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150',
-                isActive('/personalized') && 'bg-[var(--muted)]'
-              )}
-              onClick={() => setMobileMenuOpen(false)}
-              aria-current={isActive('/personalized') ? 'page' : undefined}
-            >
-              맞춤정책
-            </Link>
-            {isAuthenticated && (
-              <Link
-                to="/me"
-                className={cn(
-                  'px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150',
-                  isActive('/me') && 'bg-[var(--muted)]'
-                )}
-                onClick={() => setMobileMenuOpen(false)}
-                aria-current={isActive('/me') ? 'page' : undefined}
-              >
-                MY
-              </Link>
-            )}
-            {isAuthenticated ? (
-              <button
-                className="px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150 text-left flex items-center gap-2"
-                onClick={() => { setMobileMenuOpen(false); handleLogout(); }}
-              >
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-                로그아웃 ({userName})
-              </button>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="px-4 py-2 rounded-lg hover:bg-[var(--muted)] transition-colors duration-150"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  로그인
-                </Link>
-                <Link
-                  to="/signup"
-                  className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--accent-foreground)] hover:opacity-90 transition-opacity duration-150 text-center"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  회원가입
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
-      )}
     </header>
   );
 }
