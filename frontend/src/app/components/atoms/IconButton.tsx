@@ -12,7 +12,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-all duration-150',
+          'inline-flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-all duration-150 cursor-pointer',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2',
           'disabled:pointer-events-none disabled:opacity-50',
           {

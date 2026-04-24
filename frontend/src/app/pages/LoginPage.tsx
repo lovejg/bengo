@@ -6,6 +6,8 @@ import { ApiClientError } from '../api/client';
 import { login } from '../api/auth';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
+import googleLogo from '../../img/google-logo.svg';
+import naverLogo from '../../img/naver-logo.svg';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -136,15 +138,17 @@ export function LoginPage() {
           <div className="mt-4 space-y-2">
             <button
               type="button"
-              className="w-full p-3 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors text-sm"
+              className="relative flex w-full items-center justify-center rounded-xl border border-[var(--border)] bg-white p-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] cursor-pointer"
             >
+              <img src={googleLogo} alt="" className="absolute left-4 h-5 w-5" aria-hidden="true" />
               구글로 계속하기
             </button>
             <button
               type="button"
-              className="w-full p-3 border border-[var(--border)] rounded-xl hover:bg-[var(--muted)] transition-colors text-sm"
+              className="relative flex w-full items-center justify-center rounded-xl border border-[#03C75A] bg-white p-3 text-sm font-semibold text-[#03C75A] transition-colors hover:bg-green-50 cursor-pointer"
             >
-              카카오로 계속하기
+              <img src={naverLogo} alt="" className="absolute left-4 h-5 w-5" aria-hidden="true" />
+              네이버로 계속하기
             </button>
           </div>
         </div>

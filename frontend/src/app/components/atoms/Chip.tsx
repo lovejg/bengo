@@ -20,7 +20,7 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(
             // Filter chips (selectable)
             'border-[var(--border)] hover:border-[var(--accent)] hover:bg-blue-50 cursor-pointer':
               variant === 'filter' && !selected,
-            'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm':
+            'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)] shadow-sm cursor-pointer':
               variant === 'filter' && selected,
             // Tag chips (non-interactive)
             'border-[var(--border)] bg-[var(--muted)] cursor-default': variant === 'tag',

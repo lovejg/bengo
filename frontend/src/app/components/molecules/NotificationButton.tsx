@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router';
@@ -10,6 +10,30 @@ import { getPolicyDetail } from '../../api/policies';
 import { getAccessToken, getStoredUserProfile } from '../../api/client';
 
 type NavigateFn = (path: string) => void;
+const READ_NOTIFICATION_IDS_KEY = 'bengo_read_notification_ids';
+
+function getReadNotificationIds() {
+  const raw = window.localStorage.getItem(READ_NOTIFICATION_IDS_KEY);
+  if (!raw) return new Set<string>();
+
+  try {
+    const ids = JSON.parse(raw);
+    return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []);
+  } catch {
+    window.localStorage.removeItem(READ_NOTIFICATION_IDS_KEY);
+    return new Set<string>();
+  }
+}
+
+function setReadNotificationIds(ids: Set<string>) {
+  window.localStorage.setItem(READ_NOTIFICATION_IDS_KEY, JSON.stringify([...ids]));
+}
+
+function markNotificationIdsRead(ids: string[]) {
+  const readIds = getReadNotificationIds();
+  ids.forEach((id) => readIds.add(id));
+  setReadNotificationIds(readIds);
+}
 
 function getDaysUntil(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -22,10 +46,14 @@ function getDaysUntil(dateStr: string | null | undefined): number | null {
 
 async function buildNotifications(navigate: NavigateFn): Promise<NotificationItemProps[]> {
   const notifs: NotificationItemProps[] = [];
+  const readIds = getReadNotificationIds();
+  const token = getAccessToken();
+  const profile = getStoredUserProfile();
+
+  if (!token || !profile) return notifs;
 
   // Profile completeness notification
-  const profile = getStoredUserProfile();
-  const isProfileIncomplete = !profile || !profile.age || !profile.regionCode || !profile.interests?.length;
+  const isProfileIncomplete = !profile.age || !profile.regionCode || !profile.interests?.length;
   if (isProfileIncomplete) {
     notifs.push({
       id: 'profile',
@@ -40,9 +68,6 @@ async function buildNotifications(navigate: NavigateFn): Promise<NotificationIte
   }
 
   // Deadline & upcoming notifications from saved policies
-  const token = getAccessToken();
-  if (!token) return notifs;
-
   try {
     const res = await getMyPolicies();
     const activePolicies = res.items;
@@ -96,32 +121,75 @@ async function buildNotifications(navigate: NavigateFn): Promise<NotificationIte
     // API error - skip policy notifications
   }
 
-  return notifs;
+  return notifs.map((notification) => ({
+    ...notification,
+    isUnread: !readIds.has(notification.id),
+  }));
 }
 
 export function NotificationButton() {
   const navigate = useNavigate();
+  const isAuthenticated = Boolean(getAccessToken() && getStoredUserProfile());
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItemProps[]>([]);
+  const hasLoadedRef = useRef(false);
 
   const unreadCount = notifications.filter((n) => n.isUnread).length;
 
-  const handleToggle = async () => {
-    setIsOpen(!isOpen);
+  const loadNotifications = useCallback(async () => {
+    if (!isAuthenticated) return;
 
-    if (!isOpen) {
-      setIsLoading(true);
-      const notifs = await buildNotifications(navigate);
-      setNotifications(notifs);
-      setIsLoading(false);
+    setIsLoading(true);
+    const notifs = await buildNotifications(navigate);
+    setNotifications(notifs);
+    hasLoadedRef.current = true;
+    setIsLoading(false);
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  if (!isAuthenticated) return null;
+
+  const handleToggle = async () => {
+    const nextOpen = !isOpen;
+    setIsOpen(nextOpen);
+
+    if (nextOpen && !hasLoadedRef.current) {
+      await loadNotifications();
+    }
+
+    if (nextOpen) {
+      markNotificationIdsRead(notifications.map((n) => n.id));
+      setNotifications((current) => current.map((n) => ({ ...n, isUnread: false })));
     }
   };
 
   const handleMarkAllRead = () => {
+    markNotificationIdsRead(notifications.map((n) => n.id));
     setNotifications(notifications.map((n) => ({ ...n, isUnread: false })));
     toast.success('모든 알림을 읽음 처리했습니다');
   };
+
+  const visibleNotifications = notifications.map((notification) => ({
+    ...notification,
+    onClick: () => {
+      markNotificationIdsRead([notification.id]);
+      setNotifications((current) =>
+        current.map((n) => (n.id === notification.id ? { ...n, isUnread: false } : n)),
+      );
+      notification.onClick();
+    },
+    onAction: () => {
+      markNotificationIdsRead([notification.id]);
+      setNotifications((current) =>
+        current.map((n) => (n.id === notification.id ? { ...n, isUnread: false } : n)),
+      );
+      notification.onAction();
+    },
+  }));
 
   const handleEmptyAction = () => {
     navigate('/me');
@@ -132,7 +200,7 @@ export function NotificationButton() {
     <div className="relative">
       <button
         onClick={handleToggle}
-        className="relative p-2 hover:bg-[var(--muted)] rounded-lg transition-colors duration-150"
+        className="relative p-2 hover:bg-[var(--muted)] rounded-lg transition-colors duration-150 cursor-pointer"
         aria-label={`알림 ${unreadCount > 0 ? `(${unreadCount}개 읽지 않음)` : ''}`}
         aria-expanded={isOpen}
       >
@@ -143,7 +211,7 @@ export function NotificationButton() {
       <NotificationPopover
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        notifications={notifications}
+        notifications={visibleNotifications}
         isLoading={isLoading}
         onMarkAllRead={handleMarkAllRead}
         onEmptyAction={handleEmptyAction}

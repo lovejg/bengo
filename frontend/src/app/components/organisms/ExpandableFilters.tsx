@@ -27,26 +27,40 @@ const EMPTY: ExpandableFiltersState = {
   employmentStatuses: [],
 };
 
+// Temporary options for detailed filter density/visibility testing.
+// Remove this constant and the spreads below when the visibility test is done.
+const TEMP_VISIBILITY_TEST_OPTIONS = Array.from({ length: 7 }, (_, index) => {
+  const number = index + 1;
+  return {
+    id: `temp_visibility_test_${number}`,
+    label: `테스트 ${number}`,
+  };
+});
+
 const categoryOptions = [
   { id: 'youth_policy', label: '청년정책' },
   { id: 'childcare_policy', label: '육아정책' },
+  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 const regionOptions = [
   { id: 'all', label: '전체' },
   { id: 'seoul', label: '서울' },
+  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 const ageOptions = [
   { id: '19-24', label: '19-24세' },
   { id: '25-29', label: '25-29세' },
   { id: '30-34', label: '30-34세' },
+  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 const employmentStatusOptions = [
   { id: 'student', label: '학생' },
   { id: 'jobseeker', label: '구직자' },
   { id: 'employed', label: '재직자' },
+  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 export function ExpandableFilters({
@@ -113,7 +127,7 @@ export function ExpandableFilters({
       <div className="overflow-hidden">
 
         {/* 탭 바: 언더라인 스타일 */}
-        <div className="flex border-b border-[var(--border)]">
+        <div className="flex border-b border-[var(--border)] overflow-x-auto">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -123,11 +137,12 @@ export function ExpandableFilters({
                 onClick={() => setActiveTab(tab.id)}
                 className={`
                   relative flex items-center gap-1.5
-                  px-4 py-3 text-[13px] font-medium
-                  transition-colors whitespace-nowrap select-none
+                  px-4 py-3 text-[13px] font-semibold
+                  transition-all duration-200 whitespace-nowrap select-none cursor-pointer
+                  hover:scale-105
                   ${isActive
                     ? 'text-[var(--accent)]'
-                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--accent)]'
                   }
                 `}
               >
@@ -151,7 +166,7 @@ export function ExpandableFilters({
         </div>
 
         {/* 탭 콘텐츠: 패딩만, 내부 카드/박스 없음 */}
-        <div className="px-5 py-4">
+        <div className="px-5 py-5">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -218,7 +233,7 @@ export function ExpandableFilters({
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                    className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
                   >
                     초기화
                   </button>
@@ -243,8 +258,8 @@ export function ExpandableFilters({
   // ── ACCORDION LAYOUT ────────────────────────────────────────────────────────
   if (variant === 'accordion') {
     return (
-      <div className="space-y-3">
-        <div className="space-y-3 p-4 bg-[var(--muted)]/20 rounded-[12px] border border-[var(--border)]">
+      <div className="space-y-4">
+        <div className="space-y-4 p-4 bg-[var(--muted)]/20 rounded-[12px] border border-[var(--border)]">
           <ExpandableFilterButton
             label="지역"
             icon={<MapPin className="h-4 w-4" />}
@@ -300,14 +315,14 @@ export function ExpandableFilters({
       { id: 'employmentStatuses' as const, label: '상태', icon: <Briefcase className="h-5 w-5" />, count: filters.employmentStatuses.filter((s) => s !== 'all').length },
     ];
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex gap-4 bg-white rounded-[12px] border border-[var(--border)]/50 shadow-sm overflow-hidden">
           <div className="w-40 bg-[var(--muted)]/10 border-r border-[var(--border)]/50 py-3">
             {sidebarCategories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveTab(category.id)}
-                className={`w-full px-4 py-3.5 flex items-center gap-3 transition-all duration-200 relative ${activeTab === category.id ? 'text-[var(--accent)] font-semibold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
+                className={`w-full px-4 py-3.5 flex items-center gap-3 transition-all duration-200 relative cursor-pointer ${activeTab === category.id ? 'text-[var(--accent)] font-semibold' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}
               >
                 {activeTab === category.id && (
                   <motion.div layoutId="sidebar-indicator" className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 500, damping: 30 }} />

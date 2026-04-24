@@ -28,6 +28,7 @@ export function Header() {
   };
 
   const isActive = (path: string) => location.pathname === path;
+  const navLinkBaseClass = 'text-[14px] font-medium transition-all duration-200 relative inline-block hover:scale-105';
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--border)]">
@@ -50,7 +51,7 @@ export function Header() {
           <Link
             to="/policies"
             className={cn(
-              'text-[14px] font-medium transition-all duration-200 relative',
+              navLinkBaseClass,
               isActive('/policies') 
                 ? 'text-[var(--accent)]' 
                 : 'text-[var(--foreground)] hover:text-[var(--accent)]'
@@ -65,7 +66,7 @@ export function Header() {
           <Link
             to="/personalized"
             className={cn(
-              'text-[14px] font-medium transition-all duration-200 relative',
+              navLinkBaseClass,
               isActive('/personalized') 
                 ? 'text-[var(--accent)]' 
                 : 'text-[var(--foreground)] hover:text-[var(--accent)]'
@@ -81,7 +82,7 @@ export function Header() {
             <Link
               to="/me"
               className={cn(
-                'text-[14px] font-medium transition-all duration-200 relative',
+                navLinkBaseClass,
                 isActive('/me')
                   ? 'text-[var(--accent)]'
                   : 'text-[var(--foreground)] hover:text-[var(--accent)]'
@@ -97,9 +98,11 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:block">
-            <NotificationButton />
-          </div>
+          {isAuthenticated && (
+            <div className="hidden sm:block">
+              <NotificationButton />
+            </div>
+          )}
           {isAuthenticated ? (
             <>
               <Link to="/profile" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">

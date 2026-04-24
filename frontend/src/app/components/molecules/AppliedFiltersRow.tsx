@@ -17,7 +17,7 @@ export function AppliedFiltersRow({ filters, onRemove, onClearAll }: AppliedFilt
         <button
           key={filter.id}
           onClick={() => onRemove(filter.id)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] px-3 py-1 text-sm hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] text-[var(--accent-foreground)] px-3 py-1 text-sm hover:opacity-90 transition-opacity cursor-pointer"
         >
           {filter.value}
           <X className="h-3 w-3" />
