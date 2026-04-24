@@ -4,11 +4,10 @@ import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { getPolicies } from '../api/policies';
-import { ApiClientError } from '../api/client';
+import { ApiClientError, getAccessToken, getStoredUserProfile } from '../api/client';
 import { MainLayout } from '../components/templates/MainLayout';
 import { SearchBar } from '../components/molecules/SearchBar';
 import { SortDropdown, SortOption } from '../components/molecules/SortDropdown';
-import { FilterChipGroup } from '../components/molecules/FilterChipGroup';
 import { AppliedFiltersRow } from '../components/molecules/AppliedFiltersRow';
 import { PolicyList } from '../components/organisms/PolicyList';
 import { ExpandableFilters, ExpandableFiltersState } from '../components/organisms/ExpandableFilters';
@@ -16,13 +15,9 @@ import { EmptyState } from '../components/molecules/EmptyState';
 import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
 import { Button } from '../components/atoms/Button';
 import type { PolicyListItem, RegionCode } from '../types';
+import { REGION_LABELS } from '../lib/regions';
 
 const PAGE_SIZE = 12;
-
-const QUICK_FILTERS = [
-  { id: 'youth_policy', label: '청년정책' },
-  { id: 'childcare_policy', label: '육아정책' },
-];
 
 const EMPTY_FILTERS: ExpandableFiltersState = {
   categories: [],
@@ -31,24 +26,135 @@ const EMPTY_FILTERS: ExpandableFiltersState = {
   employmentStatuses: [],
 };
 
+// Temporary labels for detailed filter density/visibility testing.
+// Keep in sync with TEMP_VISIBILITY_TEST_OPTIONS in ExpandableFilters.tsx.
+const TEMP_VISIBILITY_TEST_LABELS: Record<string, string> = Object.fromEntries(
+  Array.from({ length: 7 }, (_, index) => {
+    const number = index + 1;
+    return [`temp_visibility_test_${number}`, `테스트 ${number}`];
+  }),
+);
+
 // 칩 표시용 라벨 맵 (ExpandableFilters 실제 옵션 id 기준)
 const CATEGORY_LABELS: Record<string, string> = {
   youth_policy: '청년정책',
   childcare_policy: '육아정책',
+  ...TEMP_VISIBILITY_TEST_LABELS,
 };
-const REGION_LABELS: Record<string, string> = { seoul: '서울' };
+const FILTER_REGION_LABELS: Record<string, string> = { ...REGION_LABELS, ...TEMP_VISIBILITY_TEST_LABELS };
 const AGE_LABELS: Record<string, string> = {
   '19-24': '19-24세', '25-29': '25-29세', '30-34': '30-34세',
+  ...TEMP_VISIBILITY_TEST_LABELS,
 };
 const EMPLOYMENT_LABELS: Record<string, string> = {
   student: '학생', jobseeker: '구직자', employed: '재직자',
+  ...TEMP_VISIBILITY_TEST_LABELS,
 };
 type StatusFilter = 'recruiting' | 'always' | 'period_raw' | 'unknown';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SORT_OPTIONS = new Set<SortOption>(['latest', 'deadline', 'recommended']);
+
+function getSortOption(value: string | null): SortOption {
+  return value && SORT_OPTIONS.has(value as SortOption) ? (value as SortOption) : 'latest';
+}
+
+function getTime(value: string | null | undefined) {
+  return value ? new Date(value).getTime() : null;
+}
+
+function isClosedPolicy(policy: PolicyListItem, now = Date.now()) {
+  const endsAt = getTime(policy.endsAt);
+  return endsAt !== null && endsAt < now;
+}
+
+function getDeadlineRank(policy: PolicyListItem, now = Date.now()) {
+  if (isClosedPolicy(policy, now)) return 4;
+  if (!policy.isAlwaysOpen && policy.endsAt) return 0;
+  if (policy.isAlwaysOpen) return 1;
+  if (policy.periodRaw) return 2;
+  return 3;
+}
+
+function sortPoliciesByLatest(policies: PolicyListItem[]) {
+  return policies;
+}
+
+function sortPoliciesByDeadline(policies: PolicyListItem[], now = Date.now()) {
+  return [...policies].sort((a, b) => {
+    const aRank = getDeadlineRank(a, now);
+    const bRank = getDeadlineRank(b, now);
+    if (aRank !== bRank) return aRank - bRank;
+
+    if (aRank === 0) {
+      return (getTime(a.endsAt) ?? Number.MAX_SAFE_INTEGER) - (getTime(b.endsAt) ?? Number.MAX_SAFE_INTEGER);
+    }
+
+    if (aRank === 4) {
+      return (getTime(b.endsAt) ?? 0) - (getTime(a.endsAt) ?? 0);
+    }
+
+    return 0;
+  });
+}
+
+function stableExplorationOffset(id: string) {
+  let hash = 0;
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) % 997;
+  }
+  return (hash % 17) / 10;
+}
+
+function getRecommendedScore(policy: PolicyListItem) {
+  const user = getStoredUserProfile();
+  if (!user) return 0;
+
+  let score = 0;
+  if (policy.categories.some((category) => user.interests.includes(category))) score += 42;
+  if (policy.regionCodes.includes(user.regionCode)) score += 26;
+  if (
+    (policy.minAge === null || user.age >= policy.minAge) &&
+    (policy.maxAge === null || user.age <= policy.maxAge)
+  ) {
+    score += 22;
+  }
+
+  const deadlineRank = getDeadlineRank(policy);
+  if (deadlineRank === 0) score += 8;
+  else if (deadlineRank === 1) score += 5;
+  else if (deadlineRank === 2) score += 2;
+  else if (deadlineRank === 4) score -= 20;
+
+  const deadline = getTime(policy.endsAt);
+  if (deadline && deadline > Date.now()) {
+    score += Math.max(0, 4 - Math.floor((deadline - Date.now()) / (30 * DAY_MS)));
+  }
+
+  return score + stableExplorationOffset(policy.id);
+}
+
+function sortPoliciesByRecommended(policies: PolicyListItem[]) {
+  return [...policies].sort((a, b) => {
+    const scoreDiff = getRecommendedScore(b) - getRecommendedScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return a.title.localeCompare(b.title, 'ko');
+  });
+}
+
+function sortPoliciesForView(policies: PolicyListItem[], sortBy: SortOption) {
+  if (sortBy === 'deadline') return sortPoliciesByDeadline(policies);
+  if (sortBy === 'recommended') return sortPoliciesByRecommended(policies);
+  return sortPoliciesByLatest(policies);
+}
 
 export function PoliciesPage() {
   const location = useLocation();
   const navigationType = useNavigationType();
-  const [sortBy, setSortBy] = useState<SortOption>('latest');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isAuthenticated = Boolean(getAccessToken() && getStoredUserProfile());
+  const sortParam = getSortOption(searchParams.get('sort'));
+  const sortBy: SortOption = !isAuthenticated && sortParam === 'recommended' ? 'latest' : sortParam;
 
   // ── 필터 상태 ──────────────────────────────────────────────────────────────
   // committedFilters: Apply 확정값 (API 호출 기준, chips 기준)
@@ -66,7 +172,7 @@ export function PoliciesPage() {
     );
     committedFilters.regions
       .filter((r) => r !== 'all')
-      .forEach((r) => chips.push({ id: `region-${r}`, label: '지역', value: REGION_LABELS[r] ?? r }));
+      .forEach((r) => chips.push({ id: `region-${r}`, label: '지역', value: FILTER_REGION_LABELS[r] ?? r }));
     committedFilters.ages
       .filter((a) => a !== 'all')
       .forEach((a) => chips.push({ id: `age-${a}`, label: '나이대', value: AGE_LABELS[a] ?? a }));
@@ -81,7 +187,6 @@ export function PoliciesPage() {
   const [policies, setPolicies] = useState<PolicyListItem[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingScrollRestore, setPendingScrollRestore] = useState<number | null>(null);
-  const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
   const searchQuery = searchParams.get('search') ?? '';
   const statusFilter = (searchParams.get('status') as StatusFilter | null) ?? null;
@@ -112,6 +217,16 @@ export function PoliciesPage() {
   const setCurrentPage = (page: number) => {
     setSearchParams((prev) => { prev.set('page', String(page)); return prev; }, { replace: true });
     window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const handleSortChange = (nextSort: SortOption) => {
+    setSearchParams((prev) => {
+      if (nextSort === 'latest') prev.delete('sort');
+      else prev.set('sort', nextSort);
+      prev.set('page', '1');
+      return prev;
+    }, { replace: true });
+    scrollToTop();
   };
 
   useEffect(() => {
@@ -147,7 +262,7 @@ export function PoliciesPage() {
         const rawRegion = committedFilters.regions.find((r) => r !== 'all');
         const selectedRegion = rawRegion ? (rawRegion as RegionCode) : undefined;
         const selectedInterest = committedFilters.categories[0] as 'youth_policy' | 'childcare_policy' | undefined;
-        const apiSortBy = sortBy === 'recommended' ? 'relevance' : sortBy;
+        const apiSortBy = sortBy === 'recommended' ? 'latest' : sortBy;
         const response = await getPolicies({
           search: searchQuery || undefined,
           sortBy: apiSortBy,
@@ -167,6 +282,16 @@ export function PoliciesPage() {
     loadPolicies();
   }, [searchQuery, sortBy, committedFilters, reloadKey]);
 
+  useEffect(() => {
+    if (!isAuthenticated && sortParam === 'recommended') {
+      setSearchParams((prev) => {
+        prev.delete('sort');
+        prev.set('page', '1');
+        return prev;
+      }, { replace: true });
+    }
+  }, [isAuthenticated, setSearchParams, sortParam]);
+
   // ── 핸들러 ─────────────────────────────────────────────────────────────────
 
   const handleSearch = (query: string) => {
@@ -175,14 +300,6 @@ export function PoliciesPage() {
       prev.set('page', '1');
       return prev;
     }, { replace: true });
-    scrollToTop();
-  };
-
-  // 퀵 필터 칩: 즉시 committedFilters.categories에 반영
-  const handleFilterChange = (filters: string[]) => {
-    setCommittedFilters((prev) => ({ ...prev, categories: filters }));
-    setCurrentPage(1);
-    if (filters.length > 0) toast.success('필터가 적용되었습니다');
     scrollToTop();
   };
 
@@ -238,16 +355,19 @@ export function PoliciesPage() {
   const alwaysOpenCount = policies.filter(p => p.isAlwaysOpen).length;
   const periodRawCount = policies.filter(p => !p.isAlwaysOpen && !p.endsAt && !!p.periodRaw).length;
   const unknownCount = policies.filter(p => !p.isAlwaysOpen && !p.endsAt && !p.periodRaw).length;
-  const filteredPolicies = policies
-    .filter(p => {
+  const filteredPolicies = sortPoliciesForView(
+    policies
+      .filter(p => {
       if (!statusFilter) return true;
       if (statusFilter === 'recruiting') return !p.isAlwaysOpen && !!p.endsAt && new Date(p.endsAt).getTime() >= now;
       if (statusFilter === 'always') return p.isAlwaysOpen;
       if (statusFilter === 'period_raw') return !p.isAlwaysOpen && !p.endsAt && !!p.periodRaw;
       if (statusFilter === 'unknown') return !p.isAlwaysOpen && !p.endsAt && !p.periodRaw;
       return true;
-    })
-    .filter(p => !typeFilter || (p as any).policyType === typeFilter);
+      })
+      .filter(p => !typeFilter || (p as any).policyType === typeFilter),
+    sortBy,
+  );
 
   return (
     <MainLayout>
@@ -265,25 +385,25 @@ export function PoliciesPage() {
                 </p>
                 <div className="flex items-center gap-2 text-xs">
                   {recruitingCount > 0 && (
-                    <button type="button" onClick={() => setStatusFilter(p => p === 'recruiting' ? null : 'recruiting')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'recruiting' ? 'bg-emerald-200 border-emerald-400 text-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:opacity-80'}`}>
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'recruiting' ? null : 'recruiting')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'recruiting' ? 'bg-emerald-200 border-emerald-400 text-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                       모집중 {recruitingCount}
                     </button>
                   )}
                   {alwaysOpenCount > 0 && (
-                    <button type="button" onClick={() => setStatusFilter(p => p === 'always' ? null : 'always')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'always' ? 'bg-blue-200 border-blue-400 text-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200 hover:opacity-80'}`}>
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'always' ? null : 'always')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'always' ? 'bg-blue-200 border-blue-400 text-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
                       상시 {alwaysOpenCount}
                     </button>
                   )}
                   {periodRawCount > 0 && (
-                    <button type="button" onClick={() => setStatusFilter(p => p === 'period_raw' ? null : 'period_raw')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'period_raw' ? 'bg-amber-200 border-amber-400 text-amber-800' : 'bg-amber-50 text-amber-700 border-amber-200 hover:opacity-80'}`}>
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'period_raw' ? null : 'period_raw')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'period_raw' ? 'bg-amber-200 border-amber-400 text-amber-800' : 'bg-amber-50 text-amber-700 border-amber-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
                       별도 확인 {periodRawCount}
                     </button>
                   )}
                   {unknownCount > 0 && (
-                    <button type="button" onClick={() => setStatusFilter(p => p === 'unknown' ? null : 'unknown')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all ${statusFilter === 'unknown' ? 'bg-red-200 border-red-400 text-red-800' : 'bg-red-50 text-red-700 border-red-200 hover:opacity-80'}`}>
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'unknown' ? null : 'unknown')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'unknown' ? 'bg-red-200 border-red-400 text-red-800' : 'bg-red-50 text-red-700 border-red-200 hover:opacity-80'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
                       기간확인불가 {unknownCount}
                     </button>
@@ -299,7 +419,7 @@ export function PoliciesPage() {
               <SearchBar key={searchQuery} onSearch={handleSearch} defaultValue={searchQuery} />
             </div>
             <div className="flex gap-2 sm:gap-3">
-              <SortDropdown value={sortBy} onChange={setSortBy} />
+              <SortDropdown value={sortBy} onChange={handleSortChange} showRecommended={isAuthenticated} />
               <Button
                 variant={isExpandableFiltersOpen ? 'primary' : 'secondary'}
                 className={`gap-2 ${isExpandableFiltersOpen ? 'shadow-md' : ''}`}
@@ -312,24 +432,19 @@ export function PoliciesPage() {
             </div>
           </div>
 
-          {/* Quick Filters */}
+          {/* Type Filters */}
           <div className="flex flex-wrap items-center gap-2">
-            <FilterChipGroup
-              filters={QUICK_FILTERS}
-              selected={committedFilters.categories}
-              onChange={handleFilterChange}
-            />
             <button
               type="button"
               onClick={() => setTypeFilter(p => p === 'application' ? null : 'application')}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${typeFilter === 'application' ? 'bg-violet-500 text-white border-violet-500' : 'bg-violet-50 text-violet-700 border-violet-200 hover:opacity-80'}`}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer ${typeFilter === 'application' ? 'bg-violet-500 text-white border-violet-500' : 'bg-violet-50 text-violet-700 border-violet-200 hover:opacity-80'}`}
             >
               신청형
             </button>
             <button
               type="button"
               onClick={() => setTypeFilter(p => p === 'info' ? null : 'info')}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${typeFilter === 'info' ? 'bg-orange-500 text-white border-orange-500' : 'bg-orange-50 text-orange-700 border-orange-200 hover:opacity-80'}`}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer ${typeFilter === 'info' ? 'bg-orange-500 text-white border-orange-500' : 'bg-orange-50 text-orange-700 border-orange-200 hover:opacity-80'}`}
             >
               정보형
             </button>

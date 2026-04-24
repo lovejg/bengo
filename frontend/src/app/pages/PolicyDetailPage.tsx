@@ -46,18 +46,12 @@ import type {
 } from '../types';
 import { cn } from '../lib/utils';
 import { CustomSelect } from '../components/atoms/CustomSelect';
+import { formatRegionCodes } from '../lib/regions';
 
 const statusLabels: Record<string, string> = {
   recruiting: '모집중',
   always: '상시모집',
   closed: '마감',
-};
-
-const regionLabels: Record<string, string> = {
-  seoul: '서울',
-  seoul_gangnam: '서울 강남구',
-  seoul_mapo: '서울 마포구',
-  seoul_songpa: '서울 송파구',
 };
 
 const sourceTypeLabels = {
@@ -526,7 +520,7 @@ export function PolicyDetailPage() {
             {/* Meta */}
             <PolicyMetaRow
               agency={policy.providerName}
-              region={policy.regionCodes?.map((code) => regionLabels[code] ?? code).join(', ')}
+              region={formatRegionCodes(policy.regionCodes)}
               period={formatPolicyPeriod(policy.startsAt, policy.endsAt, policy.isAlwaysOpen, policy.periodRaw)}
               periodClassName={!policy.isAlwaysOpen && !(policy.startsAt && policy.endsAt) ? 'text-red-500' : undefined}
               className="flex-wrap overflow-visible"
@@ -566,7 +560,7 @@ export function PolicyDetailPage() {
                   return (
                     <button
                       key={section.id}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all duration-200 ${
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all duration-200 cursor-pointer ${
                         activeSection === section.id
                           ? 'bg-[var(--accent)] text-white shadow-md'
                           : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
@@ -766,7 +760,7 @@ export function PolicyDetailPage() {
                                 <button
                                   key={val} type="button"
                                   onClick={() => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: val }))}
-                                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-colors cursor-pointer ${
                                     eligibilityAnswers[req.key] === val
                                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                                       : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]'

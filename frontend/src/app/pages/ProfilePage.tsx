@@ -4,13 +4,7 @@ import { MainLayout } from '../components/templates/MainLayout';
 import { Button } from '../components/atoms/Button';
 import { Badge } from '../components/atoms/Badge';
 import { getStoredUserProfile } from '../api/client';
-
-const regionLabels: Record<string, string> = {
-  seoul: '서울',
-  seoul_gangnam: '서울 강남구',
-  seoul_mapo: '서울 마포구',
-  seoul_songpa: '서울 송파구',
-};
+import { formatRegionCode } from '../lib/regions';
 
 const interestLabels: Record<string, string> = {
   youth_policy: '청년정책',
@@ -20,7 +14,7 @@ const interestLabels: Record<string, string> = {
 export function ProfilePage() {
   const user = getStoredUserProfile();
   const userName = user ? user.email.split('@')[0] : '사용자';
-  const region = user ? (regionLabels[user.regionCode] ?? user.regionCode) : null;
+  const region = user ? formatRegionCode(user.regionCode) : null;
   const interests = user ? user.interests.map((i) => interestLabels[i] ?? i) : [];
 
   return (

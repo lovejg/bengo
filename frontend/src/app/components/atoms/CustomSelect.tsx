@@ -35,7 +35,7 @@ export function CustomSelect({ value, onChange, options, placeholder = '선택�
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'w-full flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium bg-white transition-all duration-200',
+          'w-full flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium bg-white transition-all duration-200 cursor-pointer',
           open
             ? 'border-[var(--accent)] text-[var(--foreground)] shadow-sm ring-2 ring-[var(--accent)]/20'
             : 'border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent)]',
@@ -56,7 +56,7 @@ export function CustomSelect({ value, onChange, options, placeholder = '선택�
               type="button"
               onClick={() => { onChange(opt.value); setOpen(false); }}
               className={cn(
-                'w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors',
+                'w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors cursor-pointer',
                 value === opt.value
                   ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-medium'
                   : 'text-[var(--foreground)] hover:bg-[var(--muted)]',

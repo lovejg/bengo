@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { ArrowRight, Search, Bookmark, ChevronDown, SlidersHorizontal, User, Check, Bell, Calendar, Shield, Clock } from 'lucide-react';
+import { ArrowRight, Search, Bookmark, ChevronDown, User, Check, Bell, Calendar, Shield, Clock, Filter, Sparkles, MapPin, Gift, Edit } from 'lucide-react';
 import { Button } from '../components/atoms/Button';
 import { MainLayout } from '../components/templates/MainLayout';
 import { motion } from 'motion/react';
@@ -211,49 +211,87 @@ export function HomePage() {
                 transition={{ duration: 0.6 }}
                 className="relative"
               >
-                {/* Mock UI - 정책 검색 - 높이 통일 */}
+                {/* Mock UI - 정책찾기 (PoliciesPage 기준) */}
                 <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 h-[480px] flex flex-col">
-                  <div className="bg-white p-4 border-b border-gray-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                      </div>
-                      <div className="bg-white rounded px-3 py-1 text-xs text-gray-500">bengo.com/policies</div>
+                  {/* Browser chrome */}
+                  <div className="bg-white px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
                     </div>
-                    {/* Search Bar */}
-                    <div className="bg-gray-100 rounded-lg p-3 flex items-center gap-2 border-2 border-blue-300">
-                      <Search className="h-4 w-4 text-blue-600" />
-                      <div className="h-4 bg-gray-300 rounded w-24"></div>
+                    <div className="bg-gray-100 rounded px-3 py-1 text-xs text-gray-500 ml-2">bengo.com/policies</div>
+                  </div>
+
+                  {/* Sticky header: 실제 텍스트 그대로 노출 (블러/placeholder 제거) */}
+                  <div className="bg-white border-b border-gray-200 px-4 py-3 space-y-2.5">
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 mb-1">어떤 정책을 찾고 계신가요?</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-[11px] text-gray-500">
+                          총 <span className="font-semibold text-gray-800">24개</span>의 정책을 찾았어요 ✨
+                        </p>
+                        <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          모집중 18
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                          상시 4
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                          별도 확인 2
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                        <Search className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="text-[11px] text-gray-400">예: 월세, 취업, 주거, 교육…</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] text-gray-700 font-medium">
+                        최신순
+                        <ChevronDown className="h-3 w-3" />
+                      </div>
+                      <div className="bg-white border border-gray-200 rounded-lg p-1.5">
+                        <Filter className="h-3.5 w-3.5 text-gray-600" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-violet-200 bg-violet-50 text-violet-700">신청형</div>
+                      <div className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-orange-200 bg-orange-50 text-orange-700">정보형</div>
                     </div>
                   </div>
-                  <div className="p-4 flex-1 overflow-hidden">
-                    {/* Filters */}
-                    <div className="flex gap-2 mb-4 flex-wrap">
-                      <div className="bg-blue-100 text-blue-600 text-xs px-3 py-1.5 rounded-full flex items-center gap-1">
-                        <SlidersHorizontal className="h-3 w-3" />
-                        <span>20대</span>
-                      </div>
-                      <div className="bg-blue-100 text-blue-600 text-xs px-3 py-1.5 rounded-full">서울</div>
-                      <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full">+ 필터 추가</div>
-                    </div>
-                    {/* Policy Cards */}
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded">신청가능</div>
-                            <Bookmark className="h-4 w-4 text-gray-400" />
+
+                  {/* Results — 2열 그리드 */}
+                  <div className="p-3 flex-1 overflow-hidden">
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { status: 'recruiting', title: '청년 월세 지원', org: '서울시', category: '청년정책', region: '서울', period: '~ 05.31' },
+                        { status: 'recruiting', title: '창업 초기자금 지원', org: '서울창업허브', category: '청년정책', region: '서울', period: '~ 06.15' },
+                        { status: 'always', title: '청년 취업 멘토링', org: '고용센터', category: '청년정책', region: '서울', period: '상시모집' },
+                        { status: 'always', title: '주거안정 정보제공', org: 'LH', category: null, region: '서울', period: '상시모집' },
+                      ].map((c, i) => {
+                        const isRecruiting = c.status === 'recruiting';
+                        const border = isRecruiting ? 'border-emerald-500 bg-emerald-50/40' : 'border-blue-500 bg-blue-50/40';
+                        const chip = isRecruiting ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700';
+                        return (
+                          <div key={i} className={`rounded-lg border-2 p-2 ${border}`}>
+                            <div className="flex items-center gap-1 mb-1.5 flex-wrap">
+                              <div className={`text-[9px] font-semibold px-1 py-0.5 rounded ${chip}`}>
+                                {isRecruiting ? '모집중' : '상시'}
+                              </div>
+                              <div className="text-[9px] px-1 py-0.5 rounded bg-white border border-gray-200 text-gray-600 truncate max-w-[72px]">{c.org}</div>
+                            </div>
+                            <div className="text-[11px] font-semibold text-gray-800 line-clamp-2 leading-snug mb-1.5 min-h-[28px]">{c.title}</div>
+                            <div className="flex items-center gap-2 text-[9px] text-gray-500">
+                              <div className="flex items-center gap-0.5"><MapPin className="h-2 w-2" /><span>{c.region}</span></div>
+                              <div className="flex items-center gap-0.5"><Calendar className="h-2 w-2" /><span>{c.period}</span></div>
+                            </div>
                           </div>
-                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-gray-100 rounded w-full mb-3"></div>
-                          <div className="flex gap-2">
-                            <div className="bg-gray-100 text-xs px-2 py-1 rounded">취업</div>
-                            <div className="bg-gray-100 text-xs px-2 py-1 rounded">청년</div>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -273,52 +311,76 @@ export function HomePage() {
                 transition={{ duration: 0.6 }}
                 className="order-2 lg:order-1 relative"
               >
-                {/* Mock UI - 맞춤 추천 - 높이 통일 */}
+                {/* Mock UI - 맞춤추천: 설명형 흐름 (프로필 → 매칭 → 추천 카드) */}
                 <div className="bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 h-[480px] flex flex-col">
-                  <div className="bg-white p-4 border-b border-gray-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                      </div>
-                      <div className="bg-white rounded px-3 py-1 text-xs text-gray-500">bengo.com/personalized</div>
+                  {/* Browser chrome */}
+                  <div className="bg-white px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
                     </div>
+                    <div className="bg-gray-100 rounded px-3 py-1 text-xs text-gray-500 ml-2">bengo.com/personalized</div>
                   </div>
-                  <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-6 flex-1 overflow-hidden flex flex-col justify-center">
-                    {/* 내 정보 카드 */}
-                    <div className="bg-white rounded-xl p-4 mb-3 shadow-sm border-2 border-green-300">
+
+                  {/* 그라데이션 배경 본체 */}
+                  <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 flex-1 flex flex-col">
+                    {/* 1) 상단 프로필/조건 카드 */}
+                    <div className="bg-white rounded-xl border border-blue-100 shadow-sm p-3">
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                          <User className="h-4 w-4 text-green-600" />
+                        <div className="p-1.5 bg-blue-100 rounded-lg">
+                          <User className="h-3.5 w-3.5 text-[var(--accent)]" />
                         </div>
-                        <div className="text-xs font-semibold text-green-600">내 정보</div>
+                        <span className="text-[11px] font-semibold text-gray-800">내 프로필</span>
+                        <div className="ml-auto flex items-center gap-1 text-[9px] font-semibold text-[var(--accent)] bg-blue-50 border border-blue-200 rounded-full px-1.5 py-0.5">
+                          <Sparkles className="h-2 w-2" />
+                          완성도 80%
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">25세</div>
-                        <div className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">서울</div>
-                        <div className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">취업준비</div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5">
+                          <Calendar className="h-2.5 w-2.5" /><span>25세</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5">
+                          <MapPin className="h-2.5 w-2.5" /><span>서울</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-2 py-0.5">
+                          <Gift className="h-2.5 w-2.5" /><span>청년정책</span>
+                        </div>
                       </div>
                     </div>
-                    {/* 연결 표시 */}
-                    <div className="flex justify-center my-2">
-                      <div className="flex flex-col items-center gap-1">
-                        <ArrowRight className="h-5 w-5 text-green-600 rotate-90" />
-                        <div className="text-xs font-semibold text-green-600">매칭</div>
+
+                    {/* 2) 매칭 흐름 표시 */}
+                    <div className="flex justify-center items-center gap-2 my-2.5">
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-[var(--accent)]/70"></div>
+                      <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-full px-2 py-0.5 shadow-sm">
+                        <ArrowRight className="h-3 w-3 text-[var(--accent)] rotate-90" />
+                        <span className="text-[10px] font-semibold text-[var(--accent)]">매칭</span>
                       </div>
+                      <div className="h-px flex-1 bg-gradient-to-l from-transparent via-[var(--accent)]/40 to-[var(--accent)]/70"></div>
                     </div>
-                    {/* 맞춤 정책 카드들 */}
-                    <div className="space-y-3">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm relative">
-                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+
+                    {/* 3) 추천 정책 카드 — 3개를 2열 그리드로 (1행 2개 + 2행 1개) */}
+                    <div className="grid grid-cols-2 gap-2 flex-1 overflow-hidden content-start">
+                      {[
+                        { title: '청년 창업 지원금', org: '서울창업허브', desc: '서울 청년 대상 창업 초기자금 지원', period: '~ 06.30' },
+                        { title: '청년 월세 지원', org: '서울시', desc: '무주택 청년 월세 일부 지원', period: '~ 05.31' },
+                        { title: '청년 취업 멘토링', org: '고용센터', desc: '1:1 진로/취업 멘토링 프로그램', period: '~ 07.15' },
+                      ].map((c, i) => (
+                        <div key={i} className="rounded-xl border-2 border-emerald-500 bg-white p-2.5 relative shadow-sm">
+                          <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow">
                             <Check className="h-3 w-3 text-white" strokeWidth={3} />
                           </div>
-                          <div className="flex items-start gap-2 mb-2">
-                            <div className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded">신청가능</div>
+                          <div className="flex items-center gap-1 mb-1.5 flex-wrap">
+                            <div className="text-[9px] font-semibold px-1 py-0.5 rounded bg-emerald-100 text-emerald-700">모집중</div>
+                            <div className="text-[9px] px-1 py-0.5 rounded bg-white border border-gray-200 text-gray-600 truncate max-w-[68px]">{c.org}</div>
                           </div>
-                          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-gray-100 rounded w-full"></div>
+                          <div className="text-[11px] font-semibold text-gray-800 line-clamp-2 leading-snug mb-1 min-h-[28px]">{c.title}</div>
+                          <div className="text-[9px] text-gray-500 line-clamp-2 leading-snug mb-1.5 min-h-[24px]">{c.desc}</div>
+                          <div className="flex items-center gap-2 text-[9px] text-gray-500 pt-1 border-t border-gray-100">
+                            <div className="flex items-center gap-0.5"><MapPin className="h-2 w-2" /><span>서울</span></div>
+                            <div className="flex items-center gap-0.5"><Calendar className="h-2 w-2" /><span>{c.period}</span></div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -409,42 +471,155 @@ export function HomePage() {
                 transition={{ duration: 0.6 }}
                 className="relative"
               >
-                {/* Mock UI - MY 페이지 - 높이 통일 */}
+                {/* Mock UI - MY 페이지 / 저장한 정책 (MyPage 히어로 최대한 반영) */}
                 <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 h-[480px] flex flex-col">
-                  <div className="bg-white p-4 border-b border-gray-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                      </div>
-                      <div className="bg-white rounded px-3 py-1 text-xs text-gray-500">bengo.com/me</div>
+                  {/* Browser chrome */}
+                  <div className="bg-white px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
                     </div>
-                    <div className="text-sm font-semibold">저장한 정책</div>
+                    <div className="bg-gray-100 rounded px-3 py-1 text-xs text-gray-500 ml-2">bengo.com/me</div>
                   </div>
-                  <div className="p-4 space-y-3 flex-1 overflow-hidden">
-                    {[
-                      { deadline: 'D-3', urgent: true },
-                      { deadline: 'D-10', urgent: false },
-                      { deadline: 'D-15', urgent: false }
-                    ].map((item, i) => (
-                      <div key={i} className={`bg-white rounded-xl border p-4 ${item.urgent ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
-                        <div className="flex items-start justify-between mb-2">
-                          <div className={`text-xs px-2 py-1 rounded font-semibold ${item.urgent ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
-                            {item.deadline}
+
+                  {/* MY 페이지 히어로 (실제 MyPage.tsx 3열 구조 재현) */}
+                  <div className="bg-gradient-to-b from-blue-50 to-white px-3 py-3">
+                    <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-100 rounded-xl shadow-sm p-2.5">
+                      <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_auto] gap-2 items-center">
+                        {/* Col 1: 프로필 */}
+                        <div className="flex items-start gap-2">
+                          <div className="p-1.5 bg-blue-100 rounded-lg flex-shrink-0">
+                            <User className="h-3.5 w-3.5 text-[var(--accent)]" />
                           </div>
-                          <div className="flex items-center gap-2">
-                            {item.urgent && <Bell className="h-4 w-4 text-red-600" />}
-                            <Bookmark className="h-4 w-4 text-amber-600 fill-amber-600" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[12px] font-semibold text-gray-900 leading-tight">홍길동님</div>
+                            <div className="text-[8.5px] text-gray-500 mt-0.5 leading-snug line-clamp-2">
+                              저장한 정책과 프로필 정보를 한곳에서 관리하세요.
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[9px] text-gray-600 mt-1">
+                              <div className="flex items-center gap-0.5"><Sparkles className="h-2.5 w-2.5" /><span>25세</span></div>
+                              <div className="flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" /><span>서울</span></div>
+                            </div>
                           </div>
                         </div>
-                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <Calendar className="h-3 w-3" />
-                          <span>마감: 2026.03.{10 + i}</span>
+
+                        {/* Col 2: 통계 3박스 */}
+                        <div className="grid grid-cols-3 gap-1">
+                          <div className="bg-white/70 border border-white/80 rounded-lg px-1.5 py-1 shadow-sm">
+                            <div className="text-[8px] font-medium text-gray-500 leading-tight">저장한 정책</div>
+                            <div className="text-[14px] font-semibold text-gray-900 leading-tight mt-0.5">4</div>
+                            <div className="text-[7.5px] text-gray-400 leading-tight mt-0.5">전체 저장</div>
+                          </div>
+                          <div className="bg-white/70 border border-white/80 rounded-lg px-1.5 py-1 shadow-sm">
+                            <div className="text-[8px] font-medium text-gray-500 leading-tight">모집중</div>
+                            <div className="text-[14px] font-semibold text-emerald-600 leading-tight mt-0.5">4</div>
+                            <div className="text-[7.5px] text-gray-400 leading-tight mt-0.5">신청 가능</div>
+                          </div>
+                          <div className="bg-white/70 border border-white/80 rounded-lg px-1.5 py-1 shadow-sm">
+                            <div className="text-[8px] font-medium text-gray-500 leading-tight">관심사</div>
+                            <div className="mt-1">
+                              <span className="inline-block text-[8px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 leading-tight">청년정책</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Col 3: 링 + 프로필 수정 */}
+                        <div className="bg-white/75 border border-white/80 rounded-lg p-1.5 shadow-sm flex flex-col justify-between min-w-[96px]">
+                          <div className="flex items-center gap-1.5">
+                            <div className="relative h-9 w-9 flex-shrink-0">
+                              <svg className="h-9 w-9 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+                                <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(59, 130, 246, 0.14)" strokeWidth="3" />
+                                <circle
+                                  cx="18"
+                                  cy="18"
+                                  r="14"
+                                  fill="none"
+                                  stroke="url(#mockMyPageRing)"
+                                  strokeWidth="3"
+                                  strokeLinecap="round"
+                                  strokeDasharray={2 * Math.PI * 14}
+                                  strokeDashoffset={2 * Math.PI * 14 * 0.2}
+                                />
+                                <defs>
+                                  <linearGradient id="mockMyPageRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#2563eb" />
+                                    <stop offset="100%" stopColor="#7c3aed" />
+                                  </linearGradient>
+                                </defs>
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-gray-800">80%</span>
+                              </div>
+                            </div>
+                            <div className="text-[9px] font-semibold text-gray-700 leading-tight">프로필<br />완성도</div>
+                          </div>
+                          <div className="mt-1.5 pt-1.5 border-t border-blue-100/80">
+                            <div className="flex items-center justify-center gap-1 bg-white border border-gray-200 rounded text-[9px] text-gray-700 font-medium py-1 px-1.5">
+                              <Edit className="h-2 w-2" />
+                              <span>프로필 수정</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                  </div>
+
+                  {/* 상태 탭 (전체 / 예정 / 모집중 / 마감) */}
+                  <div className="bg-white mx-3 mb-2 rounded-xl px-1.5 py-1.5 flex items-center gap-1 border border-gray-100">
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg bg-[var(--accent)] text-white">전체</div>
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600">예정</div>
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600">모집중</div>
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600">마감</div>
+                  </div>
+
+                  {/* 저장 카드 리스트 — 2열 그리드, D-7 이하는 빨간 테두리 + 우측 상단 D-N */}
+                  <div className="px-3 pb-3 flex-1 overflow-hidden">
+                    <div className="grid grid-cols-2 gap-1.5 content-start">
+                      {[
+                        { status: 'recruiting' as const, daysLeft: 3, deadline: '2026.04.25', title: '청년 월세 지원', org: '서울시' },
+                        { status: 'recruiting' as const, daysLeft: 10, deadline: '2026.05.02', title: '청년 창업 지원금', org: '서울창업허브' },
+                        { status: 'recruiting' as const, daysLeft: 25, deadline: '2026.05.18', title: '청년 취업 멘토링', org: '고용센터' },
+                        { status: 'recruiting' as const, daysLeft: 18, deadline: '2026.05.10', title: '청년 전세보증금 대출', org: 'LH' },
+                      ].map((item, i) => {
+                        const urgent = item.daysLeft !== null && item.daysLeft <= 7;
+                        const bgClass = item.status === 'recruiting' ? 'bg-emerald-50/40' : 'bg-blue-50/40';
+                        const borderClass = urgent
+                          ? 'border-red-500'
+                          : item.status === 'recruiting'
+                            ? 'border-emerald-500'
+                            : 'border-blue-500';
+                        const statusChipClass = item.status === 'recruiting'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-blue-100 text-blue-700';
+                        return (
+                          <div key={i} className={`relative rounded-lg border-2 px-2 py-1.5 ${bgClass} ${borderClass}`}>
+                            {urgent && (
+                              <div className="absolute right-2 top-1.5 text-[10px] font-bold text-red-600">
+                                D-{item.daysLeft}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1 mb-1 flex-wrap">
+                              <div className={`text-[9px] font-semibold px-1 py-0.5 rounded ${statusChipClass}`}>
+                                {item.status === 'recruiting' ? '모집중' : '상시'}
+                              </div>
+                              <div className="text-[9px] px-1 py-0.5 rounded bg-white border border-gray-200 text-gray-600 truncate max-w-[64px]">{item.org}</div>
+                            </div>
+                            <div className={`text-[11px] font-semibold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[28px] ${urgent ? 'pr-8' : ''}`}>
+                              {item.title}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[9px] text-gray-500">
+                              <div className="flex items-center gap-0.5"><MapPin className="h-2 w-2" /><span>서울</span></div>
+                              {item.deadline ? (
+                                <div className="flex items-center gap-0.5 truncate"><Calendar className="h-2 w-2 flex-shrink-0" /><span className="truncate">{item.deadline}</span></div>
+                              ) : (
+                                <div className="flex items-center gap-0.5"><Calendar className="h-2 w-2" /><span>상시모집</span></div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </motion.div>

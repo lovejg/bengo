@@ -63,7 +63,7 @@ export function NotificationPopover({
         {!isLoading && notifications.length > 0 && (
           <button
             onClick={onMarkAllRead}
-            className="text-xs text-[var(--accent)] hover:underline font-medium"
+            className="text-xs text-[var(--accent)] hover:underline font-medium cursor-pointer"
           >
             모두 읽음
           </button>

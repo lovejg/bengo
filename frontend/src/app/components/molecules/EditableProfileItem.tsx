@@ -19,7 +19,7 @@ export function EditableProfileItem({
   return (
     <motion.button
       onClick={onClick}
-      className="group w-full flex items-center gap-2 p-2.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 hover:border-[var(--accent)] transition-all duration-200 text-left"
+      className="group w-full flex items-center gap-2 p-2.5 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 hover:border-[var(--accent)] transition-all duration-200 text-left cursor-pointer"
       whileHover={{ x: 2 }}
       whileTap={{ scale: 0.98 }}
     >

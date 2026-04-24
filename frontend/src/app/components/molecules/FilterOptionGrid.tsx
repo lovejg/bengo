@@ -14,6 +14,10 @@ interface FilterOptionGridProps {
   variant?: 'glass' | 'tag' | 'neo' | 'pill' | 'figma';
 }
 
+// Temporary layout toggle for detailed filter density testing.
+// Set this back to 'grid-cols-3' after the 4-column visibility check.
+const TEMP_VISIBILITY_TEST_GRID_COLS = 'grid-cols-4';
+
 export function FilterOptionGrid({
   options,
   selected = [],
@@ -54,7 +58,7 @@ export function FilterOptionGrid({
               className={`
                 w-full flex items-center justify-center gap-2
                 px-4 py-3 rounded-full text-sm font-medium
-                border transition-all duration-150
+                border transition-all duration-150 cursor-pointer
                 ${isSelected
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
                   : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5'
@@ -86,7 +90,7 @@ export function FilterOptionGrid({
               transition={{ duration: 0.2 }}
               className={`
                 relative px-4 py-3.5 rounded-[12px] text-sm font-medium
-                border transition-all duration-200
+                border transition-all duration-200 cursor-pointer
                 ${isSelected
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
                   : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
@@ -131,7 +135,7 @@ export function FilterOptionGrid({
               transition={{ duration: 0.15 }}
               className={`
                 relative px-4 py-2.5 rounded-[12px] text-sm font-medium
-                border transition-all duration-200
+                border transition-all duration-200 cursor-pointer
                 ${isSelected
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
                   : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
@@ -174,7 +178,7 @@ export function FilterOptionGrid({
               transition={{ duration: 0.15 }}
               className={`
                 relative px-4 py-3 text-sm font-medium rounded-[12px]
-                border transition-all duration-200
+                border transition-all duration-200 cursor-pointer
                 ${isSelected
                   ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-md'
                   : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/30 hover:shadow-sm'
@@ -208,7 +212,7 @@ export function FilterOptionGrid({
   // 2개여도 3열 그리드에 2개만 배치 → 버튼 크기 동일 유지
   if (variant === 'figma') {
     return (
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid ${TEMP_VISIBILITY_TEST_GRID_COLS} gap-x-3 gap-y-3.5`}>
         {options.map((option) => {
           const isSelected = selected.includes(option.id);
           return (
@@ -218,12 +222,12 @@ export function FilterOptionGrid({
               onClick={() => handleToggle(option.id)}
               className={`
                 flex items-center justify-center gap-2
-                px-4 py-2.5 w-full rounded-xl
+                min-h-10 w-full rounded-xl px-4 py-2.5 xl:min-h-9 xl:px-3 xl:py-2
                 border text-sm font-medium
-                transition-all duration-150
+                transition-all duration-150 cursor-pointer
                 ${isSelected
-                  ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                  : 'bg-white text-[var(--foreground)] border-[var(--border)] hover:border-[var(--accent)]/50'
+                  ? 'bg-[var(--accent)] text-white border-[var(--accent)] font-semibold'
+                  : 'bg-white text-[var(--foreground)] border-[var(--muted-foreground)]/100 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5'
                 }
               `}
               aria-pressed={isSelected}

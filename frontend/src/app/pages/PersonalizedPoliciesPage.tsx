@@ -11,16 +11,7 @@ import { EmptyState } from '../components/molecules/EmptyState';
 import { Button } from '../components/atoms/Button';
 import { MatchSummaryCard } from '../components/organisms/MatchSummaryCard';
 import type { PolicyListItem } from '../types';
-const regionLabels: Record<string, string> = {
-  seoul: '서울',
-  seoul_gangnam: '서울 강남구',
-  seoul_mapo: '서울 마포구',
-  seoul_songpa: '서울 송파구',
-};
-
-const regionCodeByLabel: Record<string, string> = Object.fromEntries(
-  Object.entries(regionLabels).map(([code, label]) => [label, code]),
-);
+import { formatRegionCode, REGION_CODE_BY_LABEL } from '../lib/regions';
 
 const PAGE_SIZE = 12;
 
@@ -177,7 +168,7 @@ export function PersonalizedPoliciesPage() {
               <MatchSummaryCard
                 userCondition={{
                   age: user?.age,
-                  region: user ? regionLabels[user.regionCode] ?? user.regionCode : undefined,
+                  region: user ? formatRegionCode(user.regionCode) : undefined,
                   interests: user?.interests,
                 }}
                 completionPercentage={
@@ -202,7 +193,7 @@ export function PersonalizedPoliciesPage() {
                   if (field === 'age') {
                     nextUser.age = Number(value) || storedUser.age;
                   } else if (field === 'region') {
-                    const code = regionCodeByLabel[value];
+                    const code = REGION_CODE_BY_LABEL[value];
                     if (code) {
                       nextUser.regionCode = code as typeof storedUser.regionCode;
                     }

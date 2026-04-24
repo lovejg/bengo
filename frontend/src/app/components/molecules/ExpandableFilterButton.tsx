@@ -47,7 +47,7 @@ export function ExpandableFilterButton({
         {/* Header Button */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="relative w-full px-5 py-4 flex items-center justify-between gap-3 transition-all duration-200"
+          className="relative w-full px-5 py-4 flex items-center justify-between gap-3 transition-all duration-200 cursor-pointer"
           aria-expanded={isExpanded}
           aria-label={`${label} 필터 ${isExpanded ? '닫기' : '열기'}`}
         >
@@ -138,7 +138,7 @@ export function ExpandableFilterButton({
         {/* Header Button */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="relative w-full px-4 py-3.5 flex items-center justify-between gap-3"
+          className="relative w-full px-4 py-3.5 flex items-center justify-between gap-3 cursor-pointer"
           aria-expanded={isExpanded}
           aria-label={`${label} 필터 ${isExpanded ? '닫기' : '열기'}`}
         >
@@ -242,7 +242,7 @@ export function ExpandableFilterButton({
         {/* Header Button */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className={`relative w-full px-5 py-4 flex items-center justify-between gap-3 transition-colors duration-150 ${
+          className={`relative w-full px-5 py-4 flex items-center justify-between gap-3 transition-colors duration-150 cursor-pointer ${
             isExpanded ? 'bg-[var(--accent)]' : 'bg-white hover:bg-yellow-100'
           }`}
           aria-expanded={isExpanded}

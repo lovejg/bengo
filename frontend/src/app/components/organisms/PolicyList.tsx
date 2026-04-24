@@ -50,7 +50,7 @@ export function PolicyList({ policies, loading, error, onRetry, onLoadMore, hasM
         <div className="flex justify-center pt-6">
           <button
             onClick={onLoadMore}
-            className="px-8 py-3 rounded-xl border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+            className="px-8 py-3 rounded-xl border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all cursor-pointer"
           >
             더보기
           </button>
