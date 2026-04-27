@@ -20,6 +20,7 @@ import {
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserPolicyState } from '../common/enums/user-policy-state.enum';
 import { JwtUser } from '../common/interfaces/jwt-user.interface';
+import { EmailVerifiedGuard } from '../auth/guards/email-verified.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CheckEligibilityDto } from './dto/check-eligibility.dto';
 import { ListPoliciesQueryDto } from './dto/list-policies-query.dto';
@@ -72,8 +73,8 @@ export class PoliciesController {
 
   @Post('policies/:id/check-eligibility')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '정책 신청 가능 여부 판정' })
+  @UseGuards(JwtAuthGuard, EmailVerifiedGuard)
+  @ApiOperation({ summary: '정책 신청 가능 여부 판정 (이메일 인증 필요)' })
   @ApiOkResponse({ description: '판정 결과' })
   checkEligibility(
     @CurrentUser() user: JwtUser,
@@ -85,8 +86,8 @@ export class PoliciesController {
 
   @Patch('me/policies/:id/state')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '정책 저장/신청완료 상태 변경' })
+  @UseGuards(JwtAuthGuard, EmailVerifiedGuard)
+  @ApiOperation({ summary: '정책 저장/신청완료 상태 변경 (이메일 인증 필요)' })
   @ApiOkResponse({ description: '변경 결과' })
   updateMyPolicyState(
     @CurrentUser() user: JwtUser,
@@ -98,8 +99,8 @@ export class PoliciesController {
 
   @Delete('me/policies/:id')
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '저장한 정책 삭제' })
+  @UseGuards(JwtAuthGuard, EmailVerifiedGuard)
+  @ApiOperation({ summary: '저장한 정책 삭제 (이메일 인증 필요)' })
   @ApiOkResponse({ description: '삭제 완료' })
   removeMyPolicy(
     @CurrentUser() user: JwtUser,

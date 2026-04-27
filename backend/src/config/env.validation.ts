@@ -56,6 +56,18 @@ interface EnvShape {
   ANTHROPIC_API_KEY?: string;
   LLM_MODEL?: string;
   LLM_ENABLED?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_CALLBACK_URL?: string;
+  NAVER_CLIENT_ID?: string;
+  NAVER_CLIENT_SECRET?: string;
+  NAVER_CALLBACK_URL?: string;
+  FRONTEND_OAUTH_REDIRECT_URL?: string;
+  FRONTEND_BASE_URL?: string;
+  BACKEND_BASE_URL?: string;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
+  SMTP_FROM?: string;
 }
 
 function toNumber(value: string | undefined, fallback: number): number {
@@ -227,6 +239,36 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
     LLM_ENABLED: config.LLM_ENABLED
       ? String(config.LLM_ENABLED)
       : undefined,
+    GOOGLE_CLIENT_ID: config.GOOGLE_CLIENT_ID
+      ? String(config.GOOGLE_CLIENT_ID)
+      : undefined,
+    GOOGLE_CLIENT_SECRET: config.GOOGLE_CLIENT_SECRET
+      ? String(config.GOOGLE_CLIENT_SECRET)
+      : undefined,
+    GOOGLE_CALLBACK_URL: config.GOOGLE_CALLBACK_URL
+      ? String(config.GOOGLE_CALLBACK_URL)
+      : undefined,
+    NAVER_CLIENT_ID: config.NAVER_CLIENT_ID
+      ? String(config.NAVER_CLIENT_ID)
+      : undefined,
+    NAVER_CLIENT_SECRET: config.NAVER_CLIENT_SECRET
+      ? String(config.NAVER_CLIENT_SECRET)
+      : undefined,
+    NAVER_CALLBACK_URL: config.NAVER_CALLBACK_URL
+      ? String(config.NAVER_CALLBACK_URL)
+      : undefined,
+    FRONTEND_OAUTH_REDIRECT_URL: config.FRONTEND_OAUTH_REDIRECT_URL
+      ? String(config.FRONTEND_OAUTH_REDIRECT_URL)
+      : undefined,
+    FRONTEND_BASE_URL: config.FRONTEND_BASE_URL
+      ? String(config.FRONTEND_BASE_URL)
+      : undefined,
+    BACKEND_BASE_URL: config.BACKEND_BASE_URL
+      ? String(config.BACKEND_BASE_URL)
+      : undefined,
+    SMTP_USER: config.SMTP_USER ? String(config.SMTP_USER) : undefined,
+    SMTP_PASS: config.SMTP_PASS ? String(config.SMTP_PASS) : undefined,
+    SMTP_FROM: config.SMTP_FROM ? String(config.SMTP_FROM) : undefined,
   };
 
   if (!env.JWT_SECRET) {

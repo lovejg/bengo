@@ -7,6 +7,7 @@ import {
   PolicyRule,
   UserPolicyState,
 } from '../database/entities';
+import { EmailVerifiedGuard } from '../auth/guards/email-verified.guard';
 import { EligibilityModule } from '../eligibility/eligibility.module';
 import { UsersModule } from '../users/users.module';
 import { PoliciesController } from './policies.controller';
@@ -26,7 +27,7 @@ import { PoliciesService } from './policies.service';
     EligibilityModule,
   ],
   controllers: [PoliciesController],
-  providers: [PoliciesService, PolicySeedService],
+  providers: [PoliciesService, PolicySeedService, EmailVerifiedGuard],
   exports: [PoliciesService],
 })
 export class PoliciesModule {}
