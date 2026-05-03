@@ -82,6 +82,45 @@ export function clearStoredUserProfile() {
   window.localStorage.removeItem(USER_PROFILE_KEY);
 }
 
+export function getEmailVerificationPath(email?: string | null) {
+  const query = email ? `?email=${encodeURIComponent(email)}` : '';
+  return `/check-email${query}`;
+}
+
+export function isEmailVerificationRequiredError(error: unknown) {
+  return (
+    error instanceof ApiClientError &&
+    error.status === 403 &&
+    (error.message.includes('이메일 인증') || error.message === 'Forbidden')
+  );
+}
+
+export function buildOAuthUserProfile(token: string, profileCompleted: boolean): UserProfileSummary | null {
+  try {
+    const [, payload] = token.split('.');
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(window.atob(normalized)) as { sub?: string; email?: string };
+
+    if (!decoded.sub || !decoded.email) {
+      return null;
+    }
+
+    return {
+      userId: decoded.sub,
+      email: decoded.email,
+      emailVerified: true,
+      profileCompleted,
+      displayName: null,
+      age: null,
+      gender: null,
+      regionCode: null,
+      interests: [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers, query, auth = false, signal } = options;
   const token = auth ? getAccessToken() : null;

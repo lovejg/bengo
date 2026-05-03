@@ -112,8 +112,9 @@ function getRecommendedScore(policy: PolicyListItem) {
 
   let score = 0;
   if (policy.categories.some((category) => user.interests.includes(category))) score += 42;
-  if (policy.regionCodes.includes(user.regionCode)) score += 26;
+  if (user.regionCode && policy.regionCodes.includes(user.regionCode)) score += 26;
   if (
+    user.age !== null &&
     (policy.minAge === null || user.age >= policy.minAge) &&
     (policy.maxAge === null || user.age <= policy.maxAge)
   ) {
@@ -397,14 +398,14 @@ export function PoliciesPage() {
                     </button>
                   )}
                   {periodRawCount > 0 && (
-                    <button type="button" onClick={() => setStatusFilter(p => p === 'period_raw' ? null : 'period_raw')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'period_raw' ? 'bg-amber-200 border-amber-400 text-amber-800' : 'bg-amber-50 text-amber-700 border-amber-200 hover:opacity-80'}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-                      별도 확인 {periodRawCount}
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'period_raw' ? null : 'period_raw')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'period_raw' ? 'bg-[#00FFFF]/25 border-[#00D9D9] text-[#006B6B]' : 'bg-[#00FFFF]/10 text-[#007A7A] border-[#00D9D9]/60 hover:bg-[#00FFFF]/20'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#00D9D9] inline-block" />
+                      정책별 확인 {periodRawCount}
                     </button>
                   )}
                   {unknownCount > 0 && (
-                    <button type="button" onClick={() => setStatusFilter(p => p === 'unknown' ? null : 'unknown')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'unknown' ? 'bg-red-200 border-red-400 text-red-800' : 'bg-red-50 text-red-700 border-red-200 hover:opacity-80'}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                    <button type="button" onClick={() => setStatusFilter(p => p === 'unknown' ? null : 'unknown')} className={`flex items-center gap-1.5 px-2.5 py-1 font-semibold rounded-full border transition-all cursor-pointer ${statusFilter === 'unknown' ? 'bg-amber-200 border-amber-400 text-amber-800' : 'bg-amber-50 text-amber-700 border-amber-200 hover:opacity-80'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
                       기간확인불가 {unknownCount}
                     </button>
                   )}

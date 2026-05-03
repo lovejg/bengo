@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowRight, MapPin, User as UserIcon, LogIn, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPoliciesRecommended } from '../api/policies';
-import { ApiClientError, getAccessToken, getStoredUserProfile, setStoredUserProfile } from '../api/client';
+import { ApiClientError, getAccessToken, getEmailVerificationPath, getStoredUserProfile, setStoredUserProfile } from '../api/client';
 import { MainLayout } from '../components/templates/MainLayout';
 import { PolicyList } from '../components/organisms/PolicyList';
 import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
 import { EmptyState } from '../components/molecules/EmptyState';
+import { SignupPromptDialog } from '../components/molecules/SignupPromptDialog';
 import { Button } from '../components/atoms/Button';
 import { MatchSummaryCard } from '../components/organisms/MatchSummaryCard';
 import type { PolicyListItem } from '../types';
@@ -16,6 +17,7 @@ import { formatRegionCode, REGION_CODE_BY_LABEL } from '../lib/regions';
 const PAGE_SIZE = 12;
 
 export function PersonalizedPoliciesPage() {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [personalizedPolicies, setPersonalizedPolicies] = useState<PolicyListItem[]>([]);
@@ -37,6 +39,16 @@ export function PersonalizedPoliciesPage() {
 
       if (!currentUser) {
         setIsLoading(false);
+        return;
+      }
+
+      if (!currentUser.emailVerified) {
+        navigate(getEmailVerificationPath(currentUser.email), { replace: true });
+        return;
+      }
+
+      if (!currentUser.profileCompleted) {
+        navigate('/onboarding', { replace: true });
         return;
       }
 
@@ -63,7 +75,7 @@ export function PersonalizedPoliciesPage() {
 
     void loadPersonalizedPolicies();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadKey]);
+  }, [navigate, reloadKey]);
 
   const handleRetry = () => {
     setReloadKey((current) => current + 1);
@@ -123,11 +135,13 @@ export function PersonalizedPoliciesPage() {
                     로그인하고 시작하기
                   </Button>
                 </Link>
-                <Link to="/signup" className="flex-1">
-                  <Button variant="secondary" className="w-full">
-                    회원가입
-                  </Button>
-                </Link>
+                <div className="flex-1">
+                  <SignupPromptDialog>
+                    <Button variant="secondary" className="w-full">
+                      회원가입
+                    </Button>
+                  </SignupPromptDialog>
+                </div>
               </div>
 
               <div className="pt-6 border-t border-[var(--border)]">
@@ -167,7 +181,7 @@ export function PersonalizedPoliciesPage() {
             <div className="w-full lg:w-[420px]">
               <MatchSummaryCard
                 userCondition={{
-                  age: user?.age,
+                  age: user?.age ?? undefined,
                   region: user ? formatRegionCode(user.regionCode) : undefined,
                   interests: user?.interests,
                 }}

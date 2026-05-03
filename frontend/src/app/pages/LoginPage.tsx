@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { ApiClientError } from '../api/client';
+import { ApiClientError, getEmailVerificationPath } from '../api/client';
 import { login } from '../api/auth';
+import { continueWithOAuth } from '../api/oauth';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import googleLogo from '../../img/google-logo.svg';
@@ -41,12 +42,16 @@ export function LoginPage() {
     if (validate()) {
       setLoading(true);
       try {
-        await login({
+        const response = await login({
           email: formData.email,
           password: formData.password,
         });
         toast.success('로그인 성공!');
-        navigate('/policies');
+        if (!response.user.emailVerified) {
+          navigate(getEmailVerificationPath(response.user.email));
+          return;
+        }
+        navigate(response.user.profileCompleted ? '/policies' : '/onboarding');
       } catch (error) {
         const message = error instanceof ApiClientError ? error.message : '로그인에 실패했습니다';
         toast.error(message);
@@ -66,7 +71,7 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-6 sm:mb-8">
-          <Link to="/" className="inline-flex items-center gap-2.5 sm:gap-3 mb-4 hover:opacity-80 transition-opacity">
+          <a href="/" className="inline-flex items-center gap-2.5 sm:gap-3 mb-4 hover:opacity-80 transition-opacity">
             <div className="relative">
               <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg shadow-blue-500/30">
                 <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-white" strokeWidth={2.5} aria-hidden="true" />
@@ -77,7 +82,7 @@ export function LoginPage() {
               <span className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-none">bengo</span>
               <span className="text-[10px] sm:text-xs text-[var(--muted-foreground)] tracking-wide leading-none mt-0.5 sm:mt-1">benefit + go</span>
             </div>
-          </Link>
+          </a>
           <p className="text-sm sm:text-base text-[var(--muted-foreground)]">정책 혜택을 찾아드립니다</p>
         </div>
 
@@ -138,6 +143,7 @@ export function LoginPage() {
           <div className="mt-4 space-y-2">
             <button
               type="button"
+              onClick={() => continueWithOAuth('google')}
               className="relative flex w-full items-center justify-center rounded-xl border border-[var(--border)] bg-white p-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] cursor-pointer"
             >
               <img src={googleLogo} alt="" className="absolute left-4 h-5 w-5" aria-hidden="true" />
@@ -145,6 +151,7 @@ export function LoginPage() {
             </button>
             <button
               type="button"
+              onClick={() => continueWithOAuth('naver')}
               className="relative flex w-full items-center justify-center rounded-xl border border-[#03C75A] bg-white p-3 text-sm font-semibold text-[#03C75A] transition-colors hover:bg-green-50 cursor-pointer"
             >
               <img src={naverLogo} alt="" className="absolute left-4 h-5 w-5" aria-hidden="true" />

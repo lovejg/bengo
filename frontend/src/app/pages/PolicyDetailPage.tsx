@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { ApiClientError, getAccessToken, getStoredUserProfile } from '../api/client';
+import { ApiClientError, getAccessToken, getEmailVerificationPath, getStoredUserProfile, isEmailVerificationRequiredError } from '../api/client';
 import { checkEligibility, getPolicies, getPolicyDetail, getPolicyDetailWithUser } from '../api/policies';
 import { updateMyPolicyState, removeMyPolicy } from '../api/me';
 import { MainLayout } from '../components/templates/MainLayout';
@@ -369,6 +369,12 @@ export function PolicyDetailPage() {
       setEligibilityResult(response);
       toast.success('자격 확인이 완료되었습니다');
     } catch (error) {
+      if (isEmailVerificationRequiredError(error)) {
+        const email = getStoredUserProfile()?.email;
+        toast.error('이메일 인증 후 자격확인을 이용할 수 있어요.');
+        navigate(getEmailVerificationPath(email));
+        return;
+      }
       const message = error instanceof ApiClientError ? error.message : '자격 확인에 실패했습니다';
       toast.error(message);
     }
@@ -384,6 +390,12 @@ export function PolicyDetailPage() {
       setBookmarked(next);
       toast.success(next ? '정책이 저장되었습니다' : '저장을 취소했습니다');
     } catch (error) {
+      if (isEmailVerificationRequiredError(error)) {
+        const email = getStoredUserProfile()?.email;
+        toast.error('이메일 인증 후 정책을 저장할 수 있어요.');
+        navigate(getEmailVerificationPath(email));
+        return;
+      }
       const message = error instanceof ApiClientError ? error.message : '저장에 실패했습니다';
       toast.error(message);
     }
@@ -405,10 +417,11 @@ export function PolicyDetailPage() {
   // 마크다운 기호, 공백, 불릿 제거 후 실제 텍스트가 있을 때만 표시
   const selectionCriteria = rawCriteria && rawCriteria.replace(/[\s\-*•·]/g, '').length > 0 ? rawCriteria : null;
 
-  const hasRequirements = (policy?.requirements ?? [])
+  const visibleRequirements = (policy?.requirements ?? [])
     .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
-    .filter((req) => req.key !== 'selection_criteria' && req.label !== '선정기준')
-    .length > 0;
+    .filter((req) => req.key !== 'selection_criteria' && req.label !== '선정기준');
+  const hasRequirements = visibleRequirements.length > 0;
+  const completedRequirementCount = visibleRequirements.filter((req) => eligibilityAnswers[req.key]).length;
   // [임시] UI 확인용 — 아동복지시설 보호아동지원 정책을 info처럼 동작하게 처리 (확인 후 아래 한 줄 제거)
   const TEMP_INFO_POLICY_ID = 'de99e7da-360c-4071-9899-1d6ded895d60';
   const isInfoPolicy = policy?.policyType === 'info' || policy?.id === TEMP_INFO_POLICY_ID;
@@ -522,7 +535,7 @@ export function PolicyDetailPage() {
               agency={policy.providerName}
               region={formatRegionCodes(policy.regionCodes)}
               period={formatPolicyPeriod(policy.startsAt, policy.endsAt, policy.isAlwaysOpen, policy.periodRaw)}
-              periodClassName={!policy.isAlwaysOpen && !(policy.startsAt && policy.endsAt) ? 'text-red-500' : undefined}
+              periodClassName={!policy.isAlwaysOpen && !(policy.startsAt && policy.endsAt) ? policy.periodRaw ? 'text-[#007A7A]' : 'text-amber-600' : undefined}
               className="flex-wrap overflow-visible"
             />
 
@@ -668,27 +681,34 @@ export function PolicyDetailPage() {
                       : 'bg-emerald-50 border-emerald-200',
               )}
             >
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center',
-                  !canCheckEligibility ? 'bg-slate-100' : eligibilityResult?.result === 'conditional' ? 'bg-amber-100' : eligibilityResult?.result === 'ineligible' ? 'bg-rose-100' : 'bg-emerald-100',
-                )}>
-                  {!canCheckEligibility
-                    ? <Info className="h-4 w-4 text-slate-500" />
-                    : eligibilityResult?.result === 'conditional' || eligibilityResult?.result === 'ineligible'
-                      ? <AlertTriangle className={cn('h-4 w-4', eligibilityResult.result === 'conditional' ? 'text-amber-600' : 'text-rose-600')} />
-                      : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <div className={cn(
+                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                    !canCheckEligibility ? 'bg-slate-100' : eligibilityResult?.result === 'conditional' ? 'bg-amber-100' : eligibilityResult?.result === 'ineligible' ? 'bg-rose-100' : 'bg-emerald-100',
+                  )}>
+                    {!canCheckEligibility
+                      ? <Info className="h-4 w-4 text-slate-500" />
+                      : eligibilityResult?.result === 'conditional' || eligibilityResult?.result === 'ineligible'
+                        ? <AlertTriangle className={cn('h-4 w-4', eligibilityResult.result === 'conditional' ? 'text-amber-600' : 'text-rose-600')} />
+                        : <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                  </div>
+                  <div>
+                    <h2 className={cn(
+                      'text-base font-semibold',
+                      !canCheckEligibility ? 'text-slate-700' : eligibilityResult?.result === 'conditional' ? 'text-amber-900' : eligibilityResult?.result === 'ineligible' ? 'text-rose-900' : 'text-emerald-900',
+                    )}>내가 맞는지 확인하기</h2>
+                    <p className={cn(
+                      'text-xs',
+                      !canCheckEligibility ? 'text-slate-500' : eligibilityResult?.result === 'conditional' ? 'text-amber-700/70' : eligibilityResult?.result === 'ineligible' ? 'text-rose-700/70' : 'text-emerald-700/70',
+                    )}>간단한 정보를 입력하면 신청 가능 여부를 확인할 수 있어요</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className={cn(
-                    'text-base font-semibold',
-                    !canCheckEligibility ? 'text-slate-700' : eligibilityResult?.result === 'conditional' ? 'text-amber-900' : eligibilityResult?.result === 'ineligible' ? 'text-rose-900' : 'text-emerald-900',
-                  )}>내가 맞는지 확인하기</h2>
-                  <p className={cn(
-                    'text-xs',
-                    !canCheckEligibility ? 'text-slate-500' : eligibilityResult?.result === 'conditional' ? 'text-amber-700/70' : eligibilityResult?.result === 'ineligible' ? 'text-rose-700/70' : 'text-emerald-700/70',
-                  )}>간단한 정보를 입력하면 신청 가능 여부를 확인할 수 있어요</p>
-                </div>
+                {canCheckEligibility && showEligibilityForm && !eligibilityResult && (
+                  <span className="hidden shrink-0 rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+                    {completedRequirementCount}/{visibleRequirements.length} 입력 완료
+                  </span>
+                )}
               </div>
 
               {!canCheckEligibility && !isInfoPolicy && (
@@ -737,17 +757,34 @@ export function PolicyDetailPage() {
                   <motion.form
                     initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                     onSubmit={handleCheckEligibility}
-                    className="space-y-3 bg-white/70 rounded-xl p-4 border border-emerald-200"
+                    className="space-y-3"
                   >
-                    {(policy?.requirements ?? [])
-                      .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
-                      .filter((req) => req.key !== 'selection_criteria' && req.label !== '선정기준')
-                      .map((req) => (
-                        <div key={req.key}>
-                          <label htmlFor={`req-${req.key}`} className="block mb-1.5 text-sm font-medium text-[var(--foreground)]">
-                            {req.label ?? req.key}
-                            {req.isRequired && <span className="text-[var(--destructive)] ml-1">*</span>}
-                          </label>
+                    {visibleRequirements.map((req, index) => {
+                      const isCompleted = Boolean(eligibilityAnswers[req.key]);
+
+                      return (
+                        <div
+                          key={req.key}
+                          className={cn(
+                            'rounded-2xl border bg-white p-4 shadow-sm transition-all',
+                            isCompleted ? 'border-emerald-200 ring-1 ring-emerald-100' : 'border-[var(--border)] hover:border-emerald-200',
+                          )}
+                        >
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <label htmlFor={`req-${req.key}`} className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
+                              <span className={cn(
+                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                                isCompleted ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700',
+                              )}>
+                                {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
+                              </span>
+                              <span className="truncate">
+                                {req.label ?? req.key}
+                                {req.isRequired && <span className="text-[var(--destructive)] ml-1">*</span>}
+                              </span>
+                            </label>
+                            {isCompleted && <span className="shrink-0 text-xs font-medium text-emerald-700">입력됨</span>}
+                          </div>
                           {req.type === 'select' && req.options ? (
                             <CustomSelect
                               value={eligibilityAnswers[req.key] ?? ''}
@@ -760,7 +797,7 @@ export function PolicyDetailPage() {
                                 <button
                                   key={val} type="button"
                                   onClick={() => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: val }))}
-                                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-colors cursor-pointer ${
+                                  className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
                                     eligibilityAnswers[req.key] === val
                                       ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                                       : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]'
@@ -776,14 +813,42 @@ export function PolicyDetailPage() {
                               type={req.type === 'number' ? 'number' : 'text'}
                               value={eligibilityAnswers[req.key] ?? ''}
                               onChange={(e) => setEligibilityAnswers((prev) => ({ ...prev, [req.key]: e.target.value }))}
-                              className="text-sm h-9"
+                              className="h-10 rounded-xl text-sm"
                             />
                           )}
                         </div>
-                      ))}
-                    <div className="flex gap-2 pt-1">
-                      <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-sm h-9">확인하기</Button>
-                      <Button type="button" variant="ghost" className="text-sm h-9" onClick={() => setShowEligibilityForm(false)}>취소</Button>
+                      );
+                    })}
+                    <div className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-emerald-900">
+                            {visibleRequirements.length}개 중 {completedRequirementCount}개 입력됨
+                          </p>
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-emerald-100 sm:w-44">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all"
+                              style={{ width: `${visibleRequirements.length ? (completedRequirementCount / visibleRequirements.length) * 100 : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button
+                            type="submit"
+                            className="h-10 w-full min-w-32 bg-emerald-600 px-6 text-sm hover:bg-emerald-700 sm:w-auto"
+                          >
+                            확인하기
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="h-10 w-full px-5 text-sm sm:w-auto"
+                            onClick={() => setShowEligibilityForm(false)}
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </motion.form>
                 )}
