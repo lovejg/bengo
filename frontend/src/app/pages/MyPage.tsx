@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { User, MapPin, Sparkles, Edit, Trash2, X } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { getPolicyDetail } from '../api/policies';
-import { ApiClientError, getStoredUserProfile, setStoredUserProfile } from '../api/client';
+import { ApiClientError, getEmailVerificationPath, getStoredUserProfile, isEmailVerificationRequiredError, setStoredUserProfile } from '../api/client';
 import { getMyPolicies, removeMyPolicy } from '../api/me';
 import { MainLayout } from '../components/templates/MainLayout';
 import { Button } from '../components/atoms/Button';
@@ -23,7 +23,7 @@ type SavedPolicy = PolicyCardProps & {
 
 interface UserProfileView {
   name: string;
-  age: number;
+  age: number | null;
   region: string;
   interests: string[];
 }
@@ -108,6 +108,7 @@ function mapStoredUserToView(user: UserProfileSummary | null): UserProfileView |
 const PAGE_SIZE = 12;
 
 export function MyPage() {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
@@ -123,7 +124,7 @@ export function MyPage() {
   const [editForm, setEditForm] = useState<EditFormState>(() => {
     const stored = getStoredUserProfile();
     return {
-      age: stored ? String(stored.age) : '',
+      age: stored?.age ? String(stored.age) : '',
       regionCode: stored?.regionCode ?? '',
       interests: stored?.interests ?? [],
     };
@@ -139,6 +140,16 @@ export function MyPage() {
       setHasError(false);
 
       const storedUser = getStoredUserProfile();
+      if (storedUser && !storedUser.emailVerified) {
+        navigate(getEmailVerificationPath(storedUser.email), { replace: true });
+        return;
+      }
+
+      if (storedUser && !storedUser.profileCompleted) {
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+
       setUser(mapStoredUserToView(storedUser));
 
       try {
@@ -156,6 +167,11 @@ export function MyPage() {
 
         setSavedPolicies(details);
       } catch (error) {
+        if (isEmailVerificationRequiredError(error)) {
+          const email = getStoredUserProfile()?.email;
+          navigate(getEmailVerificationPath(email), { replace: true });
+          return;
+        }
         setHasError(true);
         const message = error instanceof ApiClientError ? error.message : '내 정책 정보를 불러오는데 실패했습니다';
         toast.error(message);
@@ -165,7 +181,7 @@ export function MyPage() {
     };
 
     loadMyPolicies();
-  }, [reloadKey]);
+  }, [navigate, reloadKey]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -173,6 +189,11 @@ export function MyPage() {
       setSavedPolicies((current) => current.filter((policy) => policy.id !== id));
       toast.success('정책이 저장 목록에서 삭제되었습니다');
     } catch (error) {
+      if (isEmailVerificationRequiredError(error)) {
+        const email = getStoredUserProfile()?.email;
+        navigate(getEmailVerificationPath(email));
+        return;
+      }
       const message = error instanceof ApiClientError ? error.message : '정책 삭제에 실패했습니다';
       toast.error(message);
     }
@@ -206,6 +227,7 @@ export function MyPage() {
       age: editForm.age ? Number(editForm.age) : storedUser.age,
       regionCode: (editForm.regionCode || storedUser.regionCode) as typeof storedUser.regionCode,
       interests: editForm.interests.length > 0 ? editForm.interests as typeof storedUser.interests : storedUser.interests,
+      profileCompleted: true,
     };
 
     setStoredUserProfile(nextStoredUser);
@@ -244,7 +266,7 @@ export function MyPage() {
                   <div className="flex flex-wrap gap-3 text-sm text-[var(--muted-foreground)]">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 flex-shrink-0" />
-                      <span>{user ? `${user.age}세` : '나이 정보 없음'}</span>
+                      <span>{user?.age ? `${user.age}세` : '나이 정보 없음'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MapPin className="h-4 w-4 flex-shrink-0" />

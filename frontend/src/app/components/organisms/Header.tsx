@@ -1,14 +1,22 @@
-import { Link, useLocation, useNavigate } from 'react-router';
-import { ArrowRight, User, LogOut } from 'lucide-react';
+import { Link, useLocation } from 'react-router';
+import { ArrowRight, User, LogOut, ChevronDown, LockKeyhole, ShieldAlert } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { NotificationButton } from '../molecules/NotificationButton';
+import { SignupPromptDialog } from '../molecules/SignupPromptDialog';
 import { getAccessToken, getStoredUserProfile, clearAccessToken, clearStoredUserProfile } from '../../api/client';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 export function Header() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -24,7 +32,6 @@ export function Header() {
     clearStoredUserProfile();
     setIsAuthenticated(false);
     setUserName(null);
-    navigate('/login');
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -104,16 +111,45 @@ export function Header() {
             </div>
           )}
           {isAuthenticated ? (
-            <>
-              <Link to="/profile" className="hidden sm:flex items-center gap-1.5 text-sm font-medium text-[var(--foreground)] hover:text-[var(--accent)] transition-colors">
-                <User className="h-4 w-4" aria-hidden="true" />
-                {userName}
-              </Link>
-              <Button variant="ghost" size="sm" className="hidden sm:flex gap-1.5" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-                로그아웃
-              </Button>
-            </>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="hidden sm:flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+                >
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  <span className="max-w-28 truncate">{userName}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-[var(--muted-foreground)]" aria-hidden="true" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={10} className="w-48 rounded-xl p-1.5 shadow-xl">
+                <DropdownMenuLabel className="px-3 py-2">
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">{userName}</p>
+                  <p className="text-xs font-normal text-[var(--muted-foreground)]">계정 메뉴</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2.5">
+                  <Link to="/profile?tab=password">
+                    <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                    비밀번호 변경
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2.5">
+                  <Link to="/profile?tab=withdraw">
+                    <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                    회원탈퇴
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer rounded-lg px-3 py-2.5 text-red-600 focus:bg-red-50 focus:text-red-600"
+                  onSelect={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  로그아웃
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <>
               <Link to="/login" className="hidden sm:block">
@@ -122,9 +158,11 @@ export function Header() {
                   로그인
                 </Button>
               </Link>
-              <Link to="/signup" className="hidden sm:block">
-                <Button size="sm">회원가입</Button>
-              </Link>
+              <div className="hidden sm:block">
+                <SignupPromptDialog>
+                  <Button size="sm">회원가입</Button>
+                </SignupPromptDialog>
+              </div>
             </>
           )}
           

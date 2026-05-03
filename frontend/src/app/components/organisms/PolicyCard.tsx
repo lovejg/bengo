@@ -223,7 +223,7 @@ export function PolicyCard({
         className={cn(
           'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col',
           'shadow-sm hover:shadow-xl',
-          status ? borderColors[status] : periodRaw ? 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/40' : 'border-red-500 hover:border-red-600 hover:shadow-red-500/30 bg-red-100/70',
+          status ? borderColors[status] : periodRaw ? 'border-[#00D9D9] hover:border-[#00BDBD] hover:shadow-[#00FFFF]/25 bg-[#00FFFF]/10' : 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/60',
           urgentDeadlineLabel && 'border-red-500 hover:border-red-600',
           'hover:-translate-y-2',
           'transition-all duration-300 ease-out',
@@ -279,7 +279,7 @@ export function PolicyCard({
           <PolicyMetaRow
             region={formatRegionCodes(regionCodes)}
             period={formatPolicyPeriod(startsAt, endsAt, isAlwaysOpen, periodRaw)}
-            periodClassName={!isAlwaysOpen && !(startsAt && endsAt) ? 'text-red-500' : undefined}
+            periodClassName={!isAlwaysOpen && !(startsAt && endsAt) ? periodRaw ? 'text-[#007A7A]' : 'text-amber-600' : undefined}
           />
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0" aria-hidden="true">
             <span className="text-xs font-medium text-[var(--accent)]">자세히</span>

@@ -8,6 +8,11 @@ import { MyPage } from './pages/MyPage';
 import { HomePage } from './pages/HomePage';
 import { PersonalizedPoliciesPage } from './pages/PersonalizedPoliciesPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { OAuthCallbackPage } from './pages/OAuthCallbackPage';
+import { OnboardingPage } from './pages/OnboardingPage';
+import { CheckEmailPage } from './pages/CheckEmailPage';
+import { EmailVerifiedPage } from './pages/EmailVerifiedPage';
+import { RouteErrorFallback } from './components/RouteErrorFallback';
 
 function RootLayout() {
   return createElement(
@@ -21,6 +26,7 @@ function RootLayout() {
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    ErrorBoundary: RouteErrorFallback,
     children: [
       {
         path: '/',
@@ -33,6 +39,22 @@ export const router = createBrowserRouter([
       {
         path: '/login',
         Component: LoginPage,
+      },
+      {
+        path: '/oauth/callback',
+        Component: OAuthCallbackPage,
+      },
+      {
+        path: '/check-email',
+        Component: CheckEmailPage,
+      },
+      {
+        path: '/email-verified',
+        Component: EmailVerifiedPage,
+      },
+      {
+        path: '/onboarding',
+        Component: OnboardingPage,
       },
       {
         path: '/policies',

@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { useRef } from 'react';
 import { Summary } from '../components/organisms/Summary';
 import { FAQ } from '../components/organisms/FAQ';
+import { SignupPromptDialog } from '../components/molecules/SignupPromptDialog';
 
 export function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -239,9 +240,9 @@ export function HomePage() {
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                           상시 4
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                          별도 확인 2
+                        <div className="flex items-center gap-1 text-[10px] font-semibold text-[#007A7A] bg-[#00FFFF]/10 border border-[#00D9D9]/60 px-1.5 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#00D9D9]"></span>
+                          정책별 확인 2
                         </div>
                       </div>
                     </div>
@@ -654,11 +655,14 @@ export function HomePage() {
               회원가입하고 나에게 딱 맞는<br className="sm:hidden" /> 정책을 추천받아보세요
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link to="/signup">
-                <Button size="lg" className="w-full sm:w-auto min-w-[180px]">
+              <SignupPromptDialog>
+                <button
+                  type="button"
+                  className="inline-flex h-12 w-full min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-7 py-3.5 text-base font-medium text-[var(--accent-foreground)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.97] sm:w-auto"
+                >
                   무료로 시작하기
-                </Button>
-              </Link>
+                </button>
+              </SignupPromptDialog>
               <Link to="/policies">
                 <Button size="lg" variant="secondary" className="w-full sm:w-auto min-w-[180px]">
                   정책 먼저 둘러보기

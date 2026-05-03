@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { signup } from '../api/auth';
-import { ApiClientError } from '../api/client';
+import { ApiClientError, getEmailVerificationPath } from '../api/client';
 import { Button } from '../components/atoms/Button';
 import { Input } from '../components/atoms/Input';
 import { Chip } from '../components/atoms/Chip';
@@ -90,8 +90,8 @@ export function SignupPage() {
         interests: interestList,
       });
 
-      toast.success('회원가입이 완료되었습니다.');
-      navigate('/policies');
+      toast.success('인증 메일을 보냈습니다.');
+      navigate(getEmailVerificationPath(formData.email));
     } catch (error) {
       const message = error instanceof ApiClientError ? error.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
       toast.error(message);
