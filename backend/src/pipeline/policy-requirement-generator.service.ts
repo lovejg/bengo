@@ -138,7 +138,7 @@ export class PolicyRequirementGeneratorService {
     }
 
     if (!isInfoPolicy && !isManualOverride && llmResult && llmResult.conditions.length > 0) {
-      this.mergeLlmConditionsIntoRequirements(requirements, llmResult);
+      this.mergeLlmConditionsIntoRequirements(requirements, llmResult, policy.id);
       await this.saveLlmRule(policy, llmResult, manualOverride, normalized, currentHash);
       this.logger.log(
         `Policy ${policy.code}: LLM extracted ${llmResult.conditions.length} conditions, ${llmResult.conditionalHints.length} hints`,
@@ -447,6 +447,7 @@ export class PolicyRequirementGeneratorService {
   private mergeLlmConditionsIntoRequirements(
     requirements: Array<Partial<PolicyRequirement>>,
     llmResult: LlmExtractionResult,
+    policyId: string,
   ): void {
     const resolveKeyGroup = (key: string): string => {
       for (const [group, aliases] of Object.entries(KEY_ALIASES)) {
@@ -481,7 +482,7 @@ export class PolicyRequirementGeneratorService {
 
       displayOrder += 1;
       requirements.push({
-        policyId: requirements[0]?.policyId,
+        policyId,
         key: condition.key,
         label: condition.label,
         description: condition.message || condition.label,

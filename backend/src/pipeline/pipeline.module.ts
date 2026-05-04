@@ -7,6 +7,8 @@ import {
   PolicyRule,
   RawPolicyDocumentEntity,
 } from '../database/entities';
+import { BokjiroCentralCollector } from './collectors/bokjiro-central.collector';
+import { BokjiroLocalCollector } from './collectors/bokjiro-local.collector';
 import { DataGoKrCollector } from './collectors/data-go-kr.collector';
 import { MockSeoulCollector } from './collectors/mock-seoul.collector';
 import { SeoulOpenApiCollector } from './collectors/seoul-open-api.collector';
@@ -42,6 +44,8 @@ import { PolicyUrlValidatorService } from './policy-url-validator.service';
     PipelineCollectionService,
     MockSeoulCollector,
     DataGoKrCollector,
+    BokjiroCentralCollector,
+    BokjiroLocalCollector,
     YouthcenterPolicyCollector,
     YouthcenterCenterCollector,
     SeoulOpenApiCollector,

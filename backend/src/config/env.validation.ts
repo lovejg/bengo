@@ -19,6 +19,20 @@ interface EnvShape {
   DATA_GO_KR_PAGE_SIZE_PARAM?: string;
   DATA_GO_KR_PAGE_SIZE?: number;
   DATA_GO_KR_MAX_PAGES?: number;
+  DATA_GO_KR_FILTER_KEYWORD?: string;
+  DATA_GO_KR_FILTER_KEYWORDS?: string;
+  DATA_GO_KR_FILTER_FIELD?: string;
+  DATA_GO_KR_DETAIL_API_URL?: string;
+  DATA_GO_KR_CONDITIONS_API_URL?: string;
+  BOKJIRO_API_KEY?: string;
+  BOKJIRO_CENTRAL_API_URL?: string;
+  BOKJIRO_LOCAL_API_URL?: string;
+  BOKJIRO_CENTRAL_DETAIL_API_URL?: string;
+  BOKJIRO_LOCAL_DETAIL_API_URL?: string;
+  BOKJIRO_LOCAL_CTPV_NMS?: string;
+  BOKJIRO_PAGE_SIZE?: number;
+  BOKJIRO_MAX_PAGES?: number;
+  BOKJIRO_ENRICH_LIMIT?: number;
   YOUTHCENTER_POLICY_API_KEY?: string;
   YOUTHCENTER_POLICY_API_URL?: string;
   YOUTHCENTER_POLICY_API_KEY_PARAM?: string;
@@ -121,6 +135,40 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
       config.DATA_GO_KR_MAX_PAGES as string | undefined,
       20,
     ),
+    DATA_GO_KR_FILTER_KEYWORD: config.DATA_GO_KR_FILTER_KEYWORD
+      ? String(config.DATA_GO_KR_FILTER_KEYWORD)
+      : undefined,
+    DATA_GO_KR_FILTER_KEYWORDS: config.DATA_GO_KR_FILTER_KEYWORDS
+      ? String(config.DATA_GO_KR_FILTER_KEYWORDS)
+      : undefined,
+    DATA_GO_KR_FILTER_FIELD: config.DATA_GO_KR_FILTER_FIELD
+      ? String(config.DATA_GO_KR_FILTER_FIELD)
+      : undefined,
+    DATA_GO_KR_DETAIL_API_URL: config.DATA_GO_KR_DETAIL_API_URL
+      ? String(config.DATA_GO_KR_DETAIL_API_URL)
+      : undefined,
+    DATA_GO_KR_CONDITIONS_API_URL: config.DATA_GO_KR_CONDITIONS_API_URL
+      ? String(config.DATA_GO_KR_CONDITIONS_API_URL)
+      : undefined,
+    BOKJIRO_API_KEY: config.BOKJIRO_API_KEY ? String(config.BOKJIRO_API_KEY) : undefined,
+    BOKJIRO_CENTRAL_API_URL: config.BOKJIRO_CENTRAL_API_URL
+      ? String(config.BOKJIRO_CENTRAL_API_URL)
+      : undefined,
+    BOKJIRO_LOCAL_API_URL: config.BOKJIRO_LOCAL_API_URL
+      ? String(config.BOKJIRO_LOCAL_API_URL)
+      : undefined,
+    BOKJIRO_CENTRAL_DETAIL_API_URL: config.BOKJIRO_CENTRAL_DETAIL_API_URL
+      ? String(config.BOKJIRO_CENTRAL_DETAIL_API_URL)
+      : undefined,
+    BOKJIRO_LOCAL_DETAIL_API_URL: config.BOKJIRO_LOCAL_DETAIL_API_URL
+      ? String(config.BOKJIRO_LOCAL_DETAIL_API_URL)
+      : undefined,
+    BOKJIRO_LOCAL_CTPV_NMS: config.BOKJIRO_LOCAL_CTPV_NMS
+      ? String(config.BOKJIRO_LOCAL_CTPV_NMS)
+      : undefined,
+    BOKJIRO_PAGE_SIZE: toNumber(config.BOKJIRO_PAGE_SIZE as string | undefined, 100),
+    BOKJIRO_MAX_PAGES: toNumber(config.BOKJIRO_MAX_PAGES as string | undefined, 30),
+    BOKJIRO_ENRICH_LIMIT: toNumber(config.BOKJIRO_ENRICH_LIMIT as string | undefined, 0),
     YOUTHCENTER_POLICY_API_KEY: config.YOUTHCENTER_POLICY_API_KEY
       ? String(config.YOUTHCENTER_POLICY_API_KEY)
       : undefined,
