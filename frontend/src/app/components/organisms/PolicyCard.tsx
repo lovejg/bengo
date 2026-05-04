@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { PolicyListItem } from '../../types';
+import { formatRegionCodes } from '../../lib/regions';
 
 interface BadgeItem { key: string; label: string; el: React.ReactNode; }
 
@@ -95,18 +96,28 @@ export interface PolicyCardProps extends PolicyListItem {
   className?: string;
 }
 
-const regionLabels: Record<string, string> = {
-  seoul: '서울',
-  seoul_gangnam: '서울 강남구',
-  seoul_mapo: '서울 마포구',
-  seoul_songpa: '서울 송파구',
-};
-
 function formatPolicyPeriod(startsAt: string | null, endsAt: string | null, isAlwaysOpen: boolean, periodRaw?: string | null): string {
   if (isAlwaysOpen) return '상시모집';
   if (startsAt && endsAt) return `${startsAt.slice(0, 10)} ~ ${endsAt.slice(0, 10)}`;
   if (periodRaw) return periodRaw;
   return '기간확인불가';
+}
+
+function getDaysUntilEnd(endsAt: string | null): number | null {
+  if (!endsAt) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(endsAt);
+  deadline.setHours(0, 0, 0, 0);
+
+  return Math.ceil((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getUrgentDeadlineLabel(endsAt: string | null): string | null {
+  const daysLeft = getDaysUntilEnd(endsAt);
+  if (daysLeft === null || daysLeft < 0 || daysLeft > 7) return null;
+  return daysLeft === 0 ? 'D-day' : `D-${daysLeft}`;
 }
 
 function getDisplayStatus(
@@ -161,6 +172,7 @@ export function PolicyCard({
   const [isBookmarkAnimating, setIsBookmarkAnimating] = useState(false);
   const status = getDisplayStatus(applicationStatus, endsAt, isAlwaysOpen);
   const eligibility = getEligibility(fitScore ?? null);
+  const urgentDeadlineLabel = status === 'recruiting' ? getUrgentDeadlineLabel(endsAt) : null;
 
   const borderColors = {
     recruiting: 'border-emerald-500 hover:border-emerald-600 hover:shadow-emerald-500/25 bg-emerald-50/40',
@@ -206,22 +218,28 @@ export function PolicyCard({
   };
 
   return (
-    <Link to={`/policies/${id}`} className="block h-full" onClick={handleCardClick}>
+    <Link to={`/policies/${id}`} className="block h-full cursor-pointer" onClick={handleCardClick}>
       <article
         className={cn(
           'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col',
           'shadow-sm hover:shadow-xl',
-          status ? borderColors[status] : periodRaw ? 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/40' : 'border-red-500 hover:border-red-600 hover:shadow-red-500/30 bg-red-100/70',
+          status ? borderColors[status] : periodRaw ? 'border-[#00D9D9] hover:border-[#00BDBD] hover:shadow-[#00FFFF]/25 bg-[#00FFFF]/10' : 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/60',
+          urgentDeadlineLabel && 'border-red-500 hover:border-red-600',
           'hover:-translate-y-2',
           'transition-all duration-300 ease-out',
           className
         )}
         aria-label={title}
       >
+        {urgentDeadlineLabel && (
+          <div className="absolute right-5 top-5 text-sm font-bold text-red-600" aria-label={`마감 임박 ${urgentDeadlineLabel}`}>
+            {urgentDeadlineLabel}
+          </div>
+        )}
         <div className="flex-1 flex flex-col">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1">
-            <h3 className="group-hover:text-[var(--accent)] transition-colors duration-200 line-clamp-2 leading-snug mb-3 min-h-[2.75em]">
+            <h3 className={cn('group-hover:text-[var(--accent)] transition-colors duration-200 line-clamp-2 leading-snug mb-3 min-h-[2.75em]', urgentDeadlineLabel && 'pr-14')}>
               {title}
             </h3>
             <BadgeRow badges={[
@@ -234,7 +252,7 @@ export function PolicyCard({
           {onBookmark && (
             <motion.button
               onClick={handleBookmarkClick}
-              className="flex-shrink-0 p-2.5 hover:bg-[var(--muted)] rounded-xl transition-all duration-200"
+              className="flex-shrink-0 p-2.5 hover:bg-[var(--muted)] rounded-xl transition-all duration-200 cursor-pointer"
               aria-label={bookmarked ? '저장 취소' : '정책 저장'}
               aria-pressed={bookmarked}
               whileTap={{ scale: 0.9 }}
@@ -259,9 +277,9 @@ export function PolicyCard({
 
         <div className="flex items-end justify-between gap-2">
           <PolicyMetaRow
-            region={regionCodes.map((code) => regionLabels[code] ?? code).join(', ')}
+            region={formatRegionCodes(regionCodes)}
             period={formatPolicyPeriod(startsAt, endsAt, isAlwaysOpen, periodRaw)}
-            periodClassName={!isAlwaysOpen && !(startsAt && endsAt) ? 'text-red-500' : undefined}
+            periodClassName={!isAlwaysOpen && !(startsAt && endsAt) ? periodRaw ? 'text-[#007A7A]' : 'text-amber-600' : undefined}
           />
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 flex-shrink-0" aria-hidden="true">
             <span className="text-xs font-medium text-[var(--accent)]">자세히</span>

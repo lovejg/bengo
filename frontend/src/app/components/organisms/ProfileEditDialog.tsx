@@ -134,7 +134,7 @@ export function ProfileEditDialog({
                       type="button"
                       onClick={() => toggleInterest(option.value)}
                       className={cn(
-                        'flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors text-left',
+                        'flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors text-left cursor-pointer',
                         isSelected
                           ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
                           : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]',

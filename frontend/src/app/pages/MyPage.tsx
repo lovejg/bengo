@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { User, MapPin, Sparkles, Edit, Trash2, X } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { getPolicyDetail } from '../api/policies';
-import { ApiClientError, getStoredUserProfile, setStoredUserProfile } from '../api/client';
+import { ApiClientError, getEmailVerificationPath, getStoredUserProfile, isEmailVerificationRequiredError, setStoredUserProfile } from '../api/client';
 import { getMyPolicies, removeMyPolicy } from '../api/me';
 import { MainLayout } from '../components/templates/MainLayout';
 import { Button } from '../components/atoms/Button';
@@ -13,6 +13,7 @@ import { PolicyCard, PolicyCardProps } from '../components/organisms/PolicyCard'
 import { CustomSelect } from '../components/atoms/CustomSelect';
 import { EmptyState } from '../components/molecules/EmptyState';
 import type { MyPolicyItem, PolicyDetail, UserProfileSummary } from '../types';
+import { formatRegionCode, REGION_OPTIONS } from '../lib/regions';
 
 type StatusFilter = 'all' | 'upcoming' | 'recruiting' | 'closed';
 type SavedPolicy = PolicyCardProps & {
@@ -22,7 +23,7 @@ type SavedPolicy = PolicyCardProps & {
 
 interface UserProfileView {
   name: string;
-  age: number;
+  age: number | null;
   region: string;
   interests: string[];
 }
@@ -46,18 +47,10 @@ function calculateProfileCompletion(user: UserProfileSummary | null): number {
   return Math.round((completed / 3) * 100);
 }
 
-const REGION_OPTIONS: { value: string; label: string }[] = [
-  { value: 'seoul', label: '서울' },
-];
-
 const INTEREST_OPTIONS: { value: string; label: string }[] = [
   { value: 'youth_policy', label: '청년정책' },
   { value: 'childcare_policy', label: '육아/보육정책' },
 ];
-
-const regionLabels: Record<string, string> = {
-  seoul: '서울',
-};
 
 const interestLabels: Record<string, string> = {
   youth_policy: '청년정책',
@@ -107,7 +100,7 @@ function mapStoredUserToView(user: UserProfileSummary | null): UserProfileView |
   return {
     name: user.email.split('@')[0],
     age: user.age,
-    region: regionLabels[user.regionCode] ?? user.regionCode,
+    region: formatRegionCode(user.regionCode),
     interests: user.interests.map((interest) => interestLabels[interest] ?? interest),
   };
 }
@@ -115,6 +108,7 @@ function mapStoredUserToView(user: UserProfileSummary | null): UserProfileView |
 const PAGE_SIZE = 12;
 
 export function MyPage() {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'));
@@ -130,7 +124,7 @@ export function MyPage() {
   const [editForm, setEditForm] = useState<EditFormState>(() => {
     const stored = getStoredUserProfile();
     return {
-      age: stored ? String(stored.age) : '',
+      age: stored?.age ? String(stored.age) : '',
       regionCode: stored?.regionCode ?? '',
       interests: stored?.interests ?? [],
     };
@@ -146,6 +140,16 @@ export function MyPage() {
       setHasError(false);
 
       const storedUser = getStoredUserProfile();
+      if (storedUser && !storedUser.emailVerified) {
+        navigate(getEmailVerificationPath(storedUser.email), { replace: true });
+        return;
+      }
+
+      if (storedUser && !storedUser.profileCompleted) {
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+
       setUser(mapStoredUserToView(storedUser));
 
       try {
@@ -163,6 +167,11 @@ export function MyPage() {
 
         setSavedPolicies(details);
       } catch (error) {
+        if (isEmailVerificationRequiredError(error)) {
+          const email = getStoredUserProfile()?.email;
+          navigate(getEmailVerificationPath(email), { replace: true });
+          return;
+        }
         setHasError(true);
         const message = error instanceof ApiClientError ? error.message : '내 정책 정보를 불러오는데 실패했습니다';
         toast.error(message);
@@ -172,7 +181,7 @@ export function MyPage() {
     };
 
     loadMyPolicies();
-  }, [reloadKey]);
+  }, [navigate, reloadKey]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -180,6 +189,11 @@ export function MyPage() {
       setSavedPolicies((current) => current.filter((policy) => policy.id !== id));
       toast.success('정책이 저장 목록에서 삭제되었습니다');
     } catch (error) {
+      if (isEmailVerificationRequiredError(error)) {
+        const email = getStoredUserProfile()?.email;
+        navigate(getEmailVerificationPath(email));
+        return;
+      }
       const message = error instanceof ApiClientError ? error.message : '정책 삭제에 실패했습니다';
       toast.error(message);
     }
@@ -213,6 +227,7 @@ export function MyPage() {
       age: editForm.age ? Number(editForm.age) : storedUser.age,
       regionCode: (editForm.regionCode || storedUser.regionCode) as typeof storedUser.regionCode,
       interests: editForm.interests.length > 0 ? editForm.interests as typeof storedUser.interests : storedUser.interests,
+      profileCompleted: true,
     };
 
     setStoredUserProfile(nextStoredUser);
@@ -251,7 +266,7 @@ export function MyPage() {
                   <div className="flex flex-wrap gap-3 text-sm text-[var(--muted-foreground)]">
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 flex-shrink-0" />
-                      <span>{user ? `${user.age}세` : '나이 정보 없음'}</span>
+                      <span>{user?.age ? `${user.age}세` : '나이 정보 없음'}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <MapPin className="h-4 w-4 flex-shrink-0" />
@@ -345,8 +360,8 @@ export function MyPage() {
           <div className="bg-white rounded-xl p-2 mb-6 flex flex-wrap gap-2">
             <button
               onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
-              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'all' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                statusFilter === 'all' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-blue-50 hover:text-blue-700'
               }`}
             >
               <span>전체</span>
@@ -356,8 +371,8 @@ export function MyPage() {
             </button>
             <button
               onClick={() => { setStatusFilter('upcoming'); setCurrentPage(1); }}
-              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'upcoming' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                statusFilter === 'upcoming' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-blue-50 hover:text-blue-700'
               }`}
             >
               <span>예정</span>
@@ -367,8 +382,8 @@ export function MyPage() {
             </button>
             <button
               onClick={() => { setStatusFilter('recruiting'); setCurrentPage(1); }}
-              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'recruiting' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                statusFilter === 'recruiting' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-blue-50 hover:text-blue-700'
               }`}
             >
               <span>모집중</span>
@@ -378,8 +393,8 @@ export function MyPage() {
             </button>
             <button
               onClick={() => { setStatusFilter('closed'); setCurrentPage(1); }}
-              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors ${
-                statusFilter === 'closed' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-[var(--muted)]'
+              className={`group inline-flex items-center px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                statusFilter === 'closed' ? 'bg-[var(--accent)] text-[var(--accent-foreground)]' : 'hover:bg-blue-50 hover:text-blue-700'
               }`}
             >
               <span>마감</span>
@@ -408,7 +423,7 @@ export function MyPage() {
                   <PolicyCard {...policy} applicationStatus={!policy.startsAt && !policy.endsAt && !policy.isAlwaysOpen ? undefined : policy.applicationStatus} />
                   <div className="absolute top-4 right-4 z-10 transition-transform duration-300 ease-out group-hover:-translate-y-2">
                     <button
-                      className="p-2 bg-white/95 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 rounded-xl shadow-sm transition-all duration-200 active:scale-95 backdrop-blur-sm"
+                      className="p-2 bg-white/95 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 rounded-xl shadow-sm transition-all duration-200 active:scale-95 backdrop-blur-sm cursor-pointer"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -455,7 +470,7 @@ export function MyPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">정책 삭제 확인</h3>
               <button
-                className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                 onClick={() => setDeleteConfirmOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -487,7 +502,7 @@ export function MyPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">프로필 수정</h3>
               <button
-                className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                 onClick={() => setEditProfileOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -529,7 +544,7 @@ export function MyPage() {
                               : [...current.interests, opt.value],
                           }))
                         }
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors text-left ${
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors text-left cursor-pointer ${
                           isSelected
                             ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
                             : 'border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]'

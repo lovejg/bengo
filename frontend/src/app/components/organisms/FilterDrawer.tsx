@@ -112,7 +112,7 @@ export function FilterDrawer({ isOpen, onClose, onApply }: FilterDrawerProps) {
           <h3 id="filter-drawer-title">전체 필터</h3>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-[var(--muted)] rounded-lg transition-colors duration-150"
+            className="p-2 hover:bg-[var(--muted)] rounded-lg transition-colors duration-150 cursor-pointer"
             aria-label="필터 닫기"
           >
             <X className="h-5 w-5" />
