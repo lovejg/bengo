@@ -7,6 +7,9 @@ export const MVP_ALLOWED_REGIONS: RegionCode[] = [
 
 export const MVP_ALLOWED_CATEGORIES: InterestCategory[] = [
   InterestCategory.YOUTH,
+  InterestCategory.CHILDCARE,
+  InterestCategory.SENIOR,
+  InterestCategory.DISABILITY,
 ];
 
 export const MVP_EXCLUDED_SOURCES = ['youthcenter-center'];
@@ -15,6 +18,8 @@ export const MVP_EXCLUDED_SOURCES = ['youthcenter-center'];
 export const MVP_DEFAULT_BATCH_SOURCES = [
   'youth-seoul',
   'data-go-kr',
+  'bokjiro-central',
+  'bokjiro-local',
   'youthcenter-policy',
 ] as const;
 
@@ -36,7 +41,7 @@ export function evaluateMvpScope(
     MVP_ALLOWED_CATEGORIES.includes(c),
   );
   if (!hasAllowedCategory) {
-    return { inScope: false, reason: '청년정책 카테고리 불일치' };
+    return { inScope: false, reason: 'MVP 카테고리 불일치' };
   }
 
   const hasAllowedRegion = regionCodes.some((r) =>

@@ -3,6 +3,8 @@ import {
   MVP_DEFAULT_BATCH_SOURCES,
   MVP_EXCLUDED_SOURCES,
 } from '../common/constants/mvp-policy-scope.constant';
+import { BokjiroCentralCollector } from './collectors/bokjiro-central.collector';
+import { BokjiroLocalCollector } from './collectors/bokjiro-local.collector';
 import { DataGoKrCollector } from './collectors/data-go-kr.collector';
 import { MockSeoulCollector } from './collectors/mock-seoul.collector';
 import { SeoulOpenApiCollector } from './collectors/seoul-open-api.collector';
@@ -45,6 +47,8 @@ export class PipelineCollectionService {
   constructor(
     private readonly mockSeoulCollector: MockSeoulCollector,
     private readonly dataGoKrCollector: DataGoKrCollector,
+    private readonly bokjiroCentralCollector: BokjiroCentralCollector,
+    private readonly bokjiroLocalCollector: BokjiroLocalCollector,
     private readonly youthcenterPolicyCollector: YouthcenterPolicyCollector,
     private readonly youthcenterCenterCollector: YouthcenterCenterCollector,
     private readonly seoulOpenApiCollector: SeoulOpenApiCollector,
@@ -53,6 +57,8 @@ export class PipelineCollectionService {
     this.collectors = [
       this.mockSeoulCollector,
       this.dataGoKrCollector,
+      this.bokjiroCentralCollector,
+      this.bokjiroLocalCollector,
       this.youthcenterPolicyCollector,
       this.youthcenterCenterCollector,
       this.seoulOpenApiCollector,

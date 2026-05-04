@@ -14,6 +14,8 @@ export class NaverStrategy extends PassportStrategy(Strategy, 'naver') {
       clientID: configService.get<string>('NAVER_CLIENT_ID') ?? '',
       clientSecret: configService.get<string>('NAVER_CLIENT_SECRET') ?? '',
       callbackURL: configService.get<string>('NAVER_CALLBACK_URL') ?? '',
+      // Fastify에는 session이 없으므로 state 검증을 비활성화 (MVP)
+      state: false,
     });
   }
 

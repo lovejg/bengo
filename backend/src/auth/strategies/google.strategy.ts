@@ -13,6 +13,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET') ?? '',
       callbackURL: configService.get<string>('GOOGLE_CALLBACK_URL') ?? '',
       scope: ['email', 'profile'],
+      // Fastify에는 session이 없으므로 state 검증을 비활성화 (MVP)
+      state: false,
     });
   }
 

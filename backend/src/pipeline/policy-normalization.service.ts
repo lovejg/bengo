@@ -24,7 +24,21 @@ const YOUTH_KEYWORDS = [
   '청년주택',
 ];
 
-const CHILDCARE_KEYWORDS = ['육아', '돌봄', '자녀', '보육', '아이', '출산', '양육'];
+const CHILDCARE_KEYWORDS = ['육아', '돌봄', '자녀', '보육', '아이', '출산', '양육', '아동', '영유아', '어린이집'];
+
+const SENIOR_KEYWORDS = ['노인', '어르신', '시니어', '고령', '경로', '독거노인', '치매'];
+
+const DISABILITY_KEYWORDS = ['장애인', '장애아', '장애아동', '장애가족', '활동지원'];
+
+const CATEGORY_KEYWORD_MAP: ReadonlyArray<{
+  category: InterestCategory;
+  keywords: readonly string[];
+}> = [
+  { category: InterestCategory.YOUTH, keywords: YOUTH_KEYWORDS },
+  { category: InterestCategory.CHILDCARE, keywords: CHILDCARE_KEYWORDS },
+  { category: InterestCategory.SENIOR, keywords: SENIOR_KEYWORDS },
+  { category: InterestCategory.DISABILITY, keywords: DISABILITY_KEYWORDS },
+];
 
 const MVP_ALLOWED_REGION_CODES = new Set<string>([RegionCode.SEOUL]);
 
@@ -124,9 +138,7 @@ export class PolicyNormalizationService {
     const regionCodes = this.extractRegionCodes(raw, text);
     const policyType = this.classifyPolicyType(raw.title, raw.body);
 
-    const categories: InterestCategory[] = [];
-    if (YOUTH_KEYWORDS.some((kw) => text.includes(kw))) categories.push(InterestCategory.YOUTH);
-    if (CHILDCARE_KEYWORDS.some((kw) => text.includes(kw))) categories.push(InterestCategory.CHILDCARE);
+    const categories = this.classifyCategories(text);
 
     const code = `${raw.source}-${raw.title}`
       .toLowerCase()
@@ -172,6 +184,16 @@ export class PolicyNormalizationService {
         metadata: meta,
       },
     };
+  }
+
+  private classifyCategories(text: string): InterestCategory[] {
+    const matched: InterestCategory[] = [];
+    for (const { category, keywords } of CATEGORY_KEYWORD_MAP) {
+      if (keywords.some((kw) => text.includes(kw))) {
+        matched.push(category);
+      }
+    }
+    return matched;
   }
 
   private detectAlwaysOpen(text: string, meta: Record<string, unknown>): boolean {

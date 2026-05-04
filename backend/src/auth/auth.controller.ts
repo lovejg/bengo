@@ -1,6 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -11,7 +10,9 @@ import { CompleteProfileDto } from './dto/complete-profile.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { SignupDto } from './dto/signup.dto';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { NaverAuthGuard } from './guards/naver-auth.guard';
 import { OAuthProfileInput } from '../users/types/oauth-profile-input.type';
 
 @ApiTags('auth')
@@ -86,28 +87,28 @@ export class AuthController {
   }
 
   @Get('google')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Google OAuth 시작 (브라우저 redirect)' })
   googleLogin(): void {
     // Passport가 Google authorize URL로 redirect 처리
   }
 
   @Get('google/callback')
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: 'Google OAuth callback' })
   async googleCallback(@Req() req: FastifyRequest, @Res() res: FastifyReply): Promise<void> {
     await this.handleOAuthCallback(req, res);
   }
 
   @Get('naver')
-  @UseGuards(AuthGuard('naver'))
+  @UseGuards(NaverAuthGuard)
   @ApiOperation({ summary: 'Naver OAuth 시작 (브라우저 redirect)' })
   naverLogin(): void {
     // Passport가 Naver authorize URL로 redirect 처리
   }
 
   @Get('naver/callback')
-  @UseGuards(AuthGuard('naver'))
+  @UseGuards(NaverAuthGuard)
   @ApiOperation({ summary: 'Naver OAuth callback' })
   async naverCallback(@Req() req: FastifyRequest, @Res() res: FastifyReply): Promise<void> {
     await this.handleOAuthCallback(req, res);
