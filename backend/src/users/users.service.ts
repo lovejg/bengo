@@ -7,7 +7,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { DataSource, Repository } from 'typeorm';
+import { Gender } from '../common/enums/gender.enum';
+import { InterestCategory } from '../common/enums/interest-category.enum';
 import { OAuthProvider } from '../common/enums/oauth-provider.enum';
+import { RegionCode } from '../common/enums/region-code.enum';
 import { OAuthAccount, User, UserProfile } from '../database/entities';
 import { CompleteProfileInput } from './types/complete-profile-input.type';
 import { CreateUserInput } from './types/create-user-input.type';
@@ -216,5 +219,66 @@ export class UsersService {
       throw new NotFoundException('사용자 프로필을 찾을 수 없습니다.');
     }
     return profile;
+  }
+
+  async updatePassword(user: User, newPassword: string): Promise<void> {
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.save(user);
+  }
+
+  /**
+   * 부분 업데이트 — undefined 필드는 건드리지 않음.
+   * displayName은 User 테이블, 나머지는 UserProfile.
+   * 프로필이 아직 없으면(OAuth 미완성 가입자) 프로필 필드 업데이트는 거부.
+   */
+  async updateProfile(
+    userId: string,
+    input: {
+      age?: number;
+      gender?: Gender;
+      regionCode?: RegionCode;
+      interests?: InterestCategory[];
+      displayName?: string;
+    },
+  ): Promise<{ user: User; profile: UserProfile | null }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const hasProfileField =
+      input.age !== undefined ||
+      input.gender !== undefined ||
+      input.regionCode !== undefined ||
+      input.interests !== undefined;
+
+    let profile = await this.profileRepository.findOne({ where: { userId } });
+    if (hasProfileField) {
+      if (!profile) {
+        throw new NotFoundException(
+          '프로필이 아직 없습니다. complete-profile을 먼저 호출하세요.',
+        );
+      }
+      if (input.age !== undefined) profile.age = input.age;
+      if (input.gender !== undefined) profile.gender = input.gender;
+      if (input.regionCode !== undefined) profile.regionCode = input.regionCode;
+      if (input.interests !== undefined) profile.interests = input.interests;
+      profile = await this.profileRepository.save(profile);
+    }
+
+    if (input.displayName !== undefined) {
+      user.displayName = input.displayName;
+      await this.userRepository.save(user);
+    }
+
+    return { user, profile };
+  }
+
+  /** Hard delete — cascade 설정으로 profile/oauthAccounts/eligibilityChecks/policyStates도 함께 정리됨. */
+  async deleteUser(userId: string): Promise<void> {
+    const result = await this.userRepository.delete(userId);
+    if (result.affected === 0) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
   }
 }

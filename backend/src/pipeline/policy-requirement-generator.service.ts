@@ -285,8 +285,20 @@ export class PolicyRequirementGeneratorService {
     return existingRule?.contentHash === currentHash;
   }
 
+  /**
+   * shortDescription이 LLM 요약이 아닌 "raw 상태"인지 판단.
+   * LLM은 의역하므로 description의 prefix가 그대로 들어있으면 raw 발췌(정규화 fallback)로 간주.
+   * 길이 단독 검사는 프롬프트 한도(200자)가 바뀌면 함께 조정해야 하므로 prefix 검사를 우선 사용.
+   */
   private isShortDescriptionRaw(policy: Policy): boolean {
-    return !policy.shortDescription || policy.shortDescription === policy.description?.slice(0, 120);
+    if (!policy.shortDescription) return true;
+    const desc = policy.description ?? '';
+    const short = policy.shortDescription;
+    // description의 prefix이고 충분히 긴 경우 = 정규화 단계 fallback의 raw 발췌
+    if (desc && short.length >= 80 && desc.startsWith(short)) return true;
+    // 250자 초과는 LLM 응답일 리 없음 (프롬프트 명세 200자 + 50자 마진)
+    if (short.length > 250) return true;
+    return false;
   }
 
   /** 이미 requirements가 있는 경우: summary·policyType·기간 정보만 LLM로 갱신 */
@@ -588,6 +600,19 @@ export class PolicyRequirementGeneratorService {
       } else {
         policy.periodRaw = detectedPeriod;
       }
+    }
+
+    // 복지로는 단발성 공모가 아닌 상시 운영 복지서비스 포털 — 규칙/LLM 모두 단서 없으면 상시로 가정
+    const originalSource = (policy.extraMeta?.originalSource as string | undefined) ?? '';
+    if (
+      !policy.isAlwaysOpen &&
+      !policy.startsAt &&
+      !policy.endsAt &&
+      rawEmpty &&
+      originalSource.startsWith('bokjiro-')
+    ) {
+      policy.isAlwaysOpen = true;
+      policy.periodRaw = null;
     }
 
     if (policy.isAlwaysOpen && policy.periodRaw?.trim() === '-') {
