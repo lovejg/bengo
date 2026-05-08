@@ -8,6 +8,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { Gender } from '../common/enums/gender.enum';
+import { InterestCategory } from '../common/enums/interest-category.enum';
+import { RegionCode } from '../common/enums/region-code.enum';
 import { User, UserProfile } from '../database/entities';
 import { UsersService } from '../users/users.service';
 import { CompleteProfileDto } from './dto/complete-profile.dto';
@@ -68,8 +71,66 @@ export class AuthService {
     return this.buildAuthResponse(user, profile);
   }
 
+  async updateProfile(
+    userId: string,
+    input: {
+      age?: number;
+      gender?: Gender;
+      regionCode?: RegionCode;
+      interests?: InterestCategory[];
+      displayName?: string;
+    },
+  ): Promise<AuthResponseDto> {
+    const { user, profile } = await this.usersService.updateProfile(userId, input);
+    return this.buildAuthResponse(user, profile);
+  }
+
   async verifyEmail(token: string): Promise<void> {
     await this.usersService.verifyEmailByToken(token);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+    if (!user.passwordHash) {
+      throw new BadRequestException('OAuth 가입자는 비밀번호 변경 기능을 사용할 수 없습니다.');
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('현재 비밀번호가 올바르지 않습니다.');
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('새 비밀번호는 현재 비밀번호와 달라야 합니다.');
+    }
+
+    await this.usersService.updatePassword(user, newPassword);
+  }
+
+  async deleteAccount(userId: string, password?: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    // 일반 가입자는 password 확인 필수, OAuth 전용 가입자는 JWT만으로 진행
+    if (user.passwordHash) {
+      if (!password) {
+        throw new BadRequestException('비밀번호 확인이 필요합니다.');
+      }
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isValid) {
+        throw new UnauthorizedException('비밀번호가 올바르지 않습니다.');
+      }
+    }
+
+    await this.usersService.deleteUser(userId);
   }
 
   async resendVerification(email: string): Promise<void> {
