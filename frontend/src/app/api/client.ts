@@ -4,6 +4,9 @@ import type { UserProfileSummary } from '../types/user';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 const ACCESS_TOKEN_KEY = 'bengo_access_token';
 const USER_PROFILE_KEY = 'bengo_user_profile';
+const AUTH_METHOD_KEY = 'bengo_auth_method';
+
+export type AuthMethod = 'password' | 'oauth';
 
 export class ApiClientError extends Error {
   status: number;
@@ -31,10 +34,58 @@ function buildUrl(path: string, query?: RequestOptions['query']) {
       continue;
     }
 
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== '') {
+          url.searchParams.append(key, String(item));
+        }
+      });
+      continue;
+    }
+
     url.searchParams.set(key, String(value));
   }
 
   return url.toString();
+}
+
+function getApiErrorMessage(data: unknown, fallback: string) {
+  if (typeof data !== 'object' || data === null) {
+    return fallback;
+  }
+
+  const error = data as ApiErrorResponse;
+
+  if (typeof error.error === 'object' && error.error?.message) {
+    return error.error.message;
+  }
+
+  if (typeof error.message === 'string') {
+    return error.message;
+  }
+
+  if (Array.isArray(error.message)) {
+    return error.message.join('\n');
+  }
+
+  if (typeof error.error === 'string') {
+    return error.error;
+  }
+
+  return fallback;
+}
+
+function clearAuthSession() {
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.localStorage.removeItem(USER_PROFILE_KEY);
+  window.localStorage.removeItem(AUTH_METHOD_KEY);
+}
+
+function isMissingAuthenticatedUser(status: number, message: string) {
+  return (
+    status === 404 &&
+    (message.includes('사용자') || message.includes('프로필'))
+  );
 }
 
 async function parseResponse(response: Response) {
@@ -57,6 +108,7 @@ export function setAccessToken(token: string) {
 
 export function clearAccessToken() {
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.localStorage.removeItem(AUTH_METHOD_KEY);
 }
 
 export function getStoredUserProfile() {
@@ -80,6 +132,19 @@ export function setStoredUserProfile(profile: UserProfileSummary) {
 
 export function clearStoredUserProfile() {
   window.localStorage.removeItem(USER_PROFILE_KEY);
+}
+
+export function getAuthMethod(): AuthMethod | null {
+  const method = window.localStorage.getItem(AUTH_METHOD_KEY);
+  return method === 'password' || method === 'oauth' ? method : null;
+}
+
+export function setAuthMethod(method: AuthMethod) {
+  window.localStorage.setItem(AUTH_METHOD_KEY, method);
+}
+
+export function clearAuthMethod() {
+  window.localStorage.removeItem(AUTH_METHOD_KEY);
 }
 
 export function getEmailVerificationPath(email?: string | null) {
@@ -144,15 +209,26 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const data = await parseResponse(response);
 
   if (!response.ok) {
+    const message = getApiErrorMessage(data, response.statusText ?? 'API request failed');
+
     if (response.status === 401) {
-      window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-      window.localStorage.removeItem(USER_PROFILE_KEY);
+      clearAuthSession();
       window.location.href = '/login';
     }
-    const errorBody = typeof data === 'object' && data !== null ? (data as ApiErrorResponse).error : undefined;
+
+    if (auth && isMissingAuthenticatedUser(response.status, message)) {
+      clearAuthSession();
+      window.location.href = '/login';
+    }
+
+    const errorBody =
+      typeof data === 'object' && data !== null && typeof (data as ApiErrorResponse).error === 'object'
+        ? (data as ApiErrorResponse).error
+        : undefined;
+
     throw new ApiClientError(
       response.status,
-      errorBody?.message ?? response.statusText ?? 'API request failed',
+      message,
       errorBody?.code,
       errorBody?.requestId,
     );

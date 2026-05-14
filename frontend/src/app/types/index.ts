@@ -27,7 +27,7 @@ export interface User {
   name: string;
   email: string;
   age: number;
-  gender?: 'male' | 'female' | 'other';
+  gender?: 'male' | 'female' | 'unspecified';
   region: string;
   interests: string[];
 }

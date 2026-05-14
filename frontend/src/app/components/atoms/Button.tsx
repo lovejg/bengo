@@ -20,14 +20,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           'disabled:pointer-events-none disabled:opacity-50',
           'cursor-pointer active:scale-[0.97]',
           {
-            'bg-[var(--accent)] text-[var(--accent-foreground)] hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 focus-visible:ring-[var(--accent)]/50':
+            'bg-[var(--accent)] text-[var(--accent-foreground)] hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5 focus-visible:ring-[var(--accent)]/50 dark:bg-gradient-to-r dark:from-[#3B82F6] dark:to-[#2563EB] dark:hover:shadow-[0_10px_28px_rgba(59,130,246,0.28)]':
               variant === 'primary',
-            'bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--muted)] border border-[var(--border)] focus-visible:ring-[var(--accent)]/30':
+            'bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--muted)] border border-[var(--border)] focus-visible:ring-[var(--accent)]/30 dark:bg-[rgba(30,41,59,0.58)] dark:border-[var(--border-default)] dark:hover:bg-[rgba(30,41,59,0.86)] dark:hover:border-[var(--border-strong)]':
               variant === 'secondary',
-            'border border-[var(--border)] bg-transparent hover:bg-[var(--muted)] focus-visible:ring-[var(--accent)]/30':
+            'border border-[var(--border)] bg-transparent hover:bg-[var(--muted)] focus-visible:ring-[var(--accent)]/30 dark:border-[var(--border-default)] dark:hover:bg-[rgba(30,41,59,0.5)]':
               variant === 'outline',
-            'hover:bg-[var(--muted)] focus-visible:ring-[var(--accent)]/30': variant === 'ghost',
-            'bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 focus-visible:ring-red-500/50':
+            'hover:bg-[var(--muted)] focus-visible:ring-[var(--accent)]/30 dark:hover:bg-[rgba(30,41,59,0.5)]': variant === 'ghost',
+            'bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/25 hover:-translate-y-0.5 focus-visible:ring-red-500/50 dark:bg-[#EF4444] dark:hover:bg-[#F87171]':
               variant === 'danger',
           },
           {

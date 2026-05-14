@@ -20,10 +20,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             className={cn(
-              'w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm transition-all duration-200',
+              'w-full rounded-xl border border-[var(--border)] bg-white dark:bg-[rgba(15,23,42,0.82)] dark:border-[var(--border-default)] px-4 py-2.5 text-sm transition-all duration-200',
               'placeholder:text-[var(--muted-foreground)]',
               'hover:border-[var(--accent)]/40',
-              'focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]',
+              'focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)] dark:focus:ring-[var(--accent)]/20',
               'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-[var(--muted)]',
               {
                 'border-[var(--destructive)] focus:ring-[var(--destructive)]/30 focus:border-[var(--destructive)]': error,

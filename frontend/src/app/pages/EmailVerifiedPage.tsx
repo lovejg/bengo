@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowRight, CheckCircle2, CircleAlert, Clock } from 'lucide-react';
 import { Button } from '../components/atoms/Button';
+import { getEmailVerificationUrl } from '../api/auth';
+
+const EMAIL_VERIFIED_EVENT_KEY = 'bengo:email-verified';
 
 const statusContent = {
   success: {
@@ -24,18 +27,47 @@ const statusContent = {
   },
 };
 
+function notifyEmailVerified() {
+  const payload = { status: 'success', at: Date.now() };
+
+  try {
+    window.localStorage.setItem(EMAIL_VERIFIED_EVENT_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore storage failures so the verified tab can still move to login.
+  }
+
+  try {
+    const channel = new BroadcastChannel(EMAIL_VERIFIED_EVENT_KEY);
+    channel.postMessage(payload);
+    channel.close();
+  } catch {
+    // BroadcastChannel is optional; localStorage still covers normal browser tabs.
+  }
+}
+
 export function EmailVerifiedPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
   const rawStatus = searchParams.get('status') ?? 'invalid';
   const status = rawStatus in statusContent ? rawStatus as keyof typeof statusContent : 'invalid';
   const content = statusContent[status];
   const Icon = content.icon;
 
   useEffect(() => {
+    if (!token || searchParams.has('status')) {
+      return;
+    }
+
+    window.location.replace(getEmailVerificationUrl(token));
+  }, [searchParams, token]);
+
+  useEffect(() => {
     if (status !== 'success') {
       return;
     }
+
+    notifyEmailVerified();
 
     const timeoutId = window.setTimeout(() => {
       navigate('/login', { replace: true });
@@ -43,6 +75,22 @@ export function EmailVerifiedPage() {
 
     return () => window.clearTimeout(timeoutId);
   }, [navigate, status]);
+
+  if (token && !searchParams.has('status')) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4 py-8 sm:py-12">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <Clock className="h-7 w-7 animate-pulse" aria-hidden="true" />
+          </div>
+          <h1 className="text-xl font-bold text-[var(--foreground)]">이메일 인증 확인 중입니다</h1>
+          <p className="mt-3 text-sm leading-relaxed text-[var(--muted-foreground)]">
+            인증 링크를 확인하고 있어요. 잠시만 기다려주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4 py-8 sm:py-12">

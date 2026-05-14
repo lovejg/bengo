@@ -315,7 +315,7 @@ export function PolicyDetailPage() {
 
         // 연관 정책 로드
         if (response.categories?.length) {
-          const category = response.categories[0] as 'youth_policy' | 'childcare_policy';
+          const category = response.categories[0];
           const related = await getPolicies({ interest: category });
           const filtered = related.items.filter((p) => p.id !== id);
           const shuffled = [...filtered].sort(() => Math.random() - 0.5);
@@ -416,15 +416,14 @@ export function PolicyDetailPage() {
   const rawCriteria = policy?.eligibilityInfo?.selectionCriteria?.trim();
   // 마크다운 기호, 공백, 불릿 제거 후 실제 텍스트가 있을 때만 표시
   const selectionCriteria = rawCriteria && rawCriteria.replace(/[\s\-*•·]/g, '').length > 0 ? rawCriteria : null;
+  const warnBox = policy?.eligibilityInfo?.warnBox?.trim() || null;
 
   const visibleRequirements = (policy?.requirements ?? [])
     .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
     .filter((req) => req.key !== 'selection_criteria' && req.label !== '선정기준');
   const hasRequirements = visibleRequirements.length > 0;
   const completedRequirementCount = visibleRequirements.filter((req) => eligibilityAnswers[req.key]).length;
-  // [임시] UI 확인용 — 아동복지시설 보호아동지원 정책을 info처럼 동작하게 처리 (확인 후 아래 한 줄 제거)
-  const TEMP_INFO_POLICY_ID = 'de99e7da-360c-4071-9899-1d6ded895d60';
-  const isInfoPolicy = policy?.policyType === 'info' || policy?.id === TEMP_INFO_POLICY_ID;
+  const isInfoPolicy = policy?.policyType === 'info';
   const canCheckEligibility = hasRequirements && !isInfoPolicy;
 
   const sections = [
@@ -479,7 +478,7 @@ export function PolicyDetailPage() {
   const responseSourceType = isSourceType(
     eligibilityResult?.policy?.sourceType,
   )
-    ? eligibilityResult.policy.sourceType
+    ? eligibilityResult.policy?.sourceType
     : isSourceType(policy.sourceType)
       ? policy.sourceType
       : null;
@@ -625,6 +624,22 @@ export function PolicyDetailPage() {
                 <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{getTargetText(policy)}</ReactMarkdown>
               </div>
             </motion.section>
+
+            {warnBox && (
+              <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.42 }}
+                className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <div className="prose prose-sm max-w-none text-amber-950">
+                    <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{warnBox}</ReactMarkdown>
+                  </div>
+                </div>
+              </motion.section>
+            )}
 
             {/* Selection Criteria */}
             {selectionCriteria && (
@@ -820,19 +835,19 @@ export function PolicyDetailPage() {
                       );
                     })}
                     <div className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-emerald-900">
                             {visibleRequirements.length}개 중 {completedRequirementCount}개 입력됨
                           </p>
-                          <div className="mt-2 h-1.5 w-full rounded-full bg-emerald-100 sm:w-44">
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-emerald-100">
                             <div
                               className="h-full rounded-full bg-emerald-500 transition-all"
                               style={{ width: `${visibleRequirements.length ? (completedRequirementCount / visibleRequirements.length) * 100 : 0}%` }}
                             />
                           </div>
                         </div>
-                        <div className="flex flex-col gap-2 sm:flex-row">
+                        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                           <Button
                             type="submit"
                             className="h-10 w-full min-w-32 bg-emerald-600 px-6 text-sm hover:bg-emerald-700 sm:w-auto"
@@ -865,7 +880,7 @@ export function PolicyDetailPage() {
                         <p className="text-sm font-semibold text-emerald-900 mb-1">신청 가능합니다 🎉</p>
                         <p className="text-xs text-emerald-700 mb-3">{eligibilityResult.explanation}</p>
                         <Button className="bg-emerald-600 hover:bg-emerald-700 text-xs h-8" size="sm"
-                          onClick={() => window.open(getSourceUrl(eligibilityResult.policy.applicationUrl ?? policy.applicationUrl ?? policy.sourceUrl, policy.title), '_blank', 'noopener,noreferrer')}
+                          onClick={() => window.open(getSourceUrl(eligibilityResult.policy?.applicationUrl ?? policy.applicationUrl ?? policy.sourceUrl, policy.title), '_blank', 'noopener,noreferrer')}
                         >
                           <ExternalLink className="h-3.5 w-3.5 mr-1.5" />신청하러 가기
                         </Button>
@@ -1036,9 +1051,15 @@ export function PolicyDetailPage() {
               >
                 <Button
                   className="w-full gap-2 bg-blue-600 hover:bg-blue-700 shadow-sm"
-                  onClick={() => window.open(getSourceUrl(policy.applicationUrl ?? policy.sourceUrl, policy.title), '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(
+                    isInfoPolicy
+                      ? getSourceUrl(policy.sourceUrl, policy.title)
+                      : getSourceUrl(policy.applicationUrl ?? policy.sourceUrl, policy.title),
+                    '_blank',
+                    'noopener,noreferrer',
+                  )}
                 >
-                  <ExternalLink className="h-4 w-4" />지금 신청하기
+                  <ExternalLink className="h-4 w-4" />{isInfoPolicy ? '원문 보기' : '지금 신청하기'}
                 </Button>
                 <Button variant="ghost" className="w-full gap-2" onClick={handleBookmark} aria-pressed={bookmarked}>
                   <Bookmark className={bookmarked ? 'fill-current' : ''} />

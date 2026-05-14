@@ -11,10 +11,13 @@ import { REGION_OPTIONS } from '../lib/regions';
 import type { Gender, InterestCategory, RegionCode } from '../types';
 
 const CURRENT_YEAR = 2026;
+const MAX_INTERESTS = 2;
 
-const interestOptions: Array<{ value: InterestCategory; label: string; enabled: boolean }> = [
-  { value: 'youth_policy', label: '청년정책', enabled: true },
-  { value: 'childcare_policy', label: '육아정책 (추후 제공)', enabled: false },
+const interestOptions: Array<{ id: string; value?: InterestCategory; label: string }> = [
+  { id: 'youth_policy', value: 'youth_policy', label: '청년정책' },
+  { id: 'childcare_policy', value: 'childcare_policy', label: '육아정책' },
+  { id: 'senior_policy', value: 'senior_policy', label: '노인정책' },
+  { id: 'disability_policy', value: 'disability_policy', label: '장애인정책' },
 ];
 
 export function OnboardingPage() {
@@ -24,7 +27,7 @@ export function OnboardingPage() {
     birthYear: '',
     gender: 'unspecified' as Gender,
     regionCode: 'seoul' as RegionCode,
-    interests: ['youth_policy'] as InterestCategory[],
+    interests: ['youth_policy'],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -58,6 +61,8 @@ export function OnboardingPage() {
 
     if (formData.interests.length === 0) {
       nextErrors.interests = '관심 분야를 1개 이상 선택해주세요';
+    } else if (formData.interests.length > MAX_INTERESTS) {
+      nextErrors.interests = `관심 분야는 최대 ${MAX_INTERESTS}개까지 선택할 수 있습니다`;
     }
 
     setErrors(nextErrors);
@@ -78,7 +83,9 @@ export function OnboardingPage() {
         age: Math.max(0, CURRENT_YEAR - birthYear),
         gender: formData.gender,
         regionCode: formData.regionCode,
-        interests: formData.interests,
+        interests: formData.interests
+          .map((interest) => interestOptions.find((option) => option.id === interest)?.value)
+          .filter(Boolean) as InterestCategory[],
       });
 
       toast.success('프로필이 완성되었습니다.');
@@ -124,11 +131,10 @@ export function OnboardingPage() {
 
           <div>
             <label className="block mb-2">성별</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 ['male', '남성'],
                 ['female', '여성'],
-                ['other', '기타'],
                 ['unspecified', '선택 안 함'],
               ].map(([value, label]) => (
                 <Chip
@@ -161,32 +167,41 @@ export function OnboardingPage() {
 
           <div>
             <label className="block mb-3">관심 분야</label>
+            <p className="mb-3 text-xs text-[var(--muted-foreground)]">최대 {MAX_INTERESTS}개까지 선택할 수 있어요.</p>
             <div className="space-y-2">
               {interestOptions.map((interest) => {
-                const selected = formData.interests.includes(interest.value);
+                const selected = formData.interests.includes(interest.id);
                 return (
                   <button
-                    key={interest.value}
+                    key={interest.id}
                     type="button"
-                    disabled={!interest.enabled}
                     onClick={() => {
-                      if (!interest.enabled) return;
                       setFormData({
                         ...formData,
                         interests: selected
-                          ? formData.interests.filter((item) => item !== interest.value)
-                          : [...formData.interests, interest.value],
+                          ? formData.interests.filter((item) => item !== interest.id)
+                          : formData.interests.length >= MAX_INTERESTS
+                            ? formData.interests
+                            : [...formData.interests, interest.id],
                       });
+                      if (!selected && formData.interests.length >= MAX_INTERESTS) {
+                        setErrors((current) => ({
+                          ...current,
+                          interests: `관심 분야는 최대 ${MAX_INTERESTS}개까지 선택할 수 있습니다`,
+                        }));
+                      } else {
+                        setErrors((current) => ({ ...current, interests: '' }));
+                      }
                     }}
                     className={`w-full rounded-xl border p-4 text-left transition-colors ${
                       selected
                         ? 'border-[var(--accent)] bg-blue-50'
                         : 'border-[var(--border)] hover:bg-[var(--muted)]'
-                    } ${!interest.enabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{interest.label}</span>
-                      {!interest.enabled && <span className="text-xs text-[var(--muted-foreground)]">추후 제공</span>}
+                      <span className="text-xs text-[var(--muted-foreground)]">선택 가능</span>
                     </div>
                   </button>
                 );

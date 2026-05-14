@@ -26,7 +26,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-t border-[var(--border)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-[rgba(8,13,23,0.86)] backdrop-blur-xl border-t border-[var(--border)] dark:border-[var(--border-subtle)] md:hidden"
       aria-label="하단 네비게이션"
     >
       <div className="flex items-stretch h-16">

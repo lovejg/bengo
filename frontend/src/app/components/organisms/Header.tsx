@@ -1,11 +1,12 @@
 import { Link, useLocation } from 'react-router';
-import { ArrowRight, User, LogOut, ChevronDown, LockKeyhole, ShieldAlert } from 'lucide-react';
+import { ArrowRight, User, LogOut, ChevronDown, LockKeyhole, ShieldAlert, Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Button } from '../atoms/Button';
 import { useState, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { NotificationButton } from '../molecules/NotificationButton';
 import { SignupPromptDialog } from '../molecules/SignupPromptDialog';
-import { getAccessToken, getStoredUserProfile, clearAccessToken, clearStoredUserProfile } from '../../api/client';
+import { getAccessToken, getAuthMethod, getStoredUserProfile, clearAccessToken, clearStoredUserProfile } from '../../api/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,29 +18,40 @@ import {
 
 export function Header() {
   const location = useLocation();
+  const { resolvedTheme, setTheme } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isOAuthUser, setIsOAuthUser] = useState(false);
+  const [themeMounted, setThemeMounted] = useState(false);
 
   useEffect(() => {
     const token = getAccessToken();
     const profile = getStoredUserProfile();
     setIsAuthenticated(Boolean(token && profile));
-    setUserName(profile ? profile.email.split('@')[0] : null);
+    setUserName(profile ? profile.displayName || profile.email.split('@')[0] : null);
+    setIsOAuthUser(getAuthMethod() === 'oauth');
   }, [location.pathname]);
+
+  useEffect(() => {
+    setThemeMounted(true);
+  }, []);
 
   const handleLogout = () => {
     clearAccessToken();
     clearStoredUserProfile();
     setIsAuthenticated(false);
     setUserName(null);
+    setIsOAuthUser(false);
   };
 
   const isActive = (path: string) => location.pathname === path;
   const navLinkBaseClass = 'text-[14px] font-medium transition-all duration-200 relative inline-block hover:scale-105';
+  const isDarkTheme = themeMounted && resolvedTheme === 'dark';
+  const themeToggleLabel = isDarkTheme ? '라이트 모드로 전환' : '다크 모드로 전환';
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-[var(--border)]">
-      <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-50 bg-white/80 dark:bg-[rgba(8,13,23,0.78)] backdrop-blur-xl border-b border-[var(--border)] dark:border-[var(--border-subtle)]">
+      <div className="container mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 sm:gap-2.5 hover:opacity-80 transition-opacity group" aria-label="뱅고 홈">
           {/* Bengo Logo */}
           <div className="relative">
@@ -49,7 +61,7 @@ export function Header() {
             <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full"></div>
           </div>
           <div className="flex flex-col">
-            <span className="text-[17px] sm:text-[19px] font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-none">bengo</span>
+            <span className="text-[17px] sm:text-[19px] font-extrabold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 dark:from-[#60A5FA] dark:to-[#A78BFA] bg-clip-text text-transparent leading-none">bengo</span>
             <span className="text-[9px] sm:text-[10px] text-[var(--muted-foreground)] tracking-wide leading-none mt-0.5">benefit + go</span>
           </div>
         </Link>
@@ -105,6 +117,15 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-label={themeToggleLabel}
+            title={themeToggleLabel}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--card)] dark:bg-[rgba(15,23,42,0.6)] text-[var(--foreground)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--accent)] dark:hover:bg-[rgba(30,41,59,0.78)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+            onClick={() => setTheme(isDarkTheme ? 'light' : 'dark')}
+          >
+            {isDarkTheme ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
+          </button>
           {isAuthenticated && (
             <div className="hidden sm:block">
               <NotificationButton />
@@ -128,12 +149,22 @@ export function Header() {
                   <p className="text-xs font-normal text-[var(--muted-foreground)]">계정 메뉴</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2.5">
-                  <Link to="/profile?tab=password">
+                {isOAuthUser ? (
+                  <DropdownMenuItem
+                    disabled
+                    className="cursor-not-allowed rounded-lg px-3 py-2.5"
+                  >
                     <LockKeyhole className="h-4 w-4" aria-hidden="true" />
                     비밀번호 변경
-                  </Link>
-                </DropdownMenuItem>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2.5">
+                    <Link to="/profile?tab=password">
+                      <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                      비밀번호 변경
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild className="cursor-pointer rounded-lg px-3 py-2.5">
                   <Link to="/profile?tab=withdraw">
                     <ShieldAlert className="h-4 w-4" aria-hidden="true" />

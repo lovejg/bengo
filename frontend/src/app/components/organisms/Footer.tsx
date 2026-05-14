@@ -2,7 +2,7 @@ import { ArrowRight } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--border)] bg-white mt-auto">
+    <footer className="border-t border-[var(--border)] dark:border-[var(--border-subtle)] bg-white dark:bg-[#070B12] mt-auto">
       <div className="container mx-auto px-4 sm:px-6 py-12">
         <div className="flex flex-col md:flex-row justify-between items-start gap-8">
           <div className="flex flex-col gap-4">
