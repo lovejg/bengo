@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   buildOAuthUserProfile,
   setAccessToken,
+  setAuthMethod,
   setStoredUserProfile,
 } from '../api/client';
 
@@ -30,6 +31,7 @@ export function OAuthCallbackPage() {
     }
 
     setAccessToken(token);
+    setAuthMethod('oauth');
     setStoredUserProfile(profile);
 
     if (!profileCompleted) {

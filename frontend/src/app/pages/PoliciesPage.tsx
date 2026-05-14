@@ -3,7 +3,7 @@ import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
-import { getPolicies } from '../api/policies';
+import { getPolicies, getPoliciesRecommended } from '../api/policies';
 import { ApiClientError, getAccessToken, getStoredUserProfile } from '../api/client';
 import { MainLayout } from '../components/templates/MainLayout';
 import { SearchBar } from '../components/molecules/SearchBar';
@@ -14,7 +14,7 @@ import { ExpandableFilters, ExpandableFiltersState } from '../components/organis
 import { EmptyState } from '../components/molecules/EmptyState';
 import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
 import { Button } from '../components/atoms/Button';
-import type { PolicyListItem, RegionCode } from '../types';
+import type { InterestCategory, PolicyListItem, RegionCode } from '../types';
 import { REGION_LABELS } from '../lib/regions';
 
 const PAGE_SIZE = 12;
@@ -39,8 +39,16 @@ const TEMP_VISIBILITY_TEST_LABELS: Record<string, string> = Object.fromEntries(
 const CATEGORY_LABELS: Record<string, string> = {
   youth_policy: '청년정책',
   childcare_policy: '육아정책',
+  senior_policy: '노인정책',
+  disability_policy: '장애인정책',
   ...TEMP_VISIBILITY_TEST_LABELS,
 };
+const SUPPORTED_CATEGORY_FILTERS = [
+  'youth_policy',
+  'childcare_policy',
+  'senior_policy',
+  'disability_policy',
+] as const;
 const FILTER_REGION_LABELS: Record<string, string> = { ...REGION_LABELS, ...TEMP_VISIBILITY_TEST_LABELS };
 const AGE_LABELS: Record<string, string> = {
   '19-24': '19-24세', '25-29': '25-29세', '30-34': '30-34세',
@@ -52,7 +60,6 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
 };
 type StatusFilter = 'recruiting' | 'always' | 'period_raw' | 'unknown';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const SORT_OPTIONS = new Set<SortOption>(['latest', 'deadline', 'recommended']);
 
 function getSortOption(value: string | null): SortOption {
@@ -98,54 +105,9 @@ function sortPoliciesByDeadline(policies: PolicyListItem[], now = Date.now()) {
   });
 }
 
-function stableExplorationOffset(id: string) {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) % 997;
-  }
-  return (hash % 17) / 10;
-}
-
-function getRecommendedScore(policy: PolicyListItem) {
-  const user = getStoredUserProfile();
-  if (!user) return 0;
-
-  let score = 0;
-  if (policy.categories.some((category) => user.interests.includes(category))) score += 42;
-  if (user.regionCode && policy.regionCodes.includes(user.regionCode)) score += 26;
-  if (
-    user.age !== null &&
-    (policy.minAge === null || user.age >= policy.minAge) &&
-    (policy.maxAge === null || user.age <= policy.maxAge)
-  ) {
-    score += 22;
-  }
-
-  const deadlineRank = getDeadlineRank(policy);
-  if (deadlineRank === 0) score += 8;
-  else if (deadlineRank === 1) score += 5;
-  else if (deadlineRank === 2) score += 2;
-  else if (deadlineRank === 4) score -= 20;
-
-  const deadline = getTime(policy.endsAt);
-  if (deadline && deadline > Date.now()) {
-    score += Math.max(0, 4 - Math.floor((deadline - Date.now()) / (30 * DAY_MS)));
-  }
-
-  return score + stableExplorationOffset(policy.id);
-}
-
-function sortPoliciesByRecommended(policies: PolicyListItem[]) {
-  return [...policies].sort((a, b) => {
-    const scoreDiff = getRecommendedScore(b) - getRecommendedScore(a);
-    if (scoreDiff !== 0) return scoreDiff;
-    return a.title.localeCompare(b.title, 'ko');
-  });
-}
-
 function sortPoliciesForView(policies: PolicyListItem[], sortBy: SortOption) {
   if (sortBy === 'deadline') return sortPoliciesByDeadline(policies);
-  if (sortBy === 'recommended') return sortPoliciesByRecommended(policies);
+  if (sortBy === 'recommended') return policies;
   return sortPoliciesByLatest(policies);
 }
 
@@ -262,14 +224,23 @@ export function PoliciesPage() {
       try {
         const rawRegion = committedFilters.regions.find((r) => r !== 'all');
         const selectedRegion = rawRegion ? (rawRegion as RegionCode) : undefined;
-        const selectedInterest = committedFilters.categories[0] as 'youth_policy' | 'childcare_policy' | undefined;
-        const apiSortBy = sortBy === 'recommended' ? 'latest' : sortBy;
-        const response = await getPolicies({
+        const selectedInterests = committedFilters.categories.filter(
+          (category): category is InterestCategory =>
+            SUPPORTED_CATEGORY_FILTERS.includes(category as typeof SUPPORTED_CATEGORY_FILTERS[number]),
+        );
+        const shouldUseRecommended = isAuthenticated && sortBy === 'recommended';
+        const apiSortBy = shouldUseRecommended
+          ? 'relevance'
+          : sortBy === 'recommended'
+            ? 'latest'
+            : sortBy;
+        const response = await (shouldUseRecommended ? getPoliciesRecommended : getPolicies)({
           search: searchQuery || undefined,
           sortBy: apiSortBy,
           order: 'desc',
           regionCode: selectedRegion,
-          interest: selectedInterest,
+          interests: selectedInterests.length > 0 ? selectedInterests : undefined,
+          onlyAvailable: shouldUseRecommended ? true : undefined,
         });
         setPolicies(response.items);
       } catch (error) {
@@ -281,7 +252,7 @@ export function PoliciesPage() {
       }
     };
     loadPolicies();
-  }, [searchQuery, sortBy, committedFilters, reloadKey]);
+  }, [searchQuery, sortBy, committedFilters, isAuthenticated, reloadKey]);
 
   useEffect(() => {
     if (!isAuthenticated && sortParam === 'recommended') {
@@ -366,13 +337,13 @@ export function PoliciesPage() {
       if (statusFilter === 'unknown') return !p.isAlwaysOpen && !p.endsAt && !p.periodRaw;
       return true;
       })
-      .filter(p => !typeFilter || (p as any).policyType === typeFilter),
+      .filter(p => !typeFilter || p.policyType === typeFilter),
     sortBy,
   );
 
   return (
     <MainLayout>
-      <div className="bg-white/80 backdrop-blur-sm border-b border-[var(--border)] md:sticky md:top-16 md:z-40 shadow-sm">
+      <div data-page="policies" className="bg-white/80 dark:bg-[rgba(8,13,23,0.78)] backdrop-blur-xl border-b border-[var(--border)] dark:border-[var(--border-subtle)] md:sticky md:top-[68px] md:z-40 shadow-sm dark:shadow-none">
         <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 md:py-6 space-y-3 md:space-y-4">
           {/* Title + Stats */}
           {!isLoading && !hasError && policies.length > 0 && (
@@ -488,7 +459,7 @@ export function PoliciesPage() {
       </div>
 
       {/* Results */}
-      <div className="container mx-auto px-4 py-8">
+      <div data-page="policies" className="container mx-auto px-4 py-8">
         {!isLoading && !hasError && policies.length > 0 && (
           <div className="mb-6">
             <p className="text-[var(--muted-foreground)]">

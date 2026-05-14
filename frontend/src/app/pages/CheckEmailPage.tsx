@@ -1,10 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { ArrowRight, MailCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, MailCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { resendVerification } from '../api/auth';
 import { ApiClientError, getStoredUserProfile } from '../api/client';
 import { Button } from '../components/atoms/Button';
+
+const EMAIL_VERIFIED_EVENT_KEY = 'bengo:email-verified';
+
+type EmailVerificationMessage = {
+  status?: string;
+};
+
+function parseEmailVerificationMessage(value: unknown): EmailVerificationMessage | null {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as EmailVerificationMessage;
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof value === 'object' && 'status' in value) {
+    return value as EmailVerificationMessage;
+  }
+
+  return null;
+}
 
 export function CheckEmailPage() {
   const navigate = useNavigate();
@@ -12,8 +38,67 @@ export function CheckEmailPage() {
   const storedUser = getStoredUserProfile();
   const email = searchParams.get('email') ?? storedUser?.email ?? '';
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [verified, setVerified] = useState(false);
+
+  useEffect(() => {
+    if (cooldown <= 0) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timerId);
+  }, [cooldown]);
+
+  useEffect(() => {
+    let handled = false;
+
+    const handleVerified = () => {
+      if (handled) {
+        return;
+      }
+
+      handled = true;
+      setVerified(true);
+      toast.success('이메일 인증이 완료되었습니다. 인증 탭에서 로그인해주세요.');
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      const message = parseEmailVerificationMessage(event.newValue);
+      if (event.key === EMAIL_VERIFIED_EVENT_KEY && message?.status === 'success') {
+        handleVerified();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel(EMAIL_VERIFIED_EVENT_KEY);
+      channel.onmessage = (event) => {
+        const message = parseEmailVerificationMessage(event.data);
+        if (message?.status === 'success') {
+          handleVerified();
+        }
+      };
+    } catch {
+      channel = null;
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      channel?.close();
+    };
+  }, []);
 
   const handleResend = async () => {
+    if (cooldown > 0) {
+      return;
+    }
+
     if (!email) {
       toast.error('이메일 정보가 없습니다. 다시 회원가입 또는 로그인해주세요.');
       return;
@@ -22,6 +107,7 @@ export function CheckEmailPage() {
     setLoading(true);
     try {
       await resendVerification(email);
+      setCooldown(60);
       toast.success('인증 메일을 다시 보냈습니다.');
     } catch (error) {
       const message = error instanceof ApiClientError ? error.message : '인증 메일 재발송에 실패했습니다.';
@@ -50,23 +136,50 @@ export function CheckEmailPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-[var(--accent)]">
-            <MailCheck className="h-7 w-7" aria-hidden="true" />
+          <div className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl ${verified ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-[var(--accent)]'}`}>
+            {verified ? <CheckCircle2 className="h-7 w-7" aria-hidden="true" /> : <MailCheck className="h-7 w-7" aria-hidden="true" />}
           </div>
-          <h1 className="text-xl font-bold text-[var(--foreground)]">인증 메일을 확인해주세요</h1>
+          <h1 className="text-xl font-bold text-[var(--foreground)]">
+            {verified ? '이메일 인증이 완료되었습니다' : '이메일 인증이 필요합니다'}
+          </h1>
           <p className="mt-3 text-sm leading-relaxed text-[var(--muted-foreground)]">
-            {email ? <><span className="font-medium text-[var(--foreground)]">{email}</span>로 인증 링크를 보냈습니다.</> : '가입한 이메일로 인증 링크를 보냈습니다.'}
-            <br />
-            링크를 눌러야 자격확인, 정책 저장, MY 기능을 이용할 수 있어요.
+            {verified ? (
+              <>
+                메일 링크로 열린 탭에서 로그인 화면으로 이동합니다.
+                <br />
+                이 탭은 닫아도 됩니다.
+              </>
+            ) : (
+              <>
+                {email ? <><span className="font-medium text-[var(--foreground)]">{email}</span>로 인증 링크를 보냈습니다.</> : '가입한 이메일로 인증 링크를 보냈습니다.'}
+                <br />
+                메일의 인증 링크를 눌러야 회원가입이 완료됩니다.
+              </>
+            )}
           </p>
 
           <div className="mt-7 space-y-3">
-            <Button type="button" className="w-full" onClick={() => navigate('/login')}>
-              로그인하러 가기
-            </Button>
-            <Button type="button" variant="secondary" className="w-full" loading={loading} onClick={handleResend}>
-              인증 메일 재발송
-            </Button>
+            {verified ? (
+              <Button type="button" className="w-full" onClick={() => navigate('/login')}>
+                로그인하기
+              </Button>
+            ) : (
+              <>
+                <Button type="button" className="w-full" onClick={() => navigate('/login')}>
+                  인증 후 로그인하기
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  loading={loading}
+                  disabled={cooldown > 0}
+                  onClick={handleResend}
+                >
+                  {cooldown > 0 ? `인증 메일 재발송 ${cooldown}초` : '인증 메일 재발송'}
+                </Button>
+              </>
+            )}
             <Link to="/policies" className="block text-sm text-[var(--muted-foreground)] hover:text-[var(--accent)]">
               가입 없이 정책 둘러보기
             </Link>

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowRight, MapPin, User as UserIcon, LogIn, Gift } from 'lucide-react';
 import { toast } from 'sonner';
+import { updateProfile } from '../api/auth';
 import { getPoliciesRecommended } from '../api/policies';
-import { ApiClientError, getAccessToken, getEmailVerificationPath, getStoredUserProfile, setStoredUserProfile } from '../api/client';
+import { ApiClientError, getAccessToken, getEmailVerificationPath, getStoredUserProfile } from '../api/client';
 import { MainLayout } from '../components/templates/MainLayout';
 import { PolicyList } from '../components/organisms/PolicyList';
 import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
@@ -57,7 +58,7 @@ export function PersonalizedPoliciesPage() {
 
       try {
         const response = await getPoliciesRecommended({
-          interest: currentUser.interests.length > 0 ? currentUser.interests[0] : undefined,
+          interests: currentUser.interests.length > 0 ? currentUser.interests : undefined,
           sortBy: 'relevance',
           order: 'desc',
           onlyAvailable: true,
@@ -84,9 +85,9 @@ export function PersonalizedPoliciesPage() {
   if (!isLoading && !isAuthenticated) {
     return (
       <MainLayout>
-        <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-blue-50/50 to-white flex items-center justify-center px-4 py-12">
+        <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-blue-50/50 to-white dark:bg-none dark:bg-[var(--bg-main)] flex items-center justify-center px-4 py-12">
           <div className="max-w-lg w-full">
-            <div className="bg-white rounded-2xl shadow-xl shadow-blue-500/10 p-8 md:p-12 text-center border border-[var(--border)]">
+            <div className="bg-white dark:bg-[rgba(15,23,42,0.72)] dark:backdrop-blur-xl rounded-2xl shadow-xl shadow-blue-500/10 dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)] p-8 md:p-12 text-center border border-[var(--border)] dark:border-[var(--border-default)]">
               <div className="relative inline-flex items-center justify-center mb-8">
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
                   <Gift className="h-10 w-10 text-[var(--accent)]" />
@@ -103,10 +104,10 @@ export function PersonalizedPoliciesPage() {
                 맞춤형 정책만 모아서 제공해드립니다
               </p>
 
-              <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 mb-8 space-y-4">
+              <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:bg-none dark:bg-[rgba(15,23,42,0.5)] dark:border dark:border-[var(--border-subtle)] rounded-xl p-6 mb-8 space-y-4">
                 <div className="flex items-start gap-3 text-left">
-                  <div className="p-2.5 bg-white rounded-xl shadow-sm">
-                    <UserIcon className="h-5 w-5 text-[var(--accent)]" />
+                  <div className="p-2.5 bg-white dark:bg-[rgba(15,23,42,0.7)] dark:border dark:border-[var(--border-subtle)] rounded-xl shadow-sm">
+                    <UserIcon className="h-5 w-5 text-[var(--accent)] dark:text-[#93C5FD]" />
                   </div>
                   <div>
                     <p className="font-medium mb-1 text-sm">개인화된 정책 추천</p>
@@ -116,8 +117,8 @@ export function PersonalizedPoliciesPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3 text-left">
-                  <div className="p-2.5 bg-white rounded-xl shadow-sm">
-                    <MapPin className="h-5 w-5 text-[var(--accent)]" />
+                  <div className="p-2.5 bg-white dark:bg-[rgba(15,23,42,0.7)] dark:border dark:border-[var(--border-subtle)] rounded-xl shadow-sm">
+                    <MapPin className="h-5 w-5 text-[var(--accent)] dark:text-[#93C5FD]" />
                   </div>
                   <div>
                     <p className="font-medium mb-1 text-sm">지역별 맞춤 정책</p>
@@ -160,13 +161,21 @@ export function PersonalizedPoliciesPage() {
 
   return (
     <MainLayout>
-      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-b border-blue-100 py-8 sm:py-10 md:py-12">
-        <div className="container mx-auto px-4">
+      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border-b border-blue-100 dark:bg-none dark:bg-[var(--bg-main)] dark:border-[var(--border-subtle)] py-10 sm:py-12 md:py-14 relative">
+        <div
+          aria-hidden="true"
+          className="hidden dark:block absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 18% 30%, rgba(59,130,246,0.10), transparent 38%), radial-gradient(circle at 82% 60%, rgba(139,92,246,0.10), transparent 42%)',
+          }}
+        ></div>
+        <div className="container mx-auto px-4 max-w-[1200px] relative">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 lg:gap-8 items-start">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="p-2 bg-white rounded-xl shadow-sm">
-                  <Gift className="h-5 w-5 text-[var(--accent)]" />
+                <div className="p-2 bg-white dark:bg-[rgba(15,23,42,0.7)] dark:border dark:border-[var(--border-subtle)] rounded-xl shadow-sm">
+                  <Gift className="h-5 w-5 text-[var(--accent)] dark:text-[#93C5FD]" />
                 </div>
                 <span className="text-sm font-medium text-[var(--muted-foreground)]">맞춤정책</span>
               </div>
@@ -203,25 +212,38 @@ export function PersonalizedPoliciesPage() {
                     return;
                   }
 
-                  const nextUser = { ...storedUser };
-                  if (field === 'age') {
-                    nextUser.age = Number(value) || storedUser.age;
-                  } else if (field === 'region') {
-                    const code = REGION_CODE_BY_LABEL[value];
-                    if (code) {
-                      nextUser.regionCode = code as typeof storedUser.regionCode;
-                    }
-                  } else if (field === 'interests') {
+                  void (async () => {
                     try {
-                      nextUser.interests = JSON.parse(value) as typeof storedUser.interests;
-                    } catch {
-                      return;
-                    }
-                  }
+                      if (field === 'age') {
+                        const age = Number(value);
+                        if (!Number.isInteger(age) || age < 14 || age > 120) {
+                          toast.error('나이는 14세 이상 120세 이하로 입력해주세요.');
+                          return;
+                        }
+                        await updateProfile({ age });
+                      } else if (field === 'region') {
+                        const code = REGION_CODE_BY_LABEL[value];
+                        if (!code) {
+                          toast.error('지역 정보를 확인할 수 없습니다.');
+                          return;
+                        }
+                        await updateProfile({ regionCode: code as NonNullable<typeof storedUser.regionCode> });
+                      } else if (field === 'interests') {
+                        const interests = JSON.parse(value) as typeof storedUser.interests;
+                        if (!Array.isArray(interests) || interests.length === 0) {
+                          toast.error('관심사를 1개 이상 선택해주세요.');
+                          return;
+                        }
+                        await updateProfile({ interests });
+                      }
 
-                  setStoredUserProfile(nextUser);
-                  toast.success('프로필이 업데이트되었습니다.');
-                  setReloadKey((current) => current + 1);
+                      toast.success('프로필이 업데이트되었습니다.');
+                      setReloadKey((current) => current + 1);
+                    } catch (error) {
+                      const message = error instanceof ApiClientError ? error.message : '프로필 업데이트에 실패했습니다.';
+                      toast.error(message);
+                    }
+                  })();
                 }}
               />
             </div>
@@ -230,15 +252,15 @@ export function PersonalizedPoliciesPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-blue-50/50 border border-blue-200/50 rounded-xl p-4 mb-8 flex items-start gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Gift className="h-4 w-4 text-blue-600 flex-shrink-0" />
+        <div className="bg-blue-50/50 border border-blue-200/50 dark:bg-[rgba(59,130,246,0.08)] dark:border-[rgba(96,165,250,0.20)] rounded-xl p-3.5 mb-8 flex items-start gap-3">
+          <div className="p-2 bg-blue-100 dark:bg-[rgba(96,165,250,0.16)] rounded-lg">
+            <Gift className="h-4 w-4 text-blue-600 dark:text-[#93C5FD] flex-shrink-0" />
           </div>
           <div className="text-sm">
-            <p className="text-blue-900 font-medium mb-1">이 정책들을 확인해보세요!</p>
-            <p className="text-blue-700">
+            <p className="text-blue-900 dark:text-[var(--text-primary)] font-medium mb-1">이 정책들을 확인해보세요!</p>
+            <p className="text-blue-700 dark:text-[var(--text-secondary)]">
               회원님의 연령과 지역 조건에 맞는 정책만 선별했습니다.
-              <Link to="/me" className="underline ml-1 hover:text-blue-900 font-medium">
+              <Link to="/me" className="underline ml-1 hover:text-blue-900 dark:hover:text-white font-medium">
                 프로필을 수정
               </Link>
               하면 더 정확한 추천을 받을 수 있습니다.
@@ -259,7 +281,7 @@ export function PersonalizedPoliciesPage() {
         )}
 
         {!isLoading && !hasError && personalizedPolicies.length === 0 && (
-          <div className="bg-white rounded-xl p-12 text-center">
+          <div className="bg-white dark:bg-transparent dark:border dark:border-dashed dark:border-[rgba(148,163,184,0.22)] rounded-2xl px-6 py-10 text-center max-w-lg mx-auto">
             <Gift className="h-12 w-12 text-[var(--muted-foreground)] mx-auto mb-4" />
             <h3 className="mb-2">현재 조건에 맞는 정책이 없습니다</h3>
             <p className="text-[var(--muted-foreground)] mb-6">

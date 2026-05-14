@@ -1,4 +1,4 @@
-export type Gender = 'male' | 'female' | 'other' | 'unspecified';
+export type Gender = 'male' | 'female' | 'unspecified';
 
 export type RegionCode =
   | 'seoul'
@@ -28,7 +28,11 @@ export type RegionCode =
   | 'seoul_jung'
   | 'seoul_jungnang';
 
-export type InterestCategory = 'youth_policy' | 'childcare_policy';
+export type InterestCategory =
+  | 'youth_policy'
+  | 'childcare_policy'
+  | 'senior_policy'
+  | 'disability_policy';
 
 export interface UserProfileSummary {
   userId: string;
@@ -56,6 +60,23 @@ export interface CompleteProfileRequest {
   gender: Gender;
   regionCode: RegionCode;
   interests: InterestCategory[];
+}
+
+export interface UpdateProfileRequest {
+  age?: number;
+  gender?: Gender;
+  regionCode?: RegionCode;
+  interests?: InterestCategory[];
+  displayName?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface DeleteAccountRequest {
+  password?: string;
 }
 
 export interface LoginRequest {

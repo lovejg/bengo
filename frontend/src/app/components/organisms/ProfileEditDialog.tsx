@@ -22,10 +22,13 @@ interface ProfileEditDialogProps {
 }
 
 const REGION_OPTIONS = ['서울'];
+const MAX_INTERESTS = 2;
 
 const INTEREST_OPTIONS = [
   { value: 'youth_policy', label: '청년정책' },
-  { value: 'childcare_policy', label: '육아/보육정책' },
+  { value: 'childcare_policy', label: '육아정책' },
+  { value: 'senior_policy', label: '노인정책' },
+  { value: 'disability_policy', label: '장애인정책' },
 ];
 
 const fieldConfig = {
@@ -69,13 +72,19 @@ export function ProfileEditDialog({
     setSelectedInterests((prev) =>
       prev.includes(interestValue)
         ? prev.filter((i) => i !== interestValue)
+        : prev.length >= MAX_INTERESTS
+        ? prev
         : [...prev, interestValue],
     );
   };
 
   const handleSave = () => {
     if (field === 'interests') {
-      onSave(JSON.stringify(selectedInterests));
+      onSave(JSON.stringify(
+        selectedInterests
+          .filter((interest) => INTEREST_OPTIONS.some((option) => option.value === interest))
+          .slice(0, MAX_INTERESTS),
+      ));
     } else {
       onSave(value);
     }
@@ -126,6 +135,7 @@ export function ProfileEditDialog({
 
             {field === 'interests' && (
               <div className="flex flex-col gap-2">
+                <p className="text-xs text-[var(--muted-foreground)]">최대 {MAX_INTERESTS}개까지 선택할 수 있어요.</p>
                 {INTEREST_OPTIONS.map((option) => {
                   const isSelected = selectedInterests.includes(option.value);
                   return (
@@ -152,7 +162,8 @@ export function ProfileEditDialog({
                           </svg>
                         )}
                       </div>
-                      {option.label}
+                      <span className="flex-1">{option.label}</span>
+                      <span className="text-xs text-[var(--muted-foreground)]">선택 가능</span>
                     </button>
                   );
                 })}
