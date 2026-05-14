@@ -46,11 +46,12 @@ export function LoginPage() {
           email: formData.email,
           password: formData.password,
         });
-        toast.success('로그인 성공!');
         if (!response.user.emailVerified) {
+          toast.info('이메일 인증 후 로그인할 수 있습니다.');
           navigate(getEmailVerificationPath(response.user.email));
           return;
         }
+        toast.success('로그인 성공!');
         navigate(response.user.profileCompleted ? '/policies' : '/onboarding');
       } catch (error) {
         const message = error instanceof ApiClientError ? error.message : '로그인에 실패했습니다';

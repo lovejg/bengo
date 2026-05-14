@@ -40,6 +40,8 @@ const TEMP_VISIBILITY_TEST_OPTIONS = Array.from({ length: 7 }, (_, index) => {
 const categoryOptions = [
   { id: 'youth_policy', label: '청년정책' },
   { id: 'childcare_policy', label: '육아정책' },
+  { id: 'senior_policy', label: '노인정책' },
+  { id: 'disability_policy', label: '장애인정책' },
   ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 

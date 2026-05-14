@@ -15,12 +15,21 @@ export function HomePage() {
     <MainLayout>
       <div ref={containerRef}>
         {/* Hero Section */}
-        <section className="min-h-[90vh] flex items-center justify-center bg-gradient-to-b from-slate-50 to-white relative overflow-hidden px-4 pt-20 pb-16">
+        <section className="min-h-[90vh] flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:bg-none dark:bg-[var(--bg-hero)] relative overflow-hidden px-4 pt-20 pb-16">
+          {/* Dark-mode radial glow */}
+          <div
+            aria-hidden="true"
+            className="hidden dark:block absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle at 50% 28%, rgba(59,130,246,0.18), transparent 38%), radial-gradient(circle at 50% 44%, rgba(139,92,246,0.14), transparent 42%)',
+            }}
+          ></div>
           {/* CSS Grid Pattern Background */}
-          <div className="absolute inset-0 opacity-[0.4]" style={{
+          <div className="absolute inset-0 opacity-[0.4] dark:opacity-[0.18]" style={{
             backgroundImage: `
-              linear-gradient(to right, rgb(226, 232, 240) 1px, transparent 1px),
-              linear-gradient(to bottom, rgb(226, 232, 240) 1px, transparent 1px)
+              linear-gradient(to right, color-mix(in srgb, var(--muted-foreground) 24%, transparent) 1px, transparent 1px),
+              linear-gradient(to bottom, color-mix(in srgb, var(--muted-foreground) 24%, transparent) 1px, transparent 1px)
             `,
             backgroundSize: '40px 40px'
           }}></div>
@@ -168,7 +177,7 @@ export function HomePage() {
         </section>
 
         {/* Feature 1: 검색 */}
-        <section className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden py-20">
+        <section className="min-h-screen flex items-center justify-center bg-white dark:bg-[#080E18] relative overflow-hidden py-20">
           <div className="container mx-auto max-w-6xl px-4">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               <motion.div
@@ -302,7 +311,7 @@ export function HomePage() {
         </section>
 
         {/* Feature 2: 자격 확인 */}
-        <section className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden py-20">
+        <section className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0A101B] relative overflow-hidden py-20">
           <div className="container mx-auto max-w-6xl px-4">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               <motion.div
@@ -428,7 +437,7 @@ export function HomePage() {
         </section>
 
         {/* Feature 3: 저장 & 알림 */}
-        <section className="min-h-screen flex items-center justify-center bg-white relative overflow-hidden py-20">
+        <section className="min-h-screen flex items-center justify-center bg-white dark:bg-[#080E18] relative overflow-hidden py-20">
           <div className="container mx-auto max-w-6xl px-4">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               <motion.div
@@ -473,20 +482,20 @@ export function HomePage() {
                 className="relative"
               >
                 {/* Mock UI - MY 페이지 / 저장한 정책 (MyPage 히어로 최대한 반영) */}
-                <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 h-[480px] flex flex-col">
+                <div className="bg-gradient-to-br from-slate-50 to-white dark:bg-none dark:bg-[#0F172A] rounded-2xl shadow-2xl dark:shadow-[0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden border border-gray-200 dark:border-[var(--border-default)] h-[480px] flex flex-col">
                   {/* Browser chrome */}
-                  <div className="bg-white px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+                  <div className="bg-white dark:bg-[#0A101B] px-4 py-3 border-b border-gray-200 dark:border-[var(--border-default)] flex items-center gap-2">
                     <div className="flex gap-1.5">
                       <div className="w-3 h-3 rounded-full bg-red-400"></div>
                       <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                       <div className="w-3 h-3 rounded-full bg-green-400"></div>
                     </div>
-                    <div className="bg-gray-100 rounded px-3 py-1 text-xs text-gray-500 ml-2">bengo.com/me</div>
+                    <div className="bg-gray-100 dark:bg-[var(--surface-2)] rounded px-3 py-1 text-xs text-gray-500 dark:text-[var(--text-muted)] ml-2">bengo.com/me</div>
                   </div>
 
                   {/* MY 페이지 히어로 (실제 MyPage.tsx 3열 구조 재현) */}
-                  <div className="bg-gradient-to-b from-blue-50 to-white px-3 py-3">
-                    <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-100 rounded-xl shadow-sm p-2.5">
+                  <div className="bg-gradient-to-b from-blue-50 to-white dark:bg-none dark:bg-[var(--bg-main)] px-3 py-3">
+                    <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-100 shadow-sm dark:bg-none dark:bg-[rgba(15,23,42,0.72)] dark:border-[var(--border-default)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.25)] dark:backdrop-blur-xl rounded-xl p-2.5">
                       <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.35fr)_auto] gap-2 items-center">
                         {/* Col 1: 프로필 */}
                         <div className="flex items-start gap-2">
@@ -507,17 +516,17 @@ export function HomePage() {
 
                         {/* Col 2: 통계 3박스 */}
                         <div className="grid grid-cols-3 gap-1">
-                          <div className="bg-white/70 border border-white/80 rounded-lg px-1.5 py-1 shadow-sm">
+                          <div className="bg-white/70 dark:bg-[rgba(15,23,42,0.58)] backdrop-blur-sm border border-white/80 dark:border-[var(--border-default)] rounded-lg px-1.5 py-1 shadow-sm">
                             <div className="text-[8px] font-medium text-gray-500 leading-tight">저장한 정책</div>
                             <div className="text-[14px] font-semibold text-gray-900 leading-tight mt-0.5">4</div>
                             <div className="text-[7.5px] text-gray-400 leading-tight mt-0.5">전체 저장</div>
                           </div>
-                          <div className="bg-white/70 border border-white/80 rounded-lg px-1.5 py-1 shadow-sm">
+                          <div className="bg-white/70 dark:bg-[rgba(15,23,42,0.58)] backdrop-blur-sm border border-white/80 dark:border-[var(--border-default)] rounded-lg px-1.5 py-1 shadow-sm">
                             <div className="text-[8px] font-medium text-gray-500 leading-tight">모집중</div>
                             <div className="text-[14px] font-semibold text-emerald-600 leading-tight mt-0.5">4</div>
                             <div className="text-[7.5px] text-gray-400 leading-tight mt-0.5">신청 가능</div>
                           </div>
-                          <div className="bg-white/70 border border-white/80 rounded-lg px-1.5 py-1 shadow-sm">
+                          <div className="bg-white/70 dark:bg-[rgba(15,23,42,0.58)] backdrop-blur-sm border border-white/80 dark:border-[var(--border-default)] rounded-lg px-1.5 py-1 shadow-sm">
                             <div className="text-[8px] font-medium text-gray-500 leading-tight">관심사</div>
                             <div className="mt-1">
                               <span className="inline-block text-[8px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 leading-tight">청년정책</span>
@@ -526,7 +535,7 @@ export function HomePage() {
                         </div>
 
                         {/* Col 3: 링 + 프로필 수정 */}
-                        <div className="bg-white/75 border border-white/80 rounded-lg p-1.5 shadow-sm flex flex-col justify-between min-w-[96px]">
+                        <div className="bg-white/75 dark:bg-[rgba(15,23,42,0.62)] backdrop-blur-sm border border-white/80 dark:border-[var(--border-default)] rounded-lg p-1.5 shadow-sm flex flex-col justify-between min-w-[96px]">
                           <div className="flex items-center gap-1.5">
                             <div className="relative h-9 w-9 flex-shrink-0">
                               <svg className="h-9 w-9 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
@@ -555,8 +564,8 @@ export function HomePage() {
                             </div>
                             <div className="text-[9px] font-semibold text-gray-700 leading-tight">프로필<br />완성도</div>
                           </div>
-                          <div className="mt-1.5 pt-1.5 border-t border-blue-100/80">
-                            <div className="flex items-center justify-center gap-1 bg-white border border-gray-200 rounded text-[9px] text-gray-700 font-medium py-1 px-1.5">
+                          <div className="mt-1.5 pt-1.5 border-t border-blue-100/80 dark:border-[var(--border-subtle)]">
+                            <div className="flex items-center justify-center gap-1 bg-white dark:bg-[rgba(15,23,42,0.58)] border border-gray-200 dark:border-[var(--border-default)] rounded text-[9px] text-gray-700 dark:text-[var(--text-secondary)] font-medium py-1 px-1.5">
                               <Edit className="h-2 w-2" />
                               <span>프로필 수정</span>
                             </div>
@@ -567,11 +576,11 @@ export function HomePage() {
                   </div>
 
                   {/* 상태 탭 (전체 / 예정 / 모집중 / 마감) */}
-                  <div className="bg-white mx-3 mb-2 rounded-xl px-1.5 py-1.5 flex items-center gap-1 border border-gray-100">
+                  <div className="bg-white dark:bg-[rgba(15,23,42,0.6)] mx-3 mb-2 rounded-xl px-1.5 py-1.5 flex items-center gap-1 border border-gray-100 dark:border-[var(--border-subtle)]">
                     <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg bg-[var(--accent)] text-white">전체</div>
-                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600">예정</div>
-                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600">모집중</div>
-                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600">마감</div>
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600 dark:text-[var(--text-muted)]">예정</div>
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600 dark:text-[var(--text-muted)]">모집중</div>
+                    <div className="text-[10px] font-medium px-2.5 py-1 rounded-lg text-gray-600 dark:text-[var(--text-muted)]">마감</div>
                   </div>
 
                   {/* 저장 카드 리스트 — 2열 그리드, D-7 이하는 빨간 테두리 + 우측 상단 D-N */}
@@ -584,12 +593,12 @@ export function HomePage() {
                         { status: 'recruiting' as const, daysLeft: 18, deadline: '2026.05.10', title: '청년 전세보증금 대출', org: 'LH' },
                       ].map((item, i) => {
                         const urgent = item.daysLeft !== null && item.daysLeft <= 7;
-                        const bgClass = item.status === 'recruiting' ? 'bg-emerald-50/40' : 'bg-blue-50/40';
+                        const bgClass = item.status === 'recruiting' ? 'bg-emerald-50/40 dark:bg-[rgba(15,23,42,0.72)]' : 'bg-blue-50/40 dark:bg-[rgba(15,23,42,0.72)]';
                         const borderClass = urgent
-                          ? 'border-red-500'
+                          ? 'border-red-500 dark:border-[rgba(248,113,113,0.45)]'
                           : item.status === 'recruiting'
-                            ? 'border-emerald-500'
-                            : 'border-blue-500';
+                            ? 'border-emerald-500 dark:border-[var(--border-default)]'
+                            : 'border-blue-500 dark:border-[var(--border-default)]';
                         const statusChipClass = item.status === 'recruiting'
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-blue-100 text-blue-700';
@@ -604,7 +613,7 @@ export function HomePage() {
                               <div className={`text-[9px] font-semibold px-1 py-0.5 rounded ${statusChipClass}`}>
                                 {item.status === 'recruiting' ? '모집중' : '상시'}
                               </div>
-                              <div className="text-[9px] px-1 py-0.5 rounded bg-white border border-gray-200 text-gray-600 truncate max-w-[64px]">{item.org}</div>
+                              <div className="text-[9px] px-1 py-0.5 rounded bg-white dark:bg-[rgba(15,23,42,0.58)] border border-gray-200 dark:border-[var(--border-default)] text-gray-600 dark:text-[var(--text-muted)] truncate max-w-[64px]">{item.org}</div>
                             </div>
                             <div className={`text-[11px] font-semibold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[28px] ${urgent ? 'pr-8' : ''}`}>
                               {item.title}
@@ -635,10 +644,10 @@ export function HomePage() {
         <FAQ />
 
         {/* CTA Section */}
-        <section className="pt-24 py-20 bg-gradient-to-br from-blue-100 via-purple-100 to-blue-100 relative overflow-hidden px-4">
-          <div className="absolute inset-0 opacity-50">
-            <div className="absolute top-1/4 right-1/3 w-[500px] h-[500px] bg-gradient-to-br from-blue-300 to-blue-200 rounded-full blur-3xl"></div>
-            <div className="absolute bottom-1/4 left-1/3 w-[500px] h-[500px] bg-gradient-to-br from-purple-300 to-purple-200 rounded-full blur-3xl"></div>
+        <section className="pt-24 py-20 bg-gradient-to-br from-blue-100 via-purple-100 to-blue-100 dark:from-[rgba(59,130,246,0.12)] dark:via-[rgba(139,92,246,0.10)] dark:to-[rgba(59,130,246,0.12)] dark:bg-[var(--bg-hero)] relative overflow-hidden px-4">
+          <div className="absolute inset-0 opacity-50 dark:opacity-30">
+            <div className="absolute top-1/4 right-1/3 w-[500px] h-[500px] bg-gradient-to-br from-blue-300 to-blue-200 dark:from-blue-500/40 dark:to-blue-700/30 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-1/4 left-1/3 w-[500px] h-[500px] bg-gradient-to-br from-purple-300 to-purple-200 dark:from-purple-500/40 dark:to-purple-700/30 rounded-full blur-3xl"></div>
           </div>
           
           <motion.div 

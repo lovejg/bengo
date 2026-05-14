@@ -78,7 +78,7 @@ function BadgeRow({ badges }: { badges: BadgeItem[] }) {
       )}
       {tooltipPos && hiddenBadges.length > 0 && createPortal(
         <div
-          className="fixed flex flex-col gap-1.5 bg-white border border-[var(--border)] rounded-xl px-3 py-2.5 shadow-lg z-[9999] pointer-events-none whitespace-nowrap"
+          className="fixed flex flex-col gap-1.5 bg-white dark:bg-[rgba(15,23,42,0.95)] dark:backdrop-blur-xl border border-[var(--border)] dark:border-[var(--border-default)] rounded-xl px-3 py-2.5 shadow-lg z-[9999] pointer-events-none whitespace-nowrap"
           style={{ left: tooltipPos.x, top: tooltipPos.y, transform: 'translateY(-50%)' }}
         >
           {hiddenBadges.map(b => <span key={b.key}>{b.el}</span>)}
@@ -163,6 +163,8 @@ export function PolicyCard({
   periodRaw,
   fitScore,
   categories = [],
+  policyType,
+  sourceType,
   bookmarked,
   onBookmark,
   className,
@@ -171,6 +173,15 @@ export function PolicyCard({
   const location = useLocation();
   const [isBookmarkAnimating, setIsBookmarkAnimating] = useState(false);
   const status = getDisplayStatus(applicationStatus, endsAt, isAlwaysOpen);
+  const policyCardStatus = status === 'recruiting'
+    ? 'open'
+    : status === 'always'
+      ? 'always'
+      : status === 'closed'
+        ? 'closed'
+        : periodRaw
+          ? 'check'
+          : 'unknown';
   const eligibility = getEligibility(fitScore ?? null);
   const urgentDeadlineLabel = status === 'recruiting' ? getUrgentDeadlineLabel(endsAt) : null;
 
@@ -194,11 +205,20 @@ export function PolicyCard({
     }
   };
 
-  const statusLabels = {
-    recruiting: '모집중',
+  const policyStatusLabels = {
+    open: '모집중',
     always: '상시',
+    check: '정책별 확인',
+    unknown: '기간확인불가',
     closed: '마감',
-  };
+  } as const;
+  const policyStatusVariants = {
+    open: 'recruiting',
+    always: 'always',
+    check: 'default',
+    unknown: 'default',
+    closed: 'closed',
+  } as const;
 
   const eligibilityLabels = {
     eligible: '가능성 높음',
@@ -211,21 +231,38 @@ export function PolicyCard({
     needsReview: 'needsReview' as const,
     infoLacking: 'default' as const,
   };
-  
+
   const categoryLabels: Record<string, string> = {
     youth_policy: '청년정책',
     childcare_policy: '육아정책',
+    senior_policy: '노인정책',
+    disability_policy: '장애인정책',
   };
+
+  const policyTypeLabels = {
+    application: '신청형',
+    info: '정보형',
+  } as const;
+
+  const sourceTypeLabels = {
+    official: '공식',
+    blog: '비공식',
+    none: '출처없음',
+  } as const;
 
   return (
     <Link to={`/policies/${id}`} className="block h-full cursor-pointer" onClick={handleCardClick}>
       <article
+        data-policy-card
+        data-policy-status={policyCardStatus}
+        data-policy-urgent={urgentDeadlineLabel ? 'true' : undefined}
         className={cn(
-          'group relative border rounded-3xl p-6 sm:p-8 h-full flex flex-col',
+          'group relative border rounded-2xl p-5 sm:p-7 h-full flex flex-col',
           'shadow-sm hover:shadow-xl',
+          'dark:bg-[rgba(15,23,42,0.72)] dark:backdrop-blur-md dark:shadow-[0_18px_48px_rgba(0,0,0,0.22)] dark:hover:bg-[rgba(30,41,59,0.86)] dark:hover:shadow-[0_24px_60px_rgba(0,0,0,0.32)]',
           status ? borderColors[status] : periodRaw ? 'border-[#00D9D9] hover:border-[#00BDBD] hover:shadow-[#00FFFF]/25 bg-[#00FFFF]/10' : 'border-amber-500 hover:border-amber-600 hover:shadow-amber-500/25 bg-amber-50/60',
           urgentDeadlineLabel && 'border-red-500 hover:border-red-600',
-          'hover:-translate-y-2',
+          'hover:-translate-y-1',
           'transition-all duration-300 ease-out',
           className
         )}
@@ -243,8 +280,21 @@ export function PolicyCard({
               {title}
             </h3>
             <BadgeRow badges={[
-              ...(status ? [{ key: 'status', label: statusLabels[status], el: <Badge variant={status}>{statusLabels[status]}</Badge> }] : []),
+              {
+                key: 'status',
+                label: policyStatusLabels[policyCardStatus],
+                el: (
+                  <Badge
+                    variant={policyStatusVariants[policyCardStatus]}
+                    className={`policy-status-badge status-${policyCardStatus}`}
+                  >
+                    {policyStatusLabels[policyCardStatus]}
+                  </Badge>
+                ),
+              },
               { key: 'provider', label: providerName, el: <Badge variant="default"><span className="max-w-[120px] truncate block">{providerName}</span></Badge> },
+              ...(policyType ? [{ key: `type-${policyType}`, label: policyTypeLabels[policyType], el: <Badge variant="default" className={policyType === 'application' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-orange-50 text-orange-700 border-orange-200'}>{policyTypeLabels[policyType]}</Badge> }] : []),
+              ...(sourceType ? [{ key: `source-${sourceType}`, label: sourceTypeLabels[sourceType], el: <Badge variant="default" className={sourceType === 'official' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : sourceType === 'blog' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-700 border-slate-200'}>{sourceTypeLabels[sourceType]}</Badge> }] : []),
               ...categories.map((c) => ({ key: c, label: categoryLabels[c] || c, el: <Badge variant="default" className="bg-blue-50 text-blue-700 border-blue-200">{categoryLabels[c] || c}</Badge> })),
               ...(eligibility ? [{ key: 'eligibility', label: eligibilityLabels[eligibility], el: <Badge variant={eligibilityVariants[eligibility]}>{eligibilityLabels[eligibility]}</Badge> }] : []),
             ]} />
@@ -252,7 +302,7 @@ export function PolicyCard({
           {onBookmark && (
             <motion.button
               onClick={handleBookmarkClick}
-              className="flex-shrink-0 p-2.5 hover:bg-[var(--muted)] rounded-xl transition-all duration-200 cursor-pointer"
+              className="flex-shrink-0 p-2.5 hover:bg-[var(--muted)] dark:hover:bg-[rgba(30,41,59,0.6)] rounded-xl transition-all duration-200 cursor-pointer"
               aria-label={bookmarked ? '저장 취소' : '정책 저장'}
               aria-pressed={bookmarked}
               whileTap={{ scale: 0.9 }}

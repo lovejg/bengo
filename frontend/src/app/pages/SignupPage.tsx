@@ -10,11 +10,13 @@ import { Chip } from '../components/atoms/Chip';
 import type { Gender, InterestCategory } from '../types';
 
 const CURRENT_YEAR = 2026;
-
+const MAX_INTERESTS = 2;
 
 const interestCategoryMap: Record<string, InterestCategory> = {
   청년정책: 'youth_policy',
   육아정책: 'childcare_policy',
+  노인정책: 'senior_policy',
+  장애인정책: 'disability_policy',
 };
 
 export function SignupPage() {
@@ -36,7 +38,9 @@ export function SignupPage() {
 
   const interests = [
     { id: '청년정책', label: '청년정책', enabled: true },
-    { id: '육아정책', label: '육아정책 (추후 제공)', enabled: false },
+    { id: '육아정책', label: '육아정책', enabled: true },
+    { id: '노인정책', label: '노인정책', enabled: true },
+    { id: '장애인정책', label: '장애인정책', enabled: true },
   ];
 
   const validateStep1 = () => {
@@ -79,6 +83,14 @@ export function SignupPage() {
       const interestList = formData.interests
         .map((interest) => interestCategoryMap[interest])
         .filter(Boolean) as InterestCategory[];
+      if (interestList.length === 0) {
+        toast.error('관심 분야를 1개 이상 선택해주세요.');
+        return;
+      }
+      if (interestList.length > MAX_INTERESTS) {
+        toast.error(`관심 분야는 최대 ${MAX_INTERESTS}개까지 선택할 수 있습니다.`);
+        return;
+      }
       const age = Math.max(0, CURRENT_YEAR - birthYear);
 
       await signup({
@@ -93,6 +105,15 @@ export function SignupPage() {
       toast.success('인증 메일을 보냈습니다.');
       navigate(getEmailVerificationPath(formData.email));
     } catch (error) {
+      if (
+        error instanceof ApiClientError &&
+        (error.status === 409 || error.message.toLowerCase().includes('conflict'))
+      ) {
+        toast.info('이미 가입 요청된 이메일입니다. 인증 메일을 확인해주세요.');
+        navigate(getEmailVerificationPath(formData.email));
+        return;
+      }
+
       const message = error instanceof ApiClientError ? error.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
       toast.error(message);
     } finally {
@@ -192,11 +213,11 @@ export function SignupPage() {
                     여성
                   </Chip>
                   <Chip
-                    selected={formData.gender === 'other'}
-                    onClick={() => setFormData({ ...formData, gender: 'other' })}
+                    selected={formData.gender === 'unspecified'}
+                    onClick={() => setFormData({ ...formData, gender: 'unspecified' })}
                     className="flex-1"
                   >
-                    기타
+                    선택 안 함
                   </Chip>
                 </div>
               </div>
@@ -218,23 +239,39 @@ export function SignupPage() {
 
               <div>
                 <label className="block mb-3">관심 분야</label>
+                <p className="mb-3 text-xs text-[var(--muted-foreground)]">최대 {MAX_INTERESTS}개까지 선택할 수 있어요.</p>
                 <div className="space-y-2">
                   {interests.map((interest) => (
-                    <div
+                    <button
                       key={interest.id}
-                      className={`p-4 border rounded-xl ${
-                        interest.enabled
-                          ? 'border-[var(--accent)] bg-blue-50'
-                          : 'border-[var(--border)] opacity-50'
+                      type="button"
+                      onClick={() => {
+                        setFormData((current) => ({
+                          ...current,
+                          interests: current.interests.includes(interest.id)
+                            ? current.interests.filter((item) => item !== interest.id)
+                            : current.interests.length >= MAX_INTERESTS
+                              ? current.interests
+                              : [...current.interests, interest.id],
+                        }));
+                        if (
+                          !formData.interests.includes(interest.id) &&
+                          formData.interests.length >= MAX_INTERESTS
+                        ) {
+                          toast.info(`관심 분야는 최대 ${MAX_INTERESTS}개까지 선택할 수 있어요.`);
+                        }
+                      }}
+                      className={`w-full p-4 border rounded-xl text-left transition-colors cursor-pointer ${
+                        formData.interests.includes(interest.id)
+                          ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
+                          : 'border-[var(--border)] bg-white hover:bg-[var(--muted)]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span>{interest.label}</span>
-                        {!interest.enabled && (
-                          <span className="text-xs text-[var(--muted-foreground)]">추후 제공</span>
-                        )}
+                        <span className="text-xs text-[var(--muted-foreground)]">선택 가능</span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>

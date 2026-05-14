@@ -5,7 +5,9 @@ export interface ApiErrorBody {
 }
 
 export interface ApiErrorResponse {
-  error?: ApiErrorBody;
+  error?: ApiErrorBody | string;
+  message?: string | string[];
+  statusCode?: number;
 }
 
 export interface ListResponse<T> {
@@ -17,7 +19,15 @@ export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   headers?: HeadersInit;
-  query?: Record<string, string | number | boolean | undefined | null>;
+  query?: Record<
+    string,
+    | string
+    | number
+    | boolean
+    | Array<string | number | boolean>
+    | undefined
+    | null
+  >;
   auth?: boolean;
   signal?: AbortSignal;
 }

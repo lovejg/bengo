@@ -11,6 +11,7 @@ export type PolicyType = 'application' | 'info';
 export interface GetPoliciesParams {
   search?: string;
   interest?: InterestCategory;
+  interests?: InterestCategory[];
   regionCode?: RegionCode;
   sortBy?: PolicySortBy;
   order?: SortOrder;
@@ -31,6 +32,8 @@ export interface PolicyListItem {
   endsAt: string | null;
   isAlwaysOpen: boolean;
   periodRaw?: string | null;
+  policyType?: PolicyType;
+  targetDescription?: string | null;
   fitScore?: number | null;
   sourceType?: SourceType;
   userState?: UserPolicyState | null;
@@ -49,6 +52,7 @@ export interface PolicyEligibilityInfo {
   supportContent?: string | null;
   selectionCriteria?: string | null;
   applicationDeadline?: string | null;
+  warnBox?: string | null;
 }
 
 export interface LastEligibilitySummary {
@@ -78,6 +82,7 @@ export interface PolicyDetail {
   periodRaw?: string | null;
   minAge?: number | null;
   maxAge?: number | null;
+  targetDescription?: string | null;
   requirements?: PolicyRequirement[];
   eligibilityInfo?: PolicyEligibilityInfo | null;
   eligibilityCompleteness?: EligibilityCompleteness | null;
@@ -102,9 +107,9 @@ export interface EligibilityResponse {
   result: EligibilityResult;
   reasons: string[];
   explanation: string;
-  policy: EligibilityPolicySummary;
+  policy?: EligibilityPolicySummary;
   eligibilityCompleteness?: EligibilityCompleteness | null;
-  checkedAt: string;
+  checkedAt?: string;
 }
 
 export interface UpdateMyPolicyStateRequest {
@@ -118,7 +123,21 @@ export interface MyPolicyItem {
   providerName: string;
   shortDescription?: string;
   categories?: InterestCategory[];
+  startsAt?: string | null;
+  endsAt?: string | null;
+  isAlwaysOpen?: boolean;
+  periodRaw?: string | null;
+  targetDescription?: string | null;
   sourceType?: SourceType;
+  state: UserPolicyState;
+  note: string | null;
+  appliedAt: string | null;
+  updatedAt: string;
+}
+
+export interface UpdatedMyPolicyState {
+  id: string;
+  policyId: string;
   state: UserPolicyState;
   note: string | null;
   appliedAt: string | null;
