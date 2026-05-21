@@ -33,8 +33,10 @@ export function ProfilePage() {
     confirmText: '',
     password: '',
   });
+  const [requiresDeletePassword, setRequiresDeletePassword] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const shouldShowDeletePassword = !isOAuthUser || requiresDeletePassword;
 
   useEffect(() => {
     if (!user) {
@@ -91,20 +93,25 @@ export function ProfilePage() {
       toast.error('확인 문구를 정확히 입력해주세요.');
       return;
     }
-    if (!isOAuthUser && !deleteForm.password) {
-      toast.error('비밀번호를 입력해주세요.');
-      return;
-    }
 
     setDeleteLoading(true);
     try {
-      await deleteAccount(isOAuthUser ? {} : { password: deleteForm.password });
+      await deleteAccount(shouldShowDeletePassword && deleteForm.password ? { password: deleteForm.password } : {});
       clearAccessToken();
       clearAuthMethod();
       clearStoredUserProfile();
       toast.success('회원탈퇴가 완료되었습니다.');
       navigate('/', { replace: true });
     } catch (error) {
+      if (
+        error instanceof ApiClientError &&
+        error.status === 400 &&
+        error.message.includes('비밀번호')
+      ) {
+        setRequiresDeletePassword(true);
+        toast.error('계정 확인을 위해 현재 비밀번호를 입력해주세요.');
+        return;
+      }
       const message = error instanceof ApiClientError ? error.message : '회원탈퇴에 실패했습니다.';
       toast.error(message);
     } finally {
@@ -208,13 +215,14 @@ export function ProfilePage() {
                     value={deleteForm.confirmText}
                     onChange={(event) => setDeleteForm((current) => ({ ...current, confirmText: event.target.value }))}
                   />
-                  {!isOAuthUser && (
+                  {shouldShowDeletePassword && (
                     <Input
                       type="password"
                       placeholder="현재 비밀번호"
                       value={deleteForm.password}
                       onChange={(event) => setDeleteForm((current) => ({ ...current, password: event.target.value }))}
                       autoComplete="current-password"
+                      helperText={isOAuthUser ? '이 이메일에 일반 가입 이력이 있어 비밀번호 확인이 필요합니다.' : undefined}
                     />
                   )}
                   <Button type="submit" variant="danger" loading={deleteLoading} className="w-full sm:w-auto">탈퇴하기</Button>
