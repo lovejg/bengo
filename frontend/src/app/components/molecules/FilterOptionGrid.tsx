@@ -14,10 +14,6 @@ interface FilterOptionGridProps {
   variant?: 'glass' | 'tag' | 'neo' | 'pill' | 'figma';
 }
 
-// Temporary layout toggle for detailed filter density testing.
-// Set this back to 'grid-cols-3' after the 4-column visibility check.
-const TEMP_VISIBILITY_TEST_GRID_COLS = 'grid-cols-4';
-
 export function FilterOptionGrid({
   options,
   selected = [],
@@ -212,7 +208,7 @@ export function FilterOptionGrid({
   // 2개여도 3열 그리드에 2개만 배치 → 버튼 크기 동일 유지
   if (variant === 'figma') {
     return (
-      <div className={`grid ${TEMP_VISIBILITY_TEST_GRID_COLS} gap-x-3 gap-y-3.5`}>
+      <div className="grid grid-cols-3 gap-x-3 gap-y-3.5">
         {options.map((option) => {
           const isSelected = selected.includes(option.id);
           return (

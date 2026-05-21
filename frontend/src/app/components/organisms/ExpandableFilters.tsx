@@ -27,42 +27,28 @@ const EMPTY: ExpandableFiltersState = {
   employmentStatuses: [],
 };
 
-// Temporary options for detailed filter density/visibility testing.
-// Remove this constant and the spreads below when the visibility test is done.
-const TEMP_VISIBILITY_TEST_OPTIONS = Array.from({ length: 7 }, (_, index) => {
-  const number = index + 1;
-  return {
-    id: `temp_visibility_test_${number}`,
-    label: `테스트 ${number}`,
-  };
-});
-
 const categoryOptions = [
   { id: 'youth_policy', label: '청년정책' },
   { id: 'childcare_policy', label: '육아정책' },
   { id: 'senior_policy', label: '노인정책' },
   { id: 'disability_policy', label: '장애인정책' },
-  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 const regionOptions = [
   { id: 'all', label: '전체' },
   { id: 'seoul', label: '서울' },
-  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 const ageOptions = [
   { id: '19-24', label: '19-24세' },
   { id: '25-29', label: '25-29세' },
   { id: '30-34', label: '30-34세' },
-  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 const employmentStatusOptions = [
   { id: 'student', label: '학생' },
   { id: 'jobseeker', label: '구직자' },
   { id: 'employed', label: '재직자' },
-  ...TEMP_VISIBILITY_TEST_OPTIONS,
 ];
 
 export function ExpandableFilters({

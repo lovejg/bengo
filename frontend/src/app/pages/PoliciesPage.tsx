@@ -26,22 +26,12 @@ const EMPTY_FILTERS: ExpandableFiltersState = {
   employmentStatuses: [],
 };
 
-// Temporary labels for detailed filter density/visibility testing.
-// Keep in sync with TEMP_VISIBILITY_TEST_OPTIONS in ExpandableFilters.tsx.
-const TEMP_VISIBILITY_TEST_LABELS: Record<string, string> = Object.fromEntries(
-  Array.from({ length: 7 }, (_, index) => {
-    const number = index + 1;
-    return [`temp_visibility_test_${number}`, `테스트 ${number}`];
-  }),
-);
-
 // 칩 표시용 라벨 맵 (ExpandableFilters 실제 옵션 id 기준)
 const CATEGORY_LABELS: Record<string, string> = {
   youth_policy: '청년정책',
   childcare_policy: '육아정책',
   senior_policy: '노인정책',
   disability_policy: '장애인정책',
-  ...TEMP_VISIBILITY_TEST_LABELS,
 };
 const SUPPORTED_CATEGORY_FILTERS = [
   'youth_policy',
@@ -49,14 +39,12 @@ const SUPPORTED_CATEGORY_FILTERS = [
   'senior_policy',
   'disability_policy',
 ] as const;
-const FILTER_REGION_LABELS: Record<string, string> = { ...REGION_LABELS, ...TEMP_VISIBILITY_TEST_LABELS };
+const FILTER_REGION_LABELS: Record<string, string> = REGION_LABELS;
 const AGE_LABELS: Record<string, string> = {
   '19-24': '19-24세', '25-29': '25-29세', '30-34': '30-34세',
-  ...TEMP_VISIBILITY_TEST_LABELS,
 };
 const EMPLOYMENT_LABELS: Record<string, string> = {
   student: '학생', jobseeker: '구직자', employed: '재직자',
-  ...TEMP_VISIBILITY_TEST_LABELS,
 };
 type StatusFilter = 'recruiting' | 'always' | 'period_raw' | 'unknown';
 
