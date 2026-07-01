@@ -18,10 +18,7 @@ function toFiniteNumber(value: unknown): number | null {
   return null;
 }
 
-export function pickFirstString(
-  item: Record<string, unknown>,
-  keys: string[],
-): string | null {
+export function pickFirstString(item: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = item[key];
     if (typeof value === 'string' && value.trim()) {
@@ -161,10 +158,7 @@ export function stringifyBody(item: Record<string, unknown>): string {
   return JSON.stringify(item);
 }
 
-export async function fetchJson(
-  url: string,
-  options: RequestInit = {},
-): Promise<unknown> {
+export async function fetchJson(url: string, options: RequestInit = {}): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
 
@@ -235,8 +229,22 @@ export function mapMvpRegionCodesFromStrings(values: string[]): RegionCode[] {
     }
 
     const nonSeoulRegions = [
-      '부산', '대구', '인천', '광주', '대전', '울산', '세종',
-      '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주',
+      '부산',
+      '대구',
+      '인천',
+      '광주',
+      '대전',
+      '울산',
+      '세종',
+      '경기',
+      '강원',
+      '충북',
+      '충남',
+      '전북',
+      '전남',
+      '경북',
+      '경남',
+      '제주',
     ];
     if (nonSeoulRegions.some((r) => provider.includes(r))) {
       return [];
@@ -246,10 +254,7 @@ export function mapMvpRegionCodesFromStrings(values: string[]): RegionCode[] {
   // 소관기관명으로 판별 불가 시 (예: '보건복지부' 등 중앙부처),
   // 접수기관/제목 등에서 '서울특별시'/'서울시'만 확인 (느슨한 '서울' 제외)
   for (const value of rest) {
-    if (
-      value &&
-      (value.includes('서울특별시') || value.includes('서울시'))
-    ) {
+    if (value && (value.includes('서울특별시') || value.includes('서울시'))) {
       return [RegionCode.SEOUL];
     }
   }

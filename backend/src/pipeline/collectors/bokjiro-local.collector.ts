@@ -22,7 +22,7 @@ export class BokjiroLocalCollector implements PolicyCollector {
   isConfigured(): boolean {
     return Boolean(
       this.configService.get<string>('BOKJIRO_LOCAL_API_URL') &&
-        this.configService.get<string>('BOKJIRO_API_KEY'),
+      this.configService.get<string>('BOKJIRO_API_KEY'),
     );
   }
 
@@ -67,7 +67,8 @@ export class BokjiroLocalCollector implements PolicyCollector {
     const detailUrl = this.configService.get<string>('BOKJIRO_LOCAL_DETAIL_API_URL');
     let enriched = allItems;
     if (detailUrl) {
-      const enrichLimit = Number(this.configService.get<string>('BOKJIRO_ENRICH_LIMIT') ?? 0) || undefined;
+      const enrichLimit =
+        Number(this.configService.get<string>('BOKJIRO_ENRICH_LIMIT') ?? 0) || undefined;
       enriched = await enrichWithDetail(allItems, detailUrl, apiKey, { limit: enrichLimit });
       this.logger.log(
         `bokjiro-local: enriched with detail (limit=${enrichLimit ?? 'none'}, total=${enriched.length})`,

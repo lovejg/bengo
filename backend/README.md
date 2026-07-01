@@ -25,6 +25,18 @@ npm run start:dev
 - Swagger: `http://localhost:4000/docs`
 - 헬스체크: `GET /health`
 - 프론트 연동용 API 명세서: `docs/API_SPEC_KO.md`
+- 아키텍처 개요: `docs/ARCHITECTURE.md`
+
+## 테스트 / 코드 품질
+```bash
+npm test            # 단위 테스트 (jest)
+npm run test:cov    # 커버리지 포함
+npm run test:e2e    # E2E 테스트 (HTTP 계층, DB 불필요)
+npm run lint        # ESLint
+npm run format      # Prettier 포매팅
+```
+- 단위 테스트는 자격판별 엔진(`eligibility`), 인증(`auth`), 지역/스코프 등 핵심 비즈니스 로직을 검증합니다.
+- E2E는 공개 정책 엔드포인트의 라우팅·검증 파이프를 실제 DB 없이 검증합니다.
 
 ## 주요 엔드포인트
 - `POST /auth/signup`
@@ -50,15 +62,15 @@ npm run start:dev
 - 개별 정책 예외 처리는 `src/common/constants/policy-manual-overrides.constant.ts`에 선언합니다.
 
 ## 실수집 설정
-- 아래 4개 키를 `.env`에 입력합니다.
+- 아래 키를 `.env`에 입력합니다. (전체 목록과 기본값은 `.env.example` 참고)
   - `DATA_GO_KR_API_KEY`
   - `YOUTHCENTER_POLICY_API_KEY`
-  - `YOUTHCENTER_CENTER_API_KEY`
+  - `BOKJIRO_API_KEY`
   - `SEOUL_OPEN_API_KEY`
 - 각 소스별 수집 URL도 함께 입력해야 실제 수집이 동작합니다.
   - `DATA_GO_KR_API_URL`
   - `YOUTHCENTER_POLICY_API_URL`
-  - `YOUTHCENTER_CENTER_API_URL`
+  - `BOKJIRO_CENTRAL_API_URL` / `BOKJIRO_LOCAL_API_URL`
   - `SEOUL_OPEN_API_URL` 또는 (`SEOUL_OPEN_API_HOST` + `SEOUL_OPEN_API_SERVICE_NAME`)
 - 서울 전체 수집량을 늘리려면 페이지/서비스 설정을 함께 조정합니다.
   - `DATA_GO_KR_MAX_PAGES`
@@ -66,4 +78,3 @@ npm run start:dev
   - `SEOUL_OPEN_API_SERVICE_NAMES`(쉼표 구분), `SEOUL_OPEN_API_MAX_PAGES`
 - `GET /pipeline/sources`에서 소스별 `configured` 상태를 확인할 수 있습니다.
 - `POST /pipeline/collect-and-ingest-mvp`로 MVP 대상 소스를 한 번에 적재할 수 있습니다.
-- 백엔드 수동 테스트용 프론트: `../frontend/test1`

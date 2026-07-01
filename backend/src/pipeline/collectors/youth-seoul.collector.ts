@@ -38,8 +38,7 @@ export class YouthSeoulCollector implements PolicyCollector {
   private readonly enabled: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.enabled =
-      this.configService.get<string>('YOUTH_SEOUL_ENABLED') !== 'false';
+    this.enabled = this.configService.get<string>('YOUTH_SEOUL_ENABLED') !== 'false';
   }
 
   isConfigured(): boolean {
@@ -175,11 +174,14 @@ export class YouthSeoulCollector implements PolicyCollector {
           td.find('p, li, div').each((_, el) => {
             $(el).prepend('\n');
           });
-          const text = td.text().trim().replace(/[^\S\n]+/g, ' ').replace(/\n\s*\n/g, '\n');
+          const text = td
+            .text()
+            .trim()
+            .replace(/[^\S\n]+/g, ' ')
+            .replace(/\n\s*\n/g, '\n');
 
           if (text || href) {
-            sections[sectionKey][key] =
-              href && href !== '#none' ? `${text} (${href})` : text;
+            sections[sectionKey][key] = href && href !== '#none' ? `${text} (${href})` : text;
           }
         });
       });
@@ -194,12 +196,14 @@ export class YouthSeoulCollector implements PolicyCollector {
     const appMethod = detail.applicationMethod;
     const etc = detail.etc;
 
-    const providerName = overview['주관 기관'] ?? (item.type === 'ct' ? '서울특별시' : '서울시 자치구');
+    const providerName =
+      overview['주관 기관'] ?? (item.type === 'ct' ? '서울특별시' : '서울시 자치구');
     const detailPageUrl = `${BASE_URL}/infoData/plcyInfo/view.do?key=${LIST_KEY}&plcyBizId=${item.id}`;
-    const sourceUrl = this.extractUrl(appMethod['신청 사이트'])
-      ?? this.extractUrl(etc['참고 사이트1'])
-      ?? this.extractUrl(overview['관련 사이트'])
-      ?? detailPageUrl;
+    const sourceUrl =
+      this.extractUrl(appMethod['신청 사이트']) ??
+      this.extractUrl(etc['참고 사이트1']) ??
+      this.extractUrl(overview['관련 사이트']) ??
+      detailPageUrl;
 
     const bodyParts = [
       overview['정책 소개'],
@@ -282,7 +286,7 @@ export class YouthSeoulCollector implements PolicyCollector {
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; BengoBot/1.0)',
-          'Accept': 'text/html',
+          Accept: 'text/html',
           'Accept-Language': 'ko-KR,ko;q=0.9',
         },
       });

@@ -6,11 +6,7 @@ import { getPolicyManualOverride } from '../common/constants/policy-manual-overr
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RegionCode } from '../common/enums/region-code.enum';
-import {
-  PipelineIngestionRun,
-  Policy,
-  RawPolicyDocumentEntity,
-} from '../database/entities';
+import { PipelineIngestionRun, Policy, RawPolicyDocumentEntity } from '../database/entities';
 import { RawPolicyDocument } from './interfaces/raw-policy.interface';
 import { PolicyNormalizationService } from './policy-normalization.service';
 import { PolicyRequirementGeneratorService } from './policy-requirement-generator.service';
@@ -210,9 +206,7 @@ export class PipelineIngestionService {
 
     const scope = this.evaluateMvpScope(raw.source, normalized.categories, normalized.regionCodes);
     if (!scope.isInScope) {
-      const deactivatedPolicyId = await this.deactivateExistingOutOfScopePolicy(
-        normalized.code,
-      );
+      const deactivatedPolicyId = await this.deactivateExistingOutOfScopePolicy(normalized.code);
       const skippedMessage = deactivatedPolicyId
         ? `${scope.reason} 기존 정책(${deactivatedPolicyId})을 비활성화했습니다.`
         : scope.reason;
@@ -254,11 +248,20 @@ export class PipelineIngestionService {
     });
     if (duplicateByTitle && duplicateByTitle.code !== normalized.code) {
       const existingSource = (duplicateByTitle.extraMeta as Record<string, unknown>)?.pipeline
-        ? ((duplicateByTitle.extraMeta as Record<string, unknown>).pipeline as Record<string, unknown>).source as string
+        ? ((
+            (duplicateByTitle.extraMeta as Record<string, unknown>).pipeline as Record<
+              string,
+              unknown
+            >
+          ).source as string)
         : '';
       const currentSource = raw.source;
       // 소스 우선순위: youth-seoul > data-go-kr > youthcenter-policy (크롤링 데이터가 가장 풍부)
-      const priority: Record<string, number> = { 'youth-seoul': 3, 'data-go-kr': 2, 'youthcenter-policy': 1 };
+      const priority: Record<string, number> = {
+        'youth-seoul': 3,
+        'data-go-kr': 2,
+        'youthcenter-policy': 1,
+      };
       const existingPriority = priority[existingSource] ?? 0;
       const currentPriority = priority[currentSource] ?? 0;
 
@@ -305,9 +308,11 @@ export class PipelineIngestionService {
       id: existing?.id,
       code: normalized.code,
       title: normalized.title,
-      shortDescription: (existing?.shortDescription && existing.shortDescription !== existing.description?.slice(0, 120))
-        ? existing.shortDescription
-        : normalized.shortDescription,
+      shortDescription:
+        existing?.shortDescription &&
+        existing.shortDescription !== existing.description?.slice(0, 120)
+          ? existing.shortDescription
+          : normalized.shortDescription,
       description: normalized.description,
       providerName: normalized.providerName,
       sourceUrl: normalized.sourceUrl,
@@ -317,8 +322,10 @@ export class PipelineIngestionService {
       categories: normalized.categories,
       regionCodes: manualOverride?.regionCodes ?? normalized.regionCodes,
       targetGenders: existing?.targetGenders ?? [],
-      minAge: manualOverride && 'minAge' in manualOverride ? manualOverride.minAge : normalized.minAge,
-      maxAge: manualOverride && 'maxAge' in manualOverride ? manualOverride.maxAge : normalized.maxAge,
+      minAge:
+        manualOverride && 'minAge' in manualOverride ? manualOverride.minAge : normalized.minAge,
+      maxAge:
+        manualOverride && 'maxAge' in manualOverride ? manualOverride.maxAge : normalized.maxAge,
       startsAt: normalized.startsAt,
       endsAt: normalized.endsAt,
       isAlwaysOpen: normalized.isAlwaysOpen,
@@ -385,7 +392,10 @@ export class PipelineIngestionService {
         try {
           const result = await this.ingestOne(raw);
           if (result.persisted) persisted++;
-          if (result.action === 'failed') { failed++; failedItems.push(result); }
+          if (result.action === 'failed') {
+            failed++;
+            failedItems.push(result);
+          }
           if (result.action === 'skipped') skipped++;
         } catch (error) {
           failed++;
@@ -407,7 +417,7 @@ export class PipelineIngestionService {
       await new Promise<void>((resolve) => setImmediate(resolve));
       this.logger.log(
         `ingestBatch progress: ${Math.min(i + chunkSize, total)}/${total}` +
-        ` (persisted=${persisted} failed=${failed} skipped=${skipped})`,
+          ` (persisted=${persisted} failed=${failed} skipped=${skipped})`,
       );
     }
 
@@ -415,7 +425,6 @@ export class PipelineIngestionService {
   }
 
   async deactivateExpiredPolicies(): Promise<{ deactivated: number }> {
-    const today = new Date().toISOString().slice(0, 10);
     const active = await this.policyRepository.find({
       where: { status: PolicyStatus.ACTIVE },
     });
@@ -475,9 +484,7 @@ export class PipelineIngestionService {
     return { isInScope: result.inScope, reason: result.reason };
   }
 
-  private async deactivateExistingOutOfScopePolicy(
-    code: string,
-  ): Promise<string | null> {
+  private async deactivateExistingOutOfScopePolicy(code: string): Promise<string | null> {
     const existing = await this.policyRepository.findOne({
       where: { code, status: PolicyStatus.ACTIVE },
     });

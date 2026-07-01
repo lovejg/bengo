@@ -10,9 +10,7 @@ import {
 import { BokjiroCentralCollector } from './collectors/bokjiro-central.collector';
 import { BokjiroLocalCollector } from './collectors/bokjiro-local.collector';
 import { DataGoKrCollector } from './collectors/data-go-kr.collector';
-import { MockSeoulCollector } from './collectors/mock-seoul.collector';
 import { SeoulOpenApiCollector } from './collectors/seoul-open-api.collector';
-import { YouthcenterCenterCollector } from './collectors/youthcenter-center.collector';
 import { YouthcenterPolicyCollector } from './collectors/youthcenter-policy.collector';
 import { YouthSeoulCollector } from './collectors/youth-seoul.collector';
 import { PipelineCollectionService } from './pipeline-collection.service';
@@ -42,12 +40,10 @@ import { PolicyUrlValidatorService } from './policy-url-validator.service';
     PipelineOrchestratorService,
     PipelineIngestionService,
     PipelineCollectionService,
-    MockSeoulCollector,
     DataGoKrCollector,
     BokjiroCentralCollector,
     BokjiroLocalCollector,
     YouthcenterPolicyCollector,
-    YouthcenterCenterCollector,
     SeoulOpenApiCollector,
     YouthSeoulCollector,
     PolicyNormalizationService,

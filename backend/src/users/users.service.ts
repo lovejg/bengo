@@ -1,9 +1,5 @@
 import { randomBytes } from 'crypto';
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { DataSource, Repository } from 'typeorm';
@@ -255,9 +251,7 @@ export class UsersService {
     let profile = await this.profileRepository.findOne({ where: { userId } });
     if (hasProfileField) {
       if (!profile) {
-        throw new NotFoundException(
-          '프로필이 아직 없습니다. complete-profile을 먼저 호출하세요.',
-        );
+        throw new NotFoundException('프로필이 아직 없습니다. complete-profile을 먼저 호출하세요.');
       }
       if (input.age !== undefined) profile.age = input.age;
       if (input.gender !== undefined) profile.gender = input.gender;

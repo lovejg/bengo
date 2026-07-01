@@ -6,9 +6,7 @@ import {
 import { BokjiroCentralCollector } from './collectors/bokjiro-central.collector';
 import { BokjiroLocalCollector } from './collectors/bokjiro-local.collector';
 import { DataGoKrCollector } from './collectors/data-go-kr.collector';
-import { MockSeoulCollector } from './collectors/mock-seoul.collector';
 import { SeoulOpenApiCollector } from './collectors/seoul-open-api.collector';
-import { YouthcenterCenterCollector } from './collectors/youthcenter-center.collector';
 import { YouthcenterPolicyCollector } from './collectors/youthcenter-policy.collector';
 import { YouthSeoulCollector } from './collectors/youth-seoul.collector';
 import { PolicyCollector } from './interfaces/policy-collector.interface';
@@ -45,22 +43,18 @@ export class PipelineCollectionService {
   private readonly collectors: PolicyCollector[];
 
   constructor(
-    private readonly mockSeoulCollector: MockSeoulCollector,
     private readonly dataGoKrCollector: DataGoKrCollector,
     private readonly bokjiroCentralCollector: BokjiroCentralCollector,
     private readonly bokjiroLocalCollector: BokjiroLocalCollector,
     private readonly youthcenterPolicyCollector: YouthcenterPolicyCollector,
-    private readonly youthcenterCenterCollector: YouthcenterCenterCollector,
     private readonly seoulOpenApiCollector: SeoulOpenApiCollector,
     private readonly youthSeoulCollector: YouthSeoulCollector,
   ) {
     this.collectors = [
-      this.mockSeoulCollector,
       this.dataGoKrCollector,
       this.bokjiroCentralCollector,
       this.bokjiroLocalCollector,
       this.youthcenterPolicyCollector,
-      this.youthcenterCenterCollector,
       this.seoulOpenApiCollector,
       this.youthSeoulCollector,
     ];
@@ -96,9 +90,7 @@ export class PipelineCollectionService {
 
   getMvpBatchPlan(): MvpBatchPlan {
     const sources = this.listSources();
-    const targets = sources
-      .filter((source) => source.mvpEnabled)
-      .map((source) => source.source);
+    const targets = sources.filter((source) => source.mvpEnabled).map((source) => source.source);
     const skipped = sources
       .filter((source) => !source.mvpEnabled)
       .map((source) => ({
@@ -142,7 +134,8 @@ export class PipelineCollectionService {
       if (result.status === 'fulfilled') {
         collected.push(result.value);
       } else {
-        const message = result.reason instanceof Error ? result.reason.message : '수집 중 알 수 없는 오류';
+        const message =
+          result.reason instanceof Error ? result.reason.message : '수집 중 알 수 없는 오류';
         this.logger.error(`[${source}] 수집 실패 — ${message}`);
         failedCollections.push({ source, message });
       }

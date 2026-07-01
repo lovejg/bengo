@@ -61,8 +61,7 @@ export class PipelineController {
   @Get('quality-report')
   @ApiOperation({
     summary: '수집/정규화 데이터 품질 리포트',
-    description:
-      '소스별 적재 현황과 MVP 범위 적합도, 신청정보 누락 비율을 요약합니다.',
+    description: '소스별 적재 현황과 MVP 범위 적합도, 신청정보 누락 비율을 요약합니다.',
   })
   @ApiOkResponse({ description: '품질 리포트' })
   qualityReport(): Promise<PipelineQualityReport> {
@@ -72,8 +71,7 @@ export class PipelineController {
   @Post('prune-mvp')
   @ApiOperation({
     summary: 'MVP 범위 밖 활성 정책 비활성화',
-    description:
-      '현재 활성 정책 중 MVP 범위 밖 정책을 INACTIVE로 변경해 목록 품질을 정리합니다.',
+    description: '현재 활성 정책 중 MVP 범위 밖 정책을 INACTIVE로 변경해 목록 품질을 정리합니다.',
   })
   @ApiOkResponse({ description: '정리 결과' })
   pruneMvp(): Promise<PipelinePruneReport> {

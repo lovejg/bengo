@@ -46,16 +46,6 @@ interface EnvShape {
   YOUTHCENTER_POLICY_MAX_PAGES?: number;
   YOUTHCENTER_POLICY_REGION_PARAM?: string;
   YOUTHCENTER_POLICY_REGION_VALUE?: string;
-  YOUTHCENTER_CENTER_API_KEY?: string;
-  YOUTHCENTER_CENTER_API_URL?: string;
-  YOUTHCENTER_CENTER_API_KEY_PARAM?: string;
-  YOUTHCENTER_CENTER_PAGE_PARAM?: string;
-  YOUTHCENTER_CENTER_PAGE_SIZE_PARAM?: string;
-  YOUTHCENTER_CENTER_PAGE_TYPE_PARAM?: string;
-  YOUTHCENTER_CENTER_PAGE_TYPE?: string;
-  YOUTHCENTER_CENTER_RETURN_TYPE_PARAM?: string;
-  YOUTHCENTER_CENTER_RETURN_TYPE?: string;
-  YOUTHCENTER_CENTER_PAGE_SIZE?: number;
   SEOUL_OPEN_API_KEY?: string;
   SEOUL_OPEN_API_URL?: string;
   SEOUL_OPEN_API_KEY_PARAM?: string;
@@ -107,17 +97,11 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
     POSTGRES_SYNC: toBoolean(config.POSTGRES_SYNC as string | undefined, false),
     REDIS_HOST: String(config.REDIS_HOST ?? 'localhost'),
     REDIS_PORT: toNumber(config.REDIS_PORT as string | undefined, 6379),
-    REDIS_PASSWORD: config.REDIS_PASSWORD
-      ? String(config.REDIS_PASSWORD)
-      : undefined,
+    REDIS_PASSWORD: config.REDIS_PASSWORD ? String(config.REDIS_PASSWORD) : undefined,
     JWT_SECRET: String(config.JWT_SECRET ?? ''),
     JWT_EXPIRES_IN: String(config.JWT_EXPIRES_IN ?? '7d'),
-    DATA_GO_KR_API_KEY: config.DATA_GO_KR_API_KEY
-      ? String(config.DATA_GO_KR_API_KEY)
-      : undefined,
-    DATA_GO_KR_API_URL: config.DATA_GO_KR_API_URL
-      ? String(config.DATA_GO_KR_API_URL)
-      : undefined,
+    DATA_GO_KR_API_KEY: config.DATA_GO_KR_API_KEY ? String(config.DATA_GO_KR_API_KEY) : undefined,
+    DATA_GO_KR_API_URL: config.DATA_GO_KR_API_URL ? String(config.DATA_GO_KR_API_URL) : undefined,
     DATA_GO_KR_API_KEY_PARAM: config.DATA_GO_KR_API_KEY_PARAM
       ? String(config.DATA_GO_KR_API_KEY_PARAM)
       : undefined,
@@ -127,14 +111,8 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
     DATA_GO_KR_PAGE_SIZE_PARAM: config.DATA_GO_KR_PAGE_SIZE_PARAM
       ? String(config.DATA_GO_KR_PAGE_SIZE_PARAM)
       : undefined,
-    DATA_GO_KR_PAGE_SIZE: toNumber(
-      config.DATA_GO_KR_PAGE_SIZE as string | undefined,
-      100,
-    ),
-    DATA_GO_KR_MAX_PAGES: toNumber(
-      config.DATA_GO_KR_MAX_PAGES as string | undefined,
-      20,
-    ),
+    DATA_GO_KR_PAGE_SIZE: toNumber(config.DATA_GO_KR_PAGE_SIZE as string | undefined, 100),
+    DATA_GO_KR_MAX_PAGES: toNumber(config.DATA_GO_KR_MAX_PAGES as string | undefined, 20),
     DATA_GO_KR_FILTER_KEYWORD: config.DATA_GO_KR_FILTER_KEYWORD
       ? String(config.DATA_GO_KR_FILTER_KEYWORD)
       : undefined,
@@ -210,43 +188,8 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
     YOUTHCENTER_POLICY_REGION_VALUE: config.YOUTHCENTER_POLICY_REGION_VALUE
       ? String(config.YOUTHCENTER_POLICY_REGION_VALUE)
       : undefined,
-    YOUTHCENTER_CENTER_API_KEY: config.YOUTHCENTER_CENTER_API_KEY
-      ? String(config.YOUTHCENTER_CENTER_API_KEY)
-      : undefined,
-    YOUTHCENTER_CENTER_API_URL: config.YOUTHCENTER_CENTER_API_URL
-      ? String(config.YOUTHCENTER_CENTER_API_URL)
-      : undefined,
-    YOUTHCENTER_CENTER_API_KEY_PARAM: config.YOUTHCENTER_CENTER_API_KEY_PARAM
-      ? String(config.YOUTHCENTER_CENTER_API_KEY_PARAM)
-      : undefined,
-    YOUTHCENTER_CENTER_PAGE_PARAM: config.YOUTHCENTER_CENTER_PAGE_PARAM
-      ? String(config.YOUTHCENTER_CENTER_PAGE_PARAM)
-      : undefined,
-    YOUTHCENTER_CENTER_PAGE_SIZE_PARAM: config.YOUTHCENTER_CENTER_PAGE_SIZE_PARAM
-      ? String(config.YOUTHCENTER_CENTER_PAGE_SIZE_PARAM)
-      : undefined,
-    YOUTHCENTER_CENTER_PAGE_TYPE_PARAM: config.YOUTHCENTER_CENTER_PAGE_TYPE_PARAM
-      ? String(config.YOUTHCENTER_CENTER_PAGE_TYPE_PARAM)
-      : undefined,
-    YOUTHCENTER_CENTER_PAGE_TYPE: config.YOUTHCENTER_CENTER_PAGE_TYPE
-      ? String(config.YOUTHCENTER_CENTER_PAGE_TYPE)
-      : undefined,
-    YOUTHCENTER_CENTER_RETURN_TYPE_PARAM: config.YOUTHCENTER_CENTER_RETURN_TYPE_PARAM
-      ? String(config.YOUTHCENTER_CENTER_RETURN_TYPE_PARAM)
-      : undefined,
-    YOUTHCENTER_CENTER_RETURN_TYPE: config.YOUTHCENTER_CENTER_RETURN_TYPE
-      ? String(config.YOUTHCENTER_CENTER_RETURN_TYPE)
-      : undefined,
-    YOUTHCENTER_CENTER_PAGE_SIZE: toNumber(
-      config.YOUTHCENTER_CENTER_PAGE_SIZE as string | undefined,
-      100,
-    ),
-    SEOUL_OPEN_API_KEY: config.SEOUL_OPEN_API_KEY
-      ? String(config.SEOUL_OPEN_API_KEY)
-      : undefined,
-    SEOUL_OPEN_API_URL: config.SEOUL_OPEN_API_URL
-      ? String(config.SEOUL_OPEN_API_URL)
-      : undefined,
+    SEOUL_OPEN_API_KEY: config.SEOUL_OPEN_API_KEY ? String(config.SEOUL_OPEN_API_KEY) : undefined,
+    SEOUL_OPEN_API_URL: config.SEOUL_OPEN_API_URL ? String(config.SEOUL_OPEN_API_URL) : undefined,
     SEOUL_OPEN_API_KEY_PARAM: config.SEOUL_OPEN_API_KEY_PARAM
       ? String(config.SEOUL_OPEN_API_KEY_PARAM)
       : undefined,
@@ -266,54 +209,29 @@ export function validateEnv(config: Record<string, unknown>): EnvShape {
       config.SEOUL_OPEN_API_START_INDEX as string | undefined,
       1,
     ),
-    SEOUL_OPEN_API_END_INDEX: toNumber(
-      config.SEOUL_OPEN_API_END_INDEX as string | undefined,
-      100,
-    ),
-    SEOUL_OPEN_API_PAGE_SIZE: toNumber(
-      config.SEOUL_OPEN_API_PAGE_SIZE as string | undefined,
-      100,
-    ),
-    SEOUL_OPEN_API_MAX_PAGES: toNumber(
-      config.SEOUL_OPEN_API_MAX_PAGES as string | undefined,
-      30,
-    ),
-    ANTHROPIC_API_KEY: config.ANTHROPIC_API_KEY
-      ? String(config.ANTHROPIC_API_KEY)
-      : undefined,
-    LLM_MODEL: config.LLM_MODEL
-      ? String(config.LLM_MODEL)
-      : undefined,
-    LLM_ENABLED: config.LLM_ENABLED
-      ? String(config.LLM_ENABLED)
-      : undefined,
-    GOOGLE_CLIENT_ID: config.GOOGLE_CLIENT_ID
-      ? String(config.GOOGLE_CLIENT_ID)
-      : undefined,
+    SEOUL_OPEN_API_END_INDEX: toNumber(config.SEOUL_OPEN_API_END_INDEX as string | undefined, 100),
+    SEOUL_OPEN_API_PAGE_SIZE: toNumber(config.SEOUL_OPEN_API_PAGE_SIZE as string | undefined, 100),
+    SEOUL_OPEN_API_MAX_PAGES: toNumber(config.SEOUL_OPEN_API_MAX_PAGES as string | undefined, 30),
+    ANTHROPIC_API_KEY: config.ANTHROPIC_API_KEY ? String(config.ANTHROPIC_API_KEY) : undefined,
+    LLM_MODEL: config.LLM_MODEL ? String(config.LLM_MODEL) : undefined,
+    LLM_ENABLED: config.LLM_ENABLED ? String(config.LLM_ENABLED) : undefined,
+    GOOGLE_CLIENT_ID: config.GOOGLE_CLIENT_ID ? String(config.GOOGLE_CLIENT_ID) : undefined,
     GOOGLE_CLIENT_SECRET: config.GOOGLE_CLIENT_SECRET
       ? String(config.GOOGLE_CLIENT_SECRET)
       : undefined,
     GOOGLE_CALLBACK_URL: config.GOOGLE_CALLBACK_URL
       ? String(config.GOOGLE_CALLBACK_URL)
       : undefined,
-    NAVER_CLIENT_ID: config.NAVER_CLIENT_ID
-      ? String(config.NAVER_CLIENT_ID)
-      : undefined,
+    NAVER_CLIENT_ID: config.NAVER_CLIENT_ID ? String(config.NAVER_CLIENT_ID) : undefined,
     NAVER_CLIENT_SECRET: config.NAVER_CLIENT_SECRET
       ? String(config.NAVER_CLIENT_SECRET)
       : undefined,
-    NAVER_CALLBACK_URL: config.NAVER_CALLBACK_URL
-      ? String(config.NAVER_CALLBACK_URL)
-      : undefined,
+    NAVER_CALLBACK_URL: config.NAVER_CALLBACK_URL ? String(config.NAVER_CALLBACK_URL) : undefined,
     FRONTEND_OAUTH_REDIRECT_URL: config.FRONTEND_OAUTH_REDIRECT_URL
       ? String(config.FRONTEND_OAUTH_REDIRECT_URL)
       : undefined,
-    FRONTEND_BASE_URL: config.FRONTEND_BASE_URL
-      ? String(config.FRONTEND_BASE_URL)
-      : undefined,
-    BACKEND_BASE_URL: config.BACKEND_BASE_URL
-      ? String(config.BACKEND_BASE_URL)
-      : undefined,
+    FRONTEND_BASE_URL: config.FRONTEND_BASE_URL ? String(config.FRONTEND_BASE_URL) : undefined,
+    BACKEND_BASE_URL: config.BACKEND_BASE_URL ? String(config.BACKEND_BASE_URL) : undefined,
     SMTP_USER: config.SMTP_USER ? String(config.SMTP_USER) : undefined,
     SMTP_PASS: config.SMTP_PASS ? String(config.SMTP_PASS) : undefined,
     SMTP_FROM: config.SMTP_FROM ? String(config.SMTP_FROM) : undefined,

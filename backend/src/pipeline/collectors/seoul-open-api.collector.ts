@@ -31,27 +31,19 @@ export class SeoulOpenApiCollector implements PolicyCollector {
       throw new BadRequestException('SEOUL_OPEN_API_KEY 환경 변수가 필요합니다.');
     }
 
-    const keyParam =
-      this.configService.get<string>('SEOUL_OPEN_API_KEY_PARAM') ?? 'KEY';
+    const keyParam = this.configService.get<string>('SEOUL_OPEN_API_KEY_PARAM') ?? 'KEY';
     const pageSize = Number(this.configService.get<string>('SEOUL_OPEN_API_PAGE_SIZE') ?? 100);
     const maxPages = Number(this.configService.get<string>('SEOUL_OPEN_API_MAX_PAGES') ?? 30);
     const apiHost =
-      this.configService.get<string>('SEOUL_OPEN_API_HOST') ??
-      'http://openapi.seoul.go.kr:8088';
-    const format =
-      this.configService.get<string>('SEOUL_OPEN_API_FORMAT') ?? 'json';
-    const serviceName =
-      this.configService.get<string>('SEOUL_OPEN_API_SERVICE_NAME');
+      this.configService.get<string>('SEOUL_OPEN_API_HOST') ?? 'http://openapi.seoul.go.kr:8088';
+    const format = this.configService.get<string>('SEOUL_OPEN_API_FORMAT') ?? 'json';
+    const serviceName = this.configService.get<string>('SEOUL_OPEN_API_SERVICE_NAME');
     const serviceNames = this.parseServiceNames(
       this.configService.get<string>('SEOUL_OPEN_API_SERVICE_NAMES'),
       serviceName,
     );
-    const startIndex = Number(
-      this.configService.get<string>('SEOUL_OPEN_API_START_INDEX') ?? 1,
-    );
-    const endIndex = Number(
-      this.configService.get<string>('SEOUL_OPEN_API_END_INDEX') ?? pageSize,
-    );
+    const startIndex = Number(this.configService.get<string>('SEOUL_OPEN_API_START_INDEX') ?? 1);
+    const endIndex = Number(this.configService.get<string>('SEOUL_OPEN_API_END_INDEX') ?? pageSize);
 
     if (serviceNames.length === 0 && !apiUrl) {
       throw new BadRequestException(
@@ -102,49 +94,49 @@ export class SeoulOpenApiCollector implements PolicyCollector {
 
     const now = new Date().toISOString();
 
-    return items
-      .map((item) => {
-        const title =
-          pickFirstString(item, ['TITLE', 'title', '서비스명', 'plcyNm']) ?? '서울 공공데이터';
-        const sourceUrl = pickFirstString(item, ['URL', 'url', 'HOMEPAGE', '상세조회URL']);
-        const regionCodes = mapMvpRegionCodesFromStrings([
-          pickFirstString(item, ['ORG_NM']) ?? '',
-          pickFirstString(item, ['UP_ORG_NM']) ?? '',
-          pickFirstString(item, ['BIZ_NM']) ?? '',
-          title,
-          sourceUrl ?? '',
-        ]);
+    return items.map((item) => {
+      const title =
+        pickFirstString(item, ['TITLE', 'title', '서비스명', 'plcyNm']) ?? '서울 공공데이터';
+      const sourceUrl = pickFirstString(item, ['URL', 'url', 'HOMEPAGE', '상세조회URL']);
+      const regionCodes = mapMvpRegionCodesFromStrings([
+        pickFirstString(item, ['ORG_NM']) ?? '',
+        pickFirstString(item, ['UP_ORG_NM']) ?? '',
+        pickFirstString(item, ['BIZ_NM']) ?? '',
+        title,
+        sourceUrl ?? '',
+      ]);
 
-        const applicationUrl = pickFirstString(item, [
-          'APLY_URL', 'APPLICATION_URL', 'HOMEPAGE',
-        ]);
-        const applicationMethod = pickFirstString(item, [
-          'APLY_MTH', 'APPLICATION_METHOD', 'REG_METHOD',
-        ]);
-        const supportContent = pickFirstString(item, [
-          'SPRT_CN', 'SUPPORT_CONTENT', 'BIZ_CN', 'CONTENT',
-        ]);
-        const targetInfo = pickFirstString(item, [
-          'TRGT_CN', 'TARGET_CN', 'ELIGIBLE_CN',
-        ]);
+      const applicationUrl = pickFirstString(item, ['APLY_URL', 'APPLICATION_URL', 'HOMEPAGE']);
+      const applicationMethod = pickFirstString(item, [
+        'APLY_MTH',
+        'APPLICATION_METHOD',
+        'REG_METHOD',
+      ]);
+      const supportContent = pickFirstString(item, [
+        'SPRT_CN',
+        'SUPPORT_CONTENT',
+        'BIZ_CN',
+        'CONTENT',
+      ]);
+      const targetInfo = pickFirstString(item, ['TRGT_CN', 'TARGET_CN', 'ELIGIBLE_CN']);
 
-        return {
-          source: this.sourceName,
-          sourceUrl: sourceUrl ?? undefined,
-          title,
-          body: stringifyBody(item),
-          fetchedAt: now,
-          metadata: {
-            providerName: pickFirstString(item, ['ORG_NM', 'UP_ORG_NM']) ?? '서울 열린데이터광장',
-            regionCodes,
-            applicationUrl: applicationUrl ?? sourceUrl,
-            applicationMethod,
-            supportContent,
-            targetInfo,
-            raw: item,
-          },
-        } satisfies RawPolicyDocument;
-      });
+      return {
+        source: this.sourceName,
+        sourceUrl: sourceUrl ?? undefined,
+        title,
+        body: stringifyBody(item),
+        fetchedAt: now,
+        metadata: {
+          providerName: pickFirstString(item, ['ORG_NM', 'UP_ORG_NM']) ?? '서울 열린데이터광장',
+          regionCodes,
+          applicationUrl: applicationUrl ?? sourceUrl,
+          applicationMethod,
+          supportContent,
+          targetInfo,
+          raw: item,
+        },
+      } satisfies RawPolicyDocument;
+    });
   }
 
   private parseServiceNames(

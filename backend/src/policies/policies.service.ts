@@ -1,36 +1,19 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from '../config/redis.module';
-import {
-  evaluateMvpScope,
-  getPolicySource,
-} from '../common/constants/mvp-policy-scope.constant';
+import { evaluateMvpScope, getPolicySource } from '../common/constants/mvp-policy-scope.constant';
 import { Gender } from '../common/enums/gender.enum';
 import { InterestCategory } from '../common/enums/interest-category.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
 import { RegionCode, regionMatches } from '../common/enums/region-code.enum';
 import { UserPolicyState as UserPolicyStateEnum } from '../common/enums/user-policy-state.enum';
-import {
-  EligibilityCheck,
-  Policy,
-  PolicyRule,
-  UserPolicyState,
-} from '../database/entities';
+import { EligibilityCheck, Policy, PolicyRule, UserPolicyState } from '../database/entities';
 import { EligibilityService } from '../eligibility/eligibility.service';
 import { UsersService } from '../users/users.service';
-import {
-  ListPoliciesQueryDto,
-  PolicySortBy,
-  SortOrder,
-} from './dto/list-policies-query.dto';
+import { ListPoliciesQueryDto, PolicySortBy, SortOrder } from './dto/list-policies-query.dto';
 import { PublicListPoliciesQueryDto } from './dto/public-list-policies-query.dto';
 import { UpdateUserPolicyStateDto } from './dto/update-user-policy-state.dto';
 
@@ -62,34 +45,33 @@ export class PoliciesService {
       where: { status: PolicyStatus.ACTIVE },
     });
 
-    const filtered = policies
-      .filter((policy) => {
-        if (!this.isPolicyInMvpScope(policy)) {
+    const filtered = policies.filter((policy) => {
+      if (!this.isPolicyInMvpScope(policy)) {
+        return false;
+      }
+
+      if (query.interest && policy.categories.length > 0) {
+        if (!policy.categories.includes(query.interest)) {
           return false;
         }
+      }
 
-        if (query.interest && policy.categories.length > 0) {
-          if (!policy.categories.includes(query.interest)) {
-            return false;
-          }
+      if (query.regionCode && policy.regionCodes.length > 0) {
+        if (!policy.regionCodes.some((pr) => regionMatches(pr, query.regionCode!))) {
+          return false;
         }
+      }
 
-        if (query.regionCode && policy.regionCodes.length > 0) {
-          if (!policy.regionCodes.some((pr) => regionMatches(pr, query.regionCode!))) {
-            return false;
-          }
+      if (query.search) {
+        const keyword = query.search.toLowerCase();
+        const content = `${policy.title} ${policy.shortDescription}`.toLowerCase();
+        if (!content.includes(keyword)) {
+          return false;
         }
+      }
 
-        if (query.search) {
-          const keyword = query.search.toLowerCase();
-          const content = `${policy.title} ${policy.shortDescription}`.toLowerCase();
-          if (!content.includes(keyword)) {
-            return false;
-          }
-        }
-
-        return true;
-      });
+      return true;
+    });
 
     const sorted = filtered.sort((a, b) => {
       const direction = query.order === SortOrder.ASC ? 1 : -1;
@@ -317,11 +299,7 @@ export class PoliciesService {
     };
   }
 
-  async checkEligibility(
-    userId: string,
-    policyId: string,
-    answers: Record<string, unknown>,
-  ) {
+  async checkEligibility(userId: string, policyId: string, answers: Record<string, unknown>) {
     // 프로필이 없어도 answers에 age/regionCode가 있으면 자격 판별 가능
     const profile = await this.usersService.findProfile(userId);
     if (!profile) {
@@ -382,7 +360,11 @@ export class PoliciesService {
 
     // 프로필 없는 경우(스테일 JWT 등) 판별 결과만 반환하고 이력 저장 스킵
     if (!profile) {
-      return { result: evaluated.result, reasons: evaluated.reasons, explanation: evaluated.explanation };
+      return {
+        result: evaluated.result,
+        reasons: evaluated.reasons,
+        explanation: evaluated.explanation,
+      };
     }
 
     const savedCheck = await this.eligibilityCheckRepository.save(
@@ -411,11 +393,7 @@ export class PoliciesService {
     };
   }
 
-  async updateUserPolicyState(
-    userId: string,
-    policyId: string,
-    dto: UpdateUserPolicyStateDto,
-  ) {
+  async updateUserPolicyState(userId: string, policyId: string, dto: UpdateUserPolicyStateDto) {
     const policy = await this.policyRepository.findOne({ where: { id: policyId } });
     if (!policy) {
       throw new NotFoundException('정책을 찾을 수 없습니다.');
@@ -437,8 +415,8 @@ export class PoliciesService {
       note: dto.note ?? current?.note ?? null,
       appliedAt:
         dto.state === UserPolicyStateEnum.APPLIED
-          ? current?.appliedAt ?? new Date()
-          : current?.appliedAt ?? null,
+          ? (current?.appliedAt ?? new Date())
+          : (current?.appliedAt ?? null),
     });
 
     const saved = await this.userPolicyStateRepository.save(next);
@@ -520,7 +498,10 @@ export class PoliciesService {
       return false;
     }
 
-    if (policy.regionCodes.length > 0 && !policy.regionCodes.some((pr) => regionMatches(pr, regionCode))) {
+    if (
+      policy.regionCodes.length > 0 &&
+      !policy.regionCodes.some((pr) => regionMatches(pr, regionCode))
+    ) {
       return false;
     }
 
@@ -597,11 +578,7 @@ export class PoliciesService {
     }
   }
 
-  private async safeRedisSet(
-    key: string,
-    value: string,
-    ttlSeconds: number,
-  ): Promise<void> {
+  private async safeRedisSet(key: string, value: string, ttlSeconds: number): Promise<void> {
     try {
       await this.redis.set(key, value, 'EX', ttlSeconds);
     } catch {
@@ -651,18 +628,15 @@ export class PoliciesService {
    * - 'minimal' : 나이/지역만, 힌트도 없음 → 데이터 부족 경고 적합
    * INFO 정책은 조건이 없는 게 정상이므로 'full' 반환.
    */
-  private computeEligibilityCompleteness(
-    policy: Policy,
-  ): 'full' | 'partial' | 'minimal' {
+  private computeEligibilityCompleteness(policy: Policy): 'full' | 'partial' | 'minimal' {
     if (policy.policyType === PolicyType.INFO) return 'full';
 
     const BASE_KEYS = new Set(['age', 'regionCode']);
-    const hasExtraRequirements = (policy.requirements ?? []).some(
-      (r) => !BASE_KEYS.has(r.key),
-    );
+    const hasExtraRequirements = (policy.requirements ?? []).some((r) => !BASE_KEYS.has(r.key));
     if (hasExtraRequirements) return 'full';
 
-    const BLOCKING_PATTERN = /선착순|인원\s*제한|모집\s*마감|심사|면접|위원회\s*평가|중복\s*(혜택|신청)/;
+    const BLOCKING_PATTERN =
+      /선착순|인원\s*제한|모집\s*마감|심사|면접|위원회\s*평가|중복\s*(혜택|신청)/;
     const activeRules = (policy.rules ?? []).filter((r) => r.isActive);
     const hasBlockingHint = activeRules.some((r) =>
       r.definition?.conditionalHints?.some((h) => BLOCKING_PATTERN.test(h)),

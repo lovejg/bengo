@@ -1,9 +1,7 @@
 import { InterestCategory } from '../enums/interest-category.enum';
 import { RegionCode } from '../enums/region-code.enum';
 
-export const MVP_ALLOWED_REGIONS: RegionCode[] = [
-  RegionCode.SEOUL,
-];
+export const MVP_ALLOWED_REGIONS: RegionCode[] = [RegionCode.SEOUL];
 
 export const MVP_ALLOWED_CATEGORIES: InterestCategory[] = [
   InterestCategory.YOUTH,
@@ -12,7 +10,8 @@ export const MVP_ALLOWED_CATEGORIES: InterestCategory[] = [
   InterestCategory.DISABILITY,
 ];
 
-export const MVP_EXCLUDED_SOURCES = ['youthcenter-center'];
+// 수집은 가능하지만 MVP 범위에서 제외할 소스 목록. 현재는 비어 있음(확장 지점).
+export const MVP_EXCLUDED_SOURCES: string[] = [];
 
 // 우선순위 높은 소스 먼저 수집 (중복 제거 시 먼저 수집된 쪽이 유지됨)
 export const MVP_DEFAULT_BATCH_SOURCES = [
@@ -37,15 +36,13 @@ export function evaluateMvpScope(
     return { inScope: false, reason: `MVP 제외 소스(${source})` };
   }
 
-  const hasAllowedCategory = categories.some((c) =>
-    MVP_ALLOWED_CATEGORIES.includes(c),
-  );
+  const hasAllowedCategory = categories.some((c) => MVP_ALLOWED_CATEGORIES.includes(c));
   if (!hasAllowedCategory) {
     return { inScope: false, reason: 'MVP 카테고리 불일치' };
   }
 
-  const hasAllowedRegion = regionCodes.some((r) =>
-    MVP_ALLOWED_REGIONS.includes(r) || r.startsWith('seoul'),
+  const hasAllowedRegion = regionCodes.some(
+    (r) => MVP_ALLOWED_REGIONS.includes(r) || r.startsWith('seoul'),
   );
   if (!hasAllowedRegion) {
     return { inScope: false, reason: 'MVP 지역(서울) 불일치' };
@@ -54,9 +51,7 @@ export function evaluateMvpScope(
   return { inScope: true, reason: '' };
 }
 
-export function getPolicySource(
-  extraMeta: unknown,
-): string | null {
+export function getPolicySource(extraMeta: unknown): string | null {
   const metadata = extraMeta as Record<string, unknown> | undefined;
   if (!metadata) return null;
 

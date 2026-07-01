@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  evaluateMvpScope,
-  getPolicySource,
-} from '../common/constants/mvp-policy-scope.constant';
+import { evaluateMvpScope, getPolicySource } from '../common/constants/mvp-policy-scope.constant';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { Policy } from '../database/entities';
 
@@ -136,9 +133,7 @@ export class PipelineQualityService {
         missingBoth,
         mvpCoverageRate: total > 0 ? Number((inMvpScope / total).toFixed(4)) : 0,
       },
-      bySource: Array.from(bySourceMap.values()).sort((a, b) =>
-        a.source.localeCompare(b.source),
-      ),
+      bySource: Array.from(bySourceMap.values()).sort((a, b) => a.source.localeCompare(b.source)),
       outOfScopeSamples,
     };
   }
