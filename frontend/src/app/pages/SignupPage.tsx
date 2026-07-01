@@ -1,0 +1,303 @@
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { signup } from '../api/auth';
+import { ApiClientError, getEmailVerificationPath } from '../api/client';
+import { Button } from '../components/atoms/Button';
+import { Input } from '../components/atoms/Input';
+import { Chip } from '../components/atoms/Chip';
+import type { Gender, InterestCategory } from '../types';
+
+const CURRENT_YEAR = 2026;
+const MAX_INTERESTS = 2;
+
+const interestCategoryMap: Record<string, InterestCategory> = {
+  청년정책: 'youth_policy',
+  육아정책: 'childcare_policy',
+  노인정책: 'senior_policy',
+  장애인정책: 'disability_policy',
+};
+
+export function SignupPage() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    birthYear: '',
+    gender: '',
+    email: '',
+    password: '',
+    region: 'seoul',
+    interests: ['청년정책'],
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const interests = [
+    { id: '청년정책', label: '청년정책', enabled: true },
+    { id: '육아정책', label: '육아정책', enabled: true },
+    { id: '노인정책', label: '노인정책', enabled: true },
+    { id: '장애인정책', label: '장애인정책', enabled: true },
+  ];
+
+  const validateStep1 = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.email) {
+      newErrors.email = '이메일을 입력해주세요';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = '올바른 이메일 형식이 아닙니다';
+    }
+
+    if (!formData.password) {
+      newErrors.password = '비밀번호를 입력해주세요';
+    } else if (formData.password.length < 8) {
+      newErrors.password = '비밀번호는 8자 이상이어야 합니다';
+    }
+
+    if (!formData.birthYear) {
+      newErrors.birthYear = '출생연도를 입력해주세요';
+    } else if (parseInt(formData.birthYear) < 1900 || parseInt(formData.birthYear) > CURRENT_YEAR) {
+      newErrors.birthYear = '올바른 출생연도를 입력해주세요';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateStep1()) {
+      setStep(2);
+      setErrors({});
+    }
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const birthYear = parseInt(formData.birthYear, 10);
+      const regionCode = 'seoul' as const;
+      const interestList = formData.interests
+        .map((interest) => interestCategoryMap[interest])
+        .filter(Boolean) as InterestCategory[];
+      if (interestList.length === 0) {
+        toast.error('관심 분야를 1개 이상 선택해주세요.');
+        return;
+      }
+      if (interestList.length > MAX_INTERESTS) {
+        toast.error(`관심 분야는 최대 ${MAX_INTERESTS}개까지 선택할 수 있습니다.`);
+        return;
+      }
+      const age = Math.max(0, CURRENT_YEAR - birthYear);
+
+      await signup({
+        email: formData.email,
+        password: formData.password,
+        age,
+        gender: (formData.gender || 'unspecified') as Gender,
+        regionCode,
+        interests: interestList,
+      });
+
+      toast.success('인증 메일을 보냈습니다.');
+      navigate(getEmailVerificationPath(formData.email));
+    } catch (error) {
+      if (
+        error instanceof ApiClientError &&
+        (error.status === 409 || error.message.toLowerCase().includes('conflict'))
+      ) {
+        toast.info('이미 가입 요청된 이메일입니다. 인증 메일을 확인해주세요.');
+        navigate(getEmailVerificationPath(formData.email));
+        return;
+      }
+
+      const message = error instanceof ApiClientError ? error.message : '회원가입에 실패했습니다. 다시 시도해주세요.';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center px-4 py-8 sm:py-12">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-6 sm:mb-8">
+          <Link to="/" className="inline-flex items-center gap-2.5 sm:gap-3 mb-4 hover:opacity-80 transition-opacity">
+            <div className="relative">
+              <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl shadow-lg shadow-blue-500/30">
+                <ArrowRight className="h-5 w-5 sm:h-6 sm:w-6 text-white" strokeWidth={2.5} aria-hidden="true" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full"></div>
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-none">bengo</span>
+              <span className="text-[10px] sm:text-xs text-[var(--muted-foreground)] tracking-wide leading-none mt-0.5 sm:mt-1">benefit + go</span>
+            </div>
+          </Link>
+          <p className="text-sm sm:text-base text-[var(--muted-foreground)]">맞춤 정책 추천을 받으려면 가입하세요</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-8">
+          {/* Progress */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[var(--muted-foreground)]">
+                {step === 1 ? '기본 정보' : '추가 정보'}
+              </span>
+              <span className="text-sm text-[var(--muted-foreground)]">{step} / 2</span>
+            </div>
+            <div className="h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--accent)] transition-all duration-300"
+                style={{ width: `${(step / 2) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Step 1: Basic Info */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-2">이메일</label>
+                <Input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  error={errors.email}
+                />
+              </div>
+
+              <div>
+                <label className="block mb-2">비밀번호</label>
+                <Input
+                  type="password"
+                  placeholder="8자 이상"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  error={errors.password}
+                />
+              </div>
+
+              <div>
+                <label className="block mb-2">출생연도</label>
+                <Input
+                  type="number"
+                  placeholder="예: 1995"
+                  value={formData.birthYear}
+                  onChange={(e) => setFormData({ ...formData, birthYear: e.target.value })}
+                  error={errors.birthYear}
+                />
+              </div>
+
+              <div>
+                <label className="block mb-2">성별 (선택)</label>
+                <div className="flex gap-2">
+                  <Chip
+                    selected={formData.gender === 'male'}
+                    onClick={() => setFormData({ ...formData, gender: 'male' })}
+                    className="flex-1"
+                  >
+                    남성
+                  </Chip>
+                  <Chip
+                    selected={formData.gender === 'female'}
+                    onClick={() => setFormData({ ...formData, gender: 'female' })}
+                    className="flex-1"
+                  >
+                    여성
+                  </Chip>
+                  <Chip
+                    selected={formData.gender === 'unspecified'}
+                    onClick={() => setFormData({ ...formData, gender: 'unspecified' })}
+                    className="flex-1"
+                  >
+                    선택 안 함
+                  </Chip>
+                </div>
+              </div>
+
+              <Button onClick={handleNext} className="w-full mt-6">
+                다음
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Step 2: Additional Info */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div>
+                <label className="block mb-3">거주 지역</label>
+                <Chip selected>서울</Chip>
+              </div>
+
+              <div>
+                <label className="block mb-3">관심 분야</label>
+                <p className="mb-3 text-xs text-[var(--muted-foreground)]">최대 {MAX_INTERESTS}개까지 선택할 수 있어요.</p>
+                <div className="space-y-2">
+                  {interests.map((interest) => (
+                    <button
+                      key={interest.id}
+                      type="button"
+                      onClick={() => {
+                        setFormData((current) => ({
+                          ...current,
+                          interests: current.interests.includes(interest.id)
+                            ? current.interests.filter((item) => item !== interest.id)
+                            : current.interests.length >= MAX_INTERESTS
+                              ? current.interests
+                              : [...current.interests, interest.id],
+                        }));
+                        if (
+                          !formData.interests.includes(interest.id) &&
+                          formData.interests.length >= MAX_INTERESTS
+                        ) {
+                          toast.info(`관심 분야는 최대 ${MAX_INTERESTS}개까지 선택할 수 있어요.`);
+                        }
+                      }}
+                      className={`w-full p-4 border rounded-xl text-left transition-colors cursor-pointer ${
+                        formData.interests.includes(interest.id)
+                          ? 'border-[var(--accent)] bg-blue-50 text-[var(--accent)]'
+                          : 'border-[var(--border)] bg-white hover:bg-[var(--muted)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{interest.label}</span>
+                        <span className="text-xs text-[var(--muted-foreground)]">선택 가능</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <Button variant="secondary" onClick={() => setStep(1)} className="flex-1">
+                  이전
+                </Button>
+                <Button onClick={handleSubmit} loading={loading} className="flex-1">
+                  맞춤 정책 추천 받기
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <p className="text-center mt-6 text-[var(--muted-foreground)]">
+          이미 계정이 있으신가요?{' '}
+          <Link to="/login" className="text-[var(--accent)] hover:underline">
+            로그인
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default SignupPage;

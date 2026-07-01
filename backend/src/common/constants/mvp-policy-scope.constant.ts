@@ -1,0 +1,68 @@
+import { InterestCategory } from '../enums/interest-category.enum';
+import { RegionCode } from '../enums/region-code.enum';
+
+export const MVP_ALLOWED_REGIONS: RegionCode[] = [RegionCode.SEOUL];
+
+export const MVP_ALLOWED_CATEGORIES: InterestCategory[] = [
+  InterestCategory.YOUTH,
+  InterestCategory.CHILDCARE,
+  InterestCategory.SENIOR,
+  InterestCategory.DISABILITY,
+];
+
+// 수집은 가능하지만 MVP 범위에서 제외할 소스 목록. 현재는 비어 있음(확장 지점).
+export const MVP_EXCLUDED_SOURCES: string[] = [];
+
+// 우선순위 높은 소스 먼저 수집 (중복 제거 시 먼저 수집된 쪽이 유지됨)
+export const MVP_DEFAULT_BATCH_SOURCES = [
+  'youth-seoul',
+  'data-go-kr',
+  'bokjiro-central',
+  'bokjiro-local',
+  'youthcenter-policy',
+] as const;
+
+export interface MvpScopeResult {
+  inScope: boolean;
+  reason: string;
+}
+
+export function evaluateMvpScope(
+  source: string,
+  categories: InterestCategory[],
+  regionCodes: RegionCode[],
+): MvpScopeResult {
+  if (MVP_EXCLUDED_SOURCES.includes(source)) {
+    return { inScope: false, reason: `MVP 제외 소스(${source})` };
+  }
+
+  const hasAllowedCategory = categories.some((c) => MVP_ALLOWED_CATEGORIES.includes(c));
+  if (!hasAllowedCategory) {
+    return { inScope: false, reason: 'MVP 카테고리 불일치' };
+  }
+
+  const hasAllowedRegion = regionCodes.some(
+    (r) => MVP_ALLOWED_REGIONS.includes(r) || r.startsWith('seoul'),
+  );
+  if (!hasAllowedRegion) {
+    return { inScope: false, reason: 'MVP 지역(서울) 불일치' };
+  }
+
+  return { inScope: true, reason: '' };
+}
+
+export function getPolicySource(extraMeta: unknown): string | null {
+  const metadata = extraMeta as Record<string, unknown> | undefined;
+  if (!metadata) return null;
+
+  const pipeline = metadata.pipeline as Record<string, unknown> | undefined;
+  if (pipeline && typeof pipeline.source === 'string' && pipeline.source.trim()) {
+    return pipeline.source.trim();
+  }
+
+  if (typeof metadata.originalSource === 'string' && metadata.originalSource.trim()) {
+    return metadata.originalSource.trim();
+  }
+
+  return null;
+}
