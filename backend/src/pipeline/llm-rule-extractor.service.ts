@@ -266,10 +266,8 @@ export class LlmRuleExtractorService {
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('ANTHROPIC_API_KEY');
-    this.model =
-      this.configService.get<string>('LLM_MODEL') ?? 'claude-haiku-4-5-20251001';
-    this.enabled =
-      this.configService.get<string>('LLM_ENABLED') !== 'false';
+    this.model = this.configService.get<string>('LLM_MODEL') ?? 'claude-haiku-4-5-20251001';
+    this.enabled = this.configService.get<string>('LLM_ENABLED') !== 'false';
 
     if (apiKey && this.enabled) {
       this.client = new Anthropic({ apiKey });
@@ -310,7 +308,7 @@ export class LlmRuleExtractorService {
         // system prompt는 모든 호출에서 동일 → Anthropic prompt caching으로 토큰 비용 절감
         system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: userMessage }],
-      } as any);
+      });
 
       const text = response.content
         .filter((block): block is Anthropic.TextBlock => block.type === 'text')
@@ -429,17 +427,16 @@ export class LlmRuleExtractorService {
         }
       }
 
-      const policyType = (parsed.policyType === 'application' || parsed.policyType === 'info')
-        ? parsed.policyType
-        : null;
+      const policyType =
+        parsed.policyType === 'application' || parsed.policyType === 'info'
+          ? parsed.policyType
+          : null;
 
-      const detectedPeriod = typeof parsed.detectedPeriod === 'string'
-        ? parsed.detectedPeriod.trim()
-        : null;
+      const detectedPeriod =
+        typeof parsed.detectedPeriod === 'string' ? parsed.detectedPeriod.trim() : null;
 
-      const targetDescription = typeof parsed.targetDescription === 'string'
-        ? parsed.targetDescription.trim()
-        : null;
+      const targetDescription =
+        typeof parsed.targetDescription === 'string' ? parsed.targetDescription.trim() : null;
 
       // LLM이 직접 제공한 중첩 rule 트리 (조건부 분기용)
       const root = this.validateRuleNode(parsed.root) ?? null;
@@ -454,7 +451,8 @@ export class LlmRuleExtractorService {
             conditions.push({
               key,
               label: sampleNode.message || key,
-              type: typeof sampleNode.value === 'number' ? QuestionType.NUMBER : QuestionType.STRING,
+              type:
+                typeof sampleNode.value === 'number' ? QuestionType.NUMBER : QuestionType.STRING,
               options: null,
               fact: factPath,
               op: sampleNode.op,
@@ -467,7 +465,16 @@ export class LlmRuleExtractorService {
         }
       }
 
-      return { conditions, root, conditionalHints, summary, detectedAge, policyType, detectedPeriod, targetDescription };
+      return {
+        conditions,
+        root,
+        conditionalHints,
+        summary,
+        detectedAge,
+        policyType,
+        detectedPeriod,
+        targetDescription,
+      };
     } catch (error) {
       this.logger.warn(
         `Failed to parse LLM response: ${error instanceof Error ? error.message : String(error)}`,
@@ -490,7 +497,14 @@ export class LlmRuleExtractorService {
     if (!key || !label || !fact || !op) return null;
 
     // age/region/gender는 base conditions에서 처리하므로 제외
-    const excludedKeys = new Set(['age', 'region', 'regionCode', 'gender', 'residenceRegion', 'residence']);
+    const excludedKeys = new Set([
+      'age',
+      'region',
+      'regionCode',
+      'gender',
+      'residenceRegion',
+      'residence',
+    ]);
     if (excludedKeys.has(key)) return null;
     // 거주지 관련 key를 다양한 이름으로 우회하는 경우도 제외
     if (/residen|거주|지역/.test(key.toLowerCase())) return null;
@@ -518,15 +532,21 @@ export class LlmRuleExtractorService {
 
     // 사용자가 본인 상황을 명확히 알 수 있는 key는 항상 verifiable
     const alwaysVerifiableKeys = new Set([
-      'householdType', 'employmentStatus', 'educationLevel',
-      'enrollmentStatus', 'isBusinessOwner', 'maritalStatus',
-      'hasDisability', 'militaryStatus', 'numberOfChildren',
-      'housingStatus', 'isStartup',
+      'householdType',
+      'employmentStatus',
+      'educationLevel',
+      'enrollmentStatus',
+      'isBusinessOwner',
+      'maritalStatus',
+      'hasDisability',
+      'militaryStatus',
+      'numberOfChildren',
+      'housingStatus',
+      'isStartup',
     ]);
     // select/number/boolean 타입은 사용자가 직접 답변하므로 항상 verifiable
     // string 타입도 =, !=, in op는 직접 비교 가능하므로 verifiable
-    const stringWithDirectOp =
-      type === QuestionType.STRING && ['=', '!=', 'in'].includes(op);
+    const stringWithDirectOp = type === QuestionType.STRING && ['=', '!=', 'in'].includes(op);
     const typeIsDirectlyAnswerable =
       type === QuestionType.SELECT ||
       type === QuestionType.NUMBER ||
@@ -544,8 +564,8 @@ export class LlmRuleExtractorService {
       if (finalOp === '=' && typeof finalValue === 'string') {
         if (!options.includes(finalValue)) {
           // value가 options에 없으면 → 부분 매칭 시도
-          const matched = options.filter((o) =>
-            o.includes(finalValue as string) || (finalValue as string).includes(o),
+          const matched = options.filter(
+            (o) => o.includes(finalValue as string) || (finalValue as string).includes(o),
           );
           if (matched.length > 0) {
             finalOp = 'in';
@@ -557,9 +577,7 @@ export class LlmRuleExtractorService {
       if (finalOp === 'in' && Array.isArray(finalValue)) {
         const resolved = (finalValue as string[]).flatMap((v) => {
           if (options.includes(v)) return [v];
-          const matched = options.filter((o) =>
-            o.includes(v) || v.includes(o),
-          );
+          const matched = options.filter((o) => o.includes(v) || v.includes(o));
           return matched.length > 0 ? matched : [v];
         });
         finalValue = [...new Set(resolved)];
@@ -587,15 +605,22 @@ export class LlmRuleExtractorService {
   ): 'application' | 'info' | null {
     // info로 강제 보정하는 키워드 (제목 기준)
     const infoTitlePatterns = [
-      /센터\s*운영/, /센터\)?\s*$/, /공간\s*운영/, /카페\s*운영/,
-      /상담소/, /정보\s*안내/, /홈페이지\s*운영/,
+      /센터\s*운영/,
+      /센터\)?\s*$/,
+      /공간\s*운영/,
+      /카페\s*운영/,
+      /상담소/,
+      /정보\s*안내/,
+      /홈페이지\s*운영/,
     ];
     const titleHasInfoPattern = infoTitlePatterns.some((p) => p.test(title));
 
     if (titleHasInfoPattern && llmType === 'application') {
       // 제목이 센터/공간 운영인데 LLM이 application으로 판단한 경우
       // 설명에 신청/선발/모집 키워드가 없으면 info로 보정
-      const hasApplicationKeyword = /모집\s*공고|선발|선정|신청서\s*접수|합격자\s*발표/.test(description);
+      const hasApplicationKeyword = /모집\s*공고|선발|선정|신청서\s*접수|합격자\s*발표/.test(
+        description,
+      );
       if (!hasApplicationKeyword) {
         this.logger.log(`policyType corrected: application → info (title: "${title}")`);
         return 'info';
@@ -605,17 +630,23 @@ export class LlmRuleExtractorService {
     return llmType;
   }
 
-  private validateRuleNode(raw: unknown): import('../common/interfaces/rule-expression.interface').RuleNode | null {
+  private validateRuleNode(
+    raw: unknown,
+  ): import('../common/interfaces/rule-expression.interface').RuleNode | null {
     if (!raw || typeof raw !== 'object') return null;
     const obj = raw as Record<string, unknown>;
 
     // all/any 그룹
     if (Array.isArray(obj.all)) {
-      const children = obj.all.map((c) => this.validateRuleNode(c)).filter((c): c is NonNullable<typeof c> => c !== null);
+      const children = obj.all
+        .map((c) => this.validateRuleNode(c))
+        .filter((c): c is NonNullable<typeof c> => c !== null);
       if (children.length > 0) return { all: children };
     }
     if (Array.isArray(obj.any)) {
-      const children = obj.any.map((c) => this.validateRuleNode(c)).filter((c): c is NonNullable<typeof c> => c !== null);
+      const children = obj.any
+        .map((c) => this.validateRuleNode(c))
+        .filter((c): c is NonNullable<typeof c> => c !== null);
       if (children.length > 0) return { any: children };
     }
 
@@ -639,16 +670,20 @@ export class LlmRuleExtractorService {
   /** root 트리에서 모든 leaf condition의 fact → 첫 번째 등장 노드를 수집 */
   private collectFactsFromRuleNode(
     node: import('../common/interfaces/rule-expression.interface').RuleNode,
-    result: Map<string, import('../common/interfaces/rule-expression.interface').RuleCondition> = new Map(),
+    result: Map<
+      string,
+      import('../common/interfaces/rule-expression.interface').RuleCondition
+    > = new Map(),
   ): Map<string, import('../common/interfaces/rule-expression.interface').RuleCondition> {
     if ('fact' in node) {
       if (!result.has(node.fact)) {
         result.set(node.fact, node);
       }
     } else {
-      const children = (node as import('../common/interfaces/rule-expression.interface').RuleGroup).all
-        ?? (node as import('../common/interfaces/rule-expression.interface').RuleGroup).any
-        ?? [];
+      const children =
+        (node as import('../common/interfaces/rule-expression.interface').RuleGroup).all ??
+        (node as import('../common/interfaces/rule-expression.interface').RuleGroup).any ??
+        [];
       for (const child of children) {
         this.collectFactsFromRuleNode(child, result);
       }

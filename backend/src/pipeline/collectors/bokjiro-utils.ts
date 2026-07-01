@@ -45,7 +45,10 @@ export async function fetchBokjiroItems(
     });
 
     // 호출 URL 로그 (key는 일부만 노출)
-    const safeUrl = url.replace(/(serviceKey=)([^&]+)/, (_, p, k) => `${p}${String(k).slice(0, 8)}***`);
+    const safeUrl = url.replace(
+      /(serviceKey=)([^&]+)/,
+      (_, p, k) => `${p}${String(k).slice(0, 8)}***`,
+    );
     logger.log(`복지로 API 호출: ${safeUrl}`);
 
     const xml = await fetchText(url);
@@ -63,8 +66,7 @@ export async function fetchBokjiroItems(
     }
 
     for (const item of pageItems) {
-      const id =
-        pickFirstString(item, ['servId', 'wlfareInfoId', 'svcId']) ?? JSON.stringify(item);
+      const id = pickFirstString(item, ['servId', 'wlfareInfoId', 'svcId']) ?? JSON.stringify(item);
       if (seenIds.has(id)) continue;
       seenIds.add(id);
       items.push(item);
@@ -269,16 +271,16 @@ export function buildRawDocFromBokjiroItem(
 
   // detail 응답에 포함된 본문성 필드들을 모두 합쳐 LLM이 자격 조건을 추출할 만큼 풍부하게 구성
   const bodyParts = [
-    pickFirstString(item, ['servDgst', 'wlfareInfoDgst', '서비스요약']),    // 서비스 요약
-    pickFirstString(item, ['servCn', 'wlfareInfoCn', '서비스내용']),         // 서비스 내용
-    pickFirstString(item, ['tgtrDtlCn', 'sprtTrgtCn', 'aplyTrgtCn']),         // 지원 대상
-    pickFirstString(item, ['slctCritCn', '선정기준']),                         // 선정 기준
-    pickFirstString(item, ['aplyMtdCn', 'aplyMthdCn']),                       // 신청 방법
-    pickFirstString(item, ['rceptPdCn', 'aplyPdCn']),                         // 접수 기간
-    pickFirstString(item, ['sbmsnDcmntCn']),                                  // 제출 서류
-    pickFirstString(item, ['alwServCn']),                                     // 상시 서비스 내용 (지급내용 등)
-    pickFirstString(item, ['wlfareInfoOutlCn']),                              // 복지정보 개요
-    pickFirstString(item, ['rprsCtadr']),                                     // 문의처
+    pickFirstString(item, ['servDgst', 'wlfareInfoDgst', '서비스요약']), // 서비스 요약
+    pickFirstString(item, ['servCn', 'wlfareInfoCn', '서비스내용']), // 서비스 내용
+    pickFirstString(item, ['tgtrDtlCn', 'sprtTrgtCn', 'aplyTrgtCn']), // 지원 대상
+    pickFirstString(item, ['slctCritCn', '선정기준']), // 선정 기준
+    pickFirstString(item, ['aplyMtdCn', 'aplyMthdCn']), // 신청 방법
+    pickFirstString(item, ['rceptPdCn', 'aplyPdCn']), // 접수 기간
+    pickFirstString(item, ['sbmsnDcmntCn']), // 제출 서류
+    pickFirstString(item, ['alwServCn']), // 상시 서비스 내용 (지급내용 등)
+    pickFirstString(item, ['wlfareInfoOutlCn']), // 복지정보 개요
+    pickFirstString(item, ['rprsCtadr']), // 문의처
   ].filter((v): v is string => Boolean(v && v.trim()));
   const combinedBody = bodyParts.length > 0 ? bodyParts.join('\n\n') : stringifyBody(item);
 
@@ -300,8 +302,7 @@ export function buildRawDocFromBokjiroItem(
       targetAgeInfo: pickFirstString(item, ['lifeArray', 'trgterIndvdlNmArray', 'sprtTrgt']),
       minAge: null,
       maxAge: null,
-      applicationPeriod:
-        applicationPeriod ?? pickFirstString(item, ['aplyPdCn', 'rceptPdCn']),
+      applicationPeriod: applicationPeriod ?? pickFirstString(item, ['aplyPdCn', 'rceptPdCn']),
       warnBox: null,
       requiredDocuments: pickFirstString(item, ['sbmsnDcmntCn', 'submitDoc']),
       receptionInfo: pickFirstString(item, ['rceptInsttNm', 'rceptInstt']),

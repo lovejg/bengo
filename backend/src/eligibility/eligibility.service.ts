@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { EligibilityResult } from '../common/enums/eligibility-result.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
 import { RegionCode, SEOUL_GU_MAP, regionMatches } from '../common/enums/region-code.enum';
-import { RuleCondition, RuleDefinition, RuleNode } from '../common/interfaces/rule-expression.interface';
+import {
+  RuleCondition,
+  RuleDefinition,
+  RuleNode,
+} from '../common/interfaces/rule-expression.interface';
 import { Policy, UserProfile } from '../database/entities';
 
 interface EligibilityEvalInput {
@@ -39,9 +43,7 @@ export class EligibilityService {
     const reasons: string[] = [];
 
     // answers에 age/regionCode가 있으면 그 값을 우선 사용 (다른 사람 대리 판별 등)
-    const effectiveAge = input.answers.age != null
-      ? Number(input.answers.age)
-      : input.profile.age;
+    const effectiveAge = input.answers.age != null ? Number(input.answers.age) : input.profile.age;
 
     let effectiveRegion: RegionCode;
     if (input.answers.regionCode != null) {
@@ -50,7 +52,12 @@ export class EligibilityService {
       effectiveRegion = input.profile.regionCode;
     }
 
-    const baseCheck = this.evaluateBaseConditions(input.policy, effectiveAge, effectiveRegion, input.profile);
+    const baseCheck = this.evaluateBaseConditions(
+      input.policy,
+      effectiveAge,
+      effectiveRegion,
+      input.profile,
+    );
     reasons.push(...baseCheck.reasons);
 
     if (!baseCheck.passed) {
@@ -179,10 +186,7 @@ export class EligibilityService {
       }
     }
 
-    if (
-      policy.targetGenders.length > 0 &&
-      !policy.targetGenders.includes(profile.gender)
-    ) {
+    if (policy.targetGenders.length > 0 && !policy.targetGenders.includes(profile.gender)) {
       reasons.push('성별 조건과 일치하지 않습니다.');
     }
 
@@ -193,10 +197,7 @@ export class EligibilityService {
     };
   }
 
-  private evaluateRuleNode(
-    node: RuleNode,
-    facts: Record<string, unknown>,
-  ): RuleEvalResult {
+  private evaluateRuleNode(node: RuleNode, facts: Record<string, unknown>): RuleEvalResult {
     if (this.isCondition(node)) {
       const isUnverifiable = node.verifiable === false;
       // verifiable: false인 조건은 자동 판별 불가 → 항상 통과 + hasUnverifiable 플래그
@@ -245,10 +246,7 @@ export class EligibilityService {
     };
   }
 
-  private evaluateCondition(
-    condition: RuleCondition,
-    facts: Record<string, unknown>,
-  ): boolean {
+  private evaluateCondition(condition: RuleCondition, facts: Record<string, unknown>): boolean {
     const actual = this.getFactValue(facts, condition.fact);
     const expected = condition.value;
 
@@ -280,9 +278,7 @@ export class EligibilityService {
       case 'region_match': {
         const userRegion = String(actual) as RegionCode;
         const policyRegions = Array.isArray(expected) ? expected : [expected];
-        return policyRegions.some((pr) =>
-          regionMatches(String(pr) as RegionCode, userRegion),
-        );
+        return policyRegions.some((pr) => regionMatches(String(pr) as RegionCode, userRegion));
       }
       default:
         return false;
@@ -290,15 +286,13 @@ export class EligibilityService {
   }
 
   private getFactValue(facts: Record<string, unknown>, path: string): unknown {
-    return path
-      .split('.')
-      .reduce<unknown>((current, key) => {
-        if (typeof current === 'object' && current !== null && key in current) {
-          return (current as Record<string, unknown>)[key];
-        }
+    return path.split('.').reduce<unknown>((current, key) => {
+      if (typeof current === 'object' && current !== null && key in current) {
+        return (current as Record<string, unknown>)[key];
+      }
 
-        return undefined;
-      }, facts);
+      return undefined;
+    }, facts);
   }
 
   /** 구 이름("관악구") 또는 enum 값("seoul_gwanak") → RegionCode 변환 */

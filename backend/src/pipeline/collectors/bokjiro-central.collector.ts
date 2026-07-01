@@ -20,7 +20,7 @@ export class BokjiroCentralCollector implements PolicyCollector {
   isConfigured(): boolean {
     return Boolean(
       this.configService.get<string>('BOKJIRO_CENTRAL_API_URL') &&
-        this.configService.get<string>('BOKJIRO_API_KEY'),
+      this.configService.get<string>('BOKJIRO_API_KEY'),
     );
   }
 
@@ -52,7 +52,8 @@ export class BokjiroCentralCollector implements PolicyCollector {
     const detailUrl = this.configService.get<string>('BOKJIRO_CENTRAL_DETAIL_API_URL');
     let enriched = items;
     if (detailUrl) {
-      const enrichLimit = Number(this.configService.get<string>('BOKJIRO_ENRICH_LIMIT') ?? 0) || undefined;
+      const enrichLimit =
+        Number(this.configService.get<string>('BOKJIRO_ENRICH_LIMIT') ?? 0) || undefined;
       // 중앙부처 detail은 callTp='D' 필요
       enriched = await enrichWithDetail(items, detailUrl, apiKey, {
         extraParams: { callTp: 'D' },

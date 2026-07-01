@@ -1,13 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  ArrayMaxSize,
-  ArrayMinSize,
-  IsArray,
-  IsEnum,
-  IsInt,
-  Max,
-  Min,
-} from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsInt, Max, Min } from 'class-validator';
 import { Gender } from '../../common/enums/gender.enum';
 import { InterestCategory } from '../../common/enums/interest-category.enum';
 import { RegionCode } from '../../common/enums/region-code.enum';

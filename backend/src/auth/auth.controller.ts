@@ -1,5 +1,17 @@
 import { randomBytes } from 'crypto';
-import { Body, Controller, Get, HttpCode, Patch, Post, Query, Redirect, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  Query,
+  Redirect,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -46,9 +58,7 @@ export class AuthController {
   async verifyEmail(@Query('token') token: string, @Res() res: FastifyReply): Promise<void> {
     const frontendBase = this.configService.get<string>('FRONTEND_BASE_URL') ?? '';
     const buildResultUrl = (status: 'success' | 'expired' | 'invalid') =>
-      frontendBase
-        ? `${frontendBase.replace(/\/$/, '')}/email-verified?status=${status}`
-        : null;
+      frontendBase ? `${frontendBase.replace(/\/$/, '')}/email-verified?status=${status}` : null;
 
     // NestJS Fastify 어댑터가 핸들러 실행 전 기본 상태코드 200을 미리 설정해두기 때문에,
     // res.redirect(url)을 코드 없이 호출하면 Fastify가 기존 200을 유지함 (Location은 붙지만 200) → 명시적으로 302 전달.
@@ -97,7 +107,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: '프로필 부분 수정',
-    description: '전달된 필드만 업데이트. age/gender/regionCode/interests는 UserProfile, displayName은 User. 이메일/비밀번호는 별도 엔드포인트.',
+    description:
+      '전달된 필드만 업데이트. age/gender/regionCode/interests는 UserProfile, displayName은 User. 이메일/비밀번호는 별도 엔드포인트.',
   })
   @ApiOkResponse({ type: AuthResponseDto })
   updateProfile(
@@ -125,12 +136,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: '회원 탈퇴',
-    description: '일반 가입자는 password 필수, OAuth 전용 가입자는 password 생략 가능. cascade로 관련 데이터 모두 삭제.',
+    description:
+      '일반 가입자는 password 필수, OAuth 전용 가입자는 password 생략 가능. cascade로 관련 데이터 모두 삭제.',
   })
-  async deleteAccount(
-    @CurrentUser() user: JwtUser,
-    @Body() dto: DeleteAccountDto,
-  ): Promise<void> {
+  async deleteAccount(@CurrentUser() user: JwtUser, @Body() dto: DeleteAccountDto): Promise<void> {
     await this.authService.deleteAccount(user.sub, dto.password);
   }
 

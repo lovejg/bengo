@@ -85,10 +85,7 @@ export class PolicyEnrichmentService {
     return result;
   }
 
-  private async enrichFromGovKr(
-    policy: Policy,
-    url: string,
-  ): Promise<string[]> {
+  private async enrichFromGovKr(policy: Policy, url: string): Promise<string[]> {
     const html = await this.fetchHtml(url);
     if (!html) return [];
 
@@ -166,17 +163,17 @@ export class PolicyEnrichmentService {
     const result: ParsedGovDetail = {};
 
     const fieldMap: Record<string, keyof ParsedGovDetail> = {
-      '신청기간': 'applicationPeriod',
-      '접수기간': 'applicationPeriod',
-      '지원대상': 'supportTarget',
-      '신청자격': 'supportTarget',
-      '지원내용': 'supportContent',
-      '서비스내용': 'supportContent',
-      '신청방법': 'applicationMethod',
-      '구비서류': 'requiredDocuments',
+      신청기간: 'applicationPeriod',
+      접수기간: 'applicationPeriod',
+      지원대상: 'supportTarget',
+      신청자격: 'supportTarget',
+      지원내용: 'supportContent',
+      서비스내용: 'supportContent',
+      신청방법: 'applicationMethod',
+      구비서류: 'requiredDocuments',
       '신  청  서': 'requiredDocuments',
-      '문의처': 'contactInfo',
-      '접수기관': 'contactInfo',
+      문의처: 'contactInfo',
+      접수기관: 'contactInfo',
       '홈페이지 URL': 'homepageUrl',
     };
 
@@ -210,7 +207,7 @@ export class PolicyEnrichmentService {
   } {
     // "2025.01.01 ~ 2025.12.31" or "2025-01-01 ~ 2025-12-31"
     const rangeMatch = text.match(
-      /(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\s*[~～\-]\s*(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/,
+      /(\d{4})[./-](\d{1,2})[./-](\d{1,2})\s*[~～-]\s*(\d{4})[./-](\d{1,2})[./-](\d{1,2})/,
     );
     if (rangeMatch) {
       const pad = (n: string) => n.padStart(2, '0');
@@ -222,7 +219,7 @@ export class PolicyEnrichmentService {
 
     // "2025년 1월 1일 ~ 2025년 12월 31일"
     const korMatch = text.match(
-      /(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*[~～\-]\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/,
+      /(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*[~～-]\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/,
     );
     if (korMatch) {
       const pad = (n: string) => n.padStart(2, '0');
@@ -239,8 +236,7 @@ export class PolicyEnrichmentService {
     try {
       const response = await fetch(url, {
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (compatible; BengoBot/1.0; +https://bengo.app)',
+          'User-Agent': 'Mozilla/5.0 (compatible; BengoBot/1.0; +https://bengo.app)',
           Accept: 'text/html',
         },
         signal: AbortSignal.timeout(10000),

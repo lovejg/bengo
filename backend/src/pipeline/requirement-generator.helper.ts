@@ -25,10 +25,7 @@ export function computePolicyContentHash(policy: Policy): string {
   return createHash('md5').update(content).digest('hex');
 }
 
-export function buildAgeDescription(
-  minAge: number | null,
-  maxAge: number | null,
-): string {
+export function buildAgeDescription(minAge: number | null, maxAge: number | null): string {
   if (minAge !== null && maxAge !== null) return `만 ${minAge}세 ~ ${maxAge}세`;
   if (minAge !== null) return `만 ${minAge}세 이상`;
   if (maxAge !== null) return `만 ${maxAge}세 이하`;
@@ -49,7 +46,10 @@ export function getSeoulGuOptions(): string[] {
 const UNRESTRICTED_VALUES = new Set(['제한없음', '무관', '제한없는', '-', '해당없음', '']);
 
 export function isUnrestricted(value: string): boolean {
-  const normalized = value.trim().replace(/^[-·\s]+/, '').replace(/\s+/g, '');
+  const normalized = value
+    .trim()
+    .replace(/^[-·\s]+/, '')
+    .replace(/\s+/g, '');
   return UNRESTRICTED_VALUES.has(normalized);
 }
 
@@ -106,16 +106,13 @@ function inferQuestionType(node: Record<string, unknown>): {
   }
 
   const isNumericComparison =
-    typeof node.value === 'number' &&
-    ['<=', '>=', '<', '>'].includes(String(node.op));
+    typeof node.value === 'number' && ['<=', '>=', '<', '>'].includes(String(node.op));
   if (isNumericComparison) {
     return { type: QuestionType.NUMBER, options: null };
   }
 
   if (node.op === 'in' && Array.isArray(node.value)) {
-    const options = (node.value as unknown[]).filter(
-      (v): v is string => typeof v === 'string',
-    );
+    const options = (node.value as unknown[]).filter((v): v is string => typeof v === 'string');
     return { type: QuestionType.SELECT, options };
   }
 
@@ -134,14 +131,17 @@ export function extractFirstComeHints(extraMeta: Record<string, unknown>): strin
   const nested = (extraMeta?.metadata as Record<string, unknown> | undefined) ?? {};
 
   const isFirstCome =
-    extraMeta?.isFirstComeFirstServed === true ||
-    nested?.isFirstComeFirstServed === true;
+    extraMeta?.isFirstComeFirstServed === true || nested?.isFirstComeFirstServed === true;
   if (isFirstCome) {
     hints.push('선착순 접수 정책입니다. 모집 마감 여부를 공식 공고문에서 확인하세요.');
   }
 
   const bizPeriodEtc = (extraMeta?.bizPeriodEtc ?? nested?.bizPeriodEtc) as string | undefined;
-  if (typeof bizPeriodEtc === 'string' && bizPeriodEtc.trim() && /소진|마감|종료/.test(bizPeriodEtc)) {
+  if (
+    typeof bizPeriodEtc === 'string' &&
+    bizPeriodEtc.trim() &&
+    /소진|마감|종료/.test(bizPeriodEtc)
+  ) {
     hints.push(`${bizPeriodEtc.trim()} 조기 종료될 수 있습니다.`);
   }
 

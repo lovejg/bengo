@@ -128,11 +128,11 @@
 ```json
 {
   "mode": "mvp",
-  "targets": ["data-go-kr", "youthcenter-policy", "seoul-open-api"],
+  "targets": ["youth-seoul", "data-go-kr", "bokjiro-central", "bokjiro-local", "youthcenter-policy"],
   "skipped": [
     {
-      "source": "mock-seoul",
-      "reason": "MVP 기본 배치 대상 소스가 아닙니다."
+      "source": "seoul-open-api",
+      "reason": "환경 변수 미설정으로 수집 불가합니다."
     }
   ],
   "results": [
@@ -182,7 +182,7 @@
 ### 5.5 소스 단건 수집/적재
 `POST /pipeline/collect-and-ingest/{source}`
 
-- path 예시: `data-go-kr`, `youthcenter-policy`, `youthcenter-center`, `seoul-open-api`, `mock-seoul`
+- path 예시: `youth-seoul`, `data-go-kr`, `youthcenter-policy`, `bokjiro-central`, `bokjiro-local`, `seoul-open-api`
 
 ### 5.6 원문 프리뷰(저장 안 함)
 `POST /pipeline/preview`

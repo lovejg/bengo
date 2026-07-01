@@ -24,7 +24,18 @@ const YOUTH_KEYWORDS = [
   '청년주택',
 ];
 
-const CHILDCARE_KEYWORDS = ['육아', '돌봄', '자녀', '보육', '아이', '출산', '양육', '아동', '영유아', '어린이집'];
+const CHILDCARE_KEYWORDS = [
+  '육아',
+  '돌봄',
+  '자녀',
+  '보육',
+  '아이',
+  '출산',
+  '양육',
+  '아동',
+  '영유아',
+  '어린이집',
+];
 
 const SENIOR_KEYWORDS = ['노인', '어르신', '시니어', '고령', '경로', '독거노인', '치매'];
 
@@ -61,7 +72,7 @@ const ALWAYS_OPEN_KEYWORD = '상시';
 const ALWAYS_OPEN_TEXT_PATTERNS: readonly RegExp[] = [
   /연중\s*(모집|운영|접수|신청|상시)/,
   // "이후~ 계속", "2012년 ~ (계속)", "'19년~" 등 계속/무기한 패턴
-  /(?:이후|20\d{2}년?\s*[~～\-]|'\d{2}년\s*[~～])\s*[~～]?\s*\(?\s*계속\s*\)?/,
+  /(?:이후|20\d{2}년?\s*[~～-]|'\d{2}년\s*[~～])\s*[~～]?\s*\(?\s*계속\s*\)?/,
 ];
 
 const NONINFORMATIVE_PERIOD_PATTERN =
@@ -77,8 +88,8 @@ const PERIOD_LABEL_PATTERNS: readonly RegExp[] = [
 
 /** 나이 범위 패턴 (양쪽 경계) */
 const AGE_RANGE_PATTERNS: readonly RegExp[] = [
-  /만?\s*(\d{1,2})\s*세\s*[~～\-]\s*만?\s*(\d{1,2})\s*세/,
-  /(\d{1,2})\s*[~～\-]\s*(\d{1,2})\s*세/,
+  /만?\s*(\d{1,2})\s*세\s*[~～-]\s*만?\s*(\d{1,2})\s*세/,
+  /(\d{1,2})\s*[~～-]\s*(\d{1,2})\s*세/,
   /연령\s*:?\s*만?\s*(\d{1,2})\s*세?\s*[~～\-이상부터]\s*만?\s*(\d{1,2})\s*세/,
   /만?\s*(\d{1,2})\s*세\s*이상\s*만?\s*(\d{1,2})\s*세\s*이하/,
 ];
@@ -86,7 +97,7 @@ const AGE_RANGE_PATTERNS: readonly RegExp[] = [
 const AGE_MIN_PATTERN = /만?\s*(\d{1,2})\s*세\s*이상/;
 const AGE_MAX_PATTERN = /만?\s*(\d{1,2})\s*세\s*이하/;
 
-const DATE_COMPACT_RANGE_PATTERN = /(\d{4})(\d{2})(\d{2})\s*[~～\-]\s*(\d{4})(\d{2})(\d{2})/;
+const DATE_COMPACT_RANGE_PATTERN = /(\d{4})(\d{2})(\d{2})\s*[~～-]\s*(\d{4})(\d{2})(\d{2})/;
 
 /** INFO 타입 키워드 — 제목에서 감지 */
 const INFO_TITLE_PATTERNS: readonly RegExp[] = [
@@ -173,10 +184,10 @@ export class PolicyNormalizationService {
         employmentStatus: (meta.employmentStatus as string | undefined) ?? null,
         educationReq: (meta.educationReq as string | undefined) ?? null,
         targetInfo:
-          (meta.targetInfo as string | undefined)
-          ?? (meta.targetAgeInfo as string | undefined)
-          ?? (meta.ageInfo as string | undefined)
-          ?? null,
+          (meta.targetInfo as string | undefined) ??
+          (meta.targetAgeInfo as string | undefined) ??
+          (meta.ageInfo as string | undefined) ??
+          null,
         supportType: (meta.supportType as string | undefined) ?? null,
         applicationDeadline: (meta.applicationDeadline as string | undefined) ?? null,
         specializedReq: (meta.specializedReq as string | undefined) ?? null,
@@ -197,8 +208,11 @@ export class PolicyNormalizationService {
   }
 
   private detectAlwaysOpen(text: string, meta: Record<string, unknown>): boolean {
-    const candidates = [meta.applicationDeadline, meta.applicationPeriod, meta.operatingPeriod]
-      .filter((v): v is string => typeof v === 'string');
+    const candidates = [
+      meta.applicationDeadline,
+      meta.applicationPeriod,
+      meta.operatingPeriod,
+    ].filter((v): v is string => typeof v === 'string');
 
     for (const value of candidates) {
       if (NOT_ALWAYS_OPEN_PATTERNS.some((p) => p.test(value))) {
@@ -223,13 +237,16 @@ export class PolicyNormalizationService {
   }
 
   private extractPeriodRaw(meta: Record<string, unknown>, body: string): string | null {
-    const metaCandidates = [meta.applicationPeriod, meta.applicationDeadline, meta.operatingPeriod]
-      .filter(
-        (v): v is string =>
-          typeof v === 'string' &&
-          v.trim().length > 0 &&
-          !NONINFORMATIVE_PERIOD_PATTERN.test(v.trim()),
-      );
+    const metaCandidates = [
+      meta.applicationPeriod,
+      meta.applicationDeadline,
+      meta.operatingPeriod,
+    ].filter(
+      (v): v is string =>
+        typeof v === 'string' &&
+        v.trim().length > 0 &&
+        !NONINFORMATIVE_PERIOD_PATTERN.test(v.trim()),
+    );
 
     if (metaCandidates.length > 0) return metaCandidates[0].trim();
 
@@ -293,8 +310,11 @@ export class PolicyNormalizationService {
     text: string,
     meta: Record<string, unknown>,
   ): { startsAt: string | null; endsAt: string | null } {
-    const metaCandidates = [meta.applicationPeriod, meta.applicationDeadline, meta.operatingPeriod]
-      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+    const metaCandidates = [
+      meta.applicationPeriod,
+      meta.applicationDeadline,
+      meta.operatingPeriod,
+    ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
 
     for (const candidate of metaCandidates) {
       const parsed = this.parseDateRange(candidate);
@@ -424,7 +444,11 @@ export class PolicyNormalizationService {
       const fromMeta = this.extractRegionCodesFromMetadata(raw.metadata?.regionCodes);
       // 메타가 SEOUL만 준 경우 본문에서 특정 구 감지 시도
       if (fromMeta.length === 1 && fromMeta[0] === RegionCode.SEOUL) {
-        const guCode = this.detectGuFromText(raw.title, text, raw.metadata?.providerName as string | undefined);
+        const guCode = this.detectGuFromText(
+          raw.title,
+          text,
+          raw.metadata?.providerName as string | undefined,
+        );
         if (guCode) return [guCode];
       }
       return fromMeta;
@@ -438,7 +462,11 @@ export class PolicyNormalizationService {
       combined.includes('11000');
 
     if (isSeoulPolicy) {
-      const guCode = this.detectGuFromText(raw.title, text, raw.metadata?.providerName as string | undefined);
+      const guCode = this.detectGuFromText(
+        raw.title,
+        text,
+        raw.metadata?.providerName as string | undefined,
+      );
       return [guCode ?? RegionCode.SEOUL];
     }
 

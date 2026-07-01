@@ -10,13 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserPolicyState } from '../common/enums/user-policy-state.enum';
 import { JwtUser } from '../common/interfaces/jwt-user.interface';
@@ -45,10 +39,7 @@ export class PoliciesController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '맞춤 정책 목록 조회 (프로필 기반 필터링)' })
   @ApiOkResponse({ description: '맞춤 정책 목록' })
-  listPoliciesRecommended(
-    @CurrentUser() user: JwtUser,
-    @Query() query: ListPoliciesQueryDto,
-  ) {
+  listPoliciesRecommended(@CurrentUser() user: JwtUser, @Query() query: ListPoliciesQueryDto) {
     return this.policiesService.listPolicies(user.sub, query);
   }
 
@@ -64,10 +55,7 @@ export class PoliciesController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '정책 상세 + 내 상태/판별이력 조회' })
   @ApiOkResponse({ description: '정책 상세 (사용자 정보 포함)' })
-  getPolicyDetailWithUser(
-    @CurrentUser() user: JwtUser,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  getPolicyDetailWithUser(@CurrentUser() user: JwtUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.policiesService.getPolicyDetail(user.sub, id);
   }
 
@@ -102,10 +90,7 @@ export class PoliciesController {
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard)
   @ApiOperation({ summary: '저장한 정책 삭제 (이메일 인증 필요)' })
   @ApiOkResponse({ description: '삭제 완료' })
-  removeMyPolicy(
-    @CurrentUser() user: JwtUser,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  removeMyPolicy(@CurrentUser() user: JwtUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.policiesService.removeUserPolicyState(user.sub, id);
   }
 
@@ -115,10 +100,7 @@ export class PoliciesController {
   @ApiOperation({ summary: 'MY 정책 목록 조회' })
   @ApiQuery({ name: 'state', enum: UserPolicyState, required: false })
   @ApiOkResponse({ description: '내 정책 목록' })
-  getMyPolicies(
-    @CurrentUser() user: JwtUser,
-    @Query('state') state?: UserPolicyState,
-  ) {
+  getMyPolicies(@CurrentUser() user: JwtUser, @Query('state') state?: UserPolicyState) {
     return this.policiesService.listMyPolicies(user.sub, state);
   }
 }

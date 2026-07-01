@@ -5,11 +5,13 @@ import { QuestionType } from '../common/enums/question-type.enum';
 import { PolicyType } from '../common/enums/policy-type.enum';
 import { PolicyStatus } from '../common/enums/policy-status.enum';
 import { RuleDefinition } from '../common/interfaces/rule-expression.interface';
-import { RegionCode } from '../common/enums/region-code.enum';
 import { Policy, PolicyRequirement, PolicyRule } from '../database/entities';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { LlmExtractionResult, LlmRuleExtractorService } from './llm-rule-extractor.service';
-import { getPolicyManualOverride, PolicyManualOverride } from '../common/constants/policy-manual-overrides.constant';
+import {
+  getPolicyManualOverride,
+  PolicyManualOverride,
+} from '../common/constants/policy-manual-overrides.constant';
 import {
   buildAgeDescription,
   computePolicyContentHash,
@@ -50,11 +52,15 @@ export class PolicyRequirementGeneratorService {
     private readonly llmExtractor: LlmRuleExtractorService,
   ) {}
 
-  async regenerateAll(force = false): Promise<{ total: number; processed: number; skipped: number; failed: number }> {
+  async regenerateAll(
+    force = false,
+  ): Promise<{ total: number; processed: number; skipped: number; failed: number }> {
     if (force) {
       await this.clearLlmArtifacts();
     } else {
-      this.logger.log('regenerateAll: hash-based skip mode (변경된 정책만 재생성). 전체 재생성은 ?force=true');
+      this.logger.log(
+        'regenerateAll: hash-based skip mode (변경된 정책만 재생성). 전체 재생성은 ?force=true',
+      );
     }
 
     await this.dedupeDuplicatePoliciesByTitle();
@@ -77,7 +83,8 @@ export class PolicyRequirementGeneratorService {
           const normalized = this.buildNormalizedDocument(policy);
           const override = getPolicyManualOverride(policy.code);
           const wasSkipped = await this.generateForPolicy(policy, normalized, override, force);
-          if (wasSkipped) skipped++; else processed++;
+          if (wasSkipped) skipped++;
+          else processed++;
         } catch (error) {
           failed++;
           this.logger.error(
@@ -89,7 +96,7 @@ export class PolicyRequirementGeneratorService {
       await new Promise<void>((resolve) => setImmediate(resolve));
       this.logger.log(
         `regenerateAll progress: ${Math.min(i + CHUNK_SIZE, total)}/${total}` +
-        ` (processed=${processed} skipped=${skipped} failed=${failed})`,
+          ` (processed=${processed} skipped=${skipped} failed=${failed})`,
       );
     }
 
@@ -197,7 +204,9 @@ export class PolicyRequirementGeneratorService {
     let deduped = 0;
     for (const [, group] of byTitle) {
       if (group.length <= 1) continue;
-      group.sort((a, b) => (SOURCE_PRIORITY[getSource(b)] ?? 0) - (SOURCE_PRIORITY[getSource(a)] ?? 0));
+      group.sort(
+        (a, b) => (SOURCE_PRIORITY[getSource(b)] ?? 0) - (SOURCE_PRIORITY[getSource(a)] ?? 0),
+      );
       for (let i = 1; i < group.length; i++) {
         group[i].status = PolicyStatus.INACTIVE;
         await this.policyRepository.save(group[i]);
@@ -253,10 +262,7 @@ export class PolicyRequirementGeneratorService {
       return false;
     }
 
-    await this.ruleRepository.update(
-      { policyId: policy.id, isActive: true },
-      { isActive: false },
-    );
+    await this.ruleRepository.update({ policyId: policy.id, isActive: true }, { isActive: false });
 
     const ruleToSave: RuleDefinition = manualOverride.overrideRule ?? {
       id: `rule-${policy.code}-manual-override`,
@@ -318,8 +324,13 @@ export class PolicyRequirementGeneratorService {
     }
 
     // manual override의 policyType은 LLM 결과로 덮어쓰지 않음
-    if (!isManualOverride && summaryResult.policyType && !this.isInfoToApplicationFlip(policy, summaryResult)) {
-      policy.policyType = summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+    if (
+      !isManualOverride &&
+      summaryResult.policyType &&
+      !this.isInfoToApplicationFlip(policy, summaryResult)
+    ) {
+      policy.policyType =
+        summaryResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
     }
     if (manualOverride?.policyType) {
       policy.policyType = manualOverride.policyType;
@@ -571,7 +582,8 @@ export class PolicyRequirementGeneratorService {
     if (manualOverride?.policyType) {
       policy.policyType = manualOverride.policyType;
     } else if (llmResult?.policyType && !this.isInfoToApplicationFlip(policy, llmResult)) {
-      policy.policyType = llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
+      policy.policyType =
+        llmResult.policyType === 'info' ? PolicyType.INFO : PolicyType.APPLICATION;
     }
 
     this.applyDetectedPeriod(policy, llmResult?.detectedPeriod ?? null);
