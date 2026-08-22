@@ -13,6 +13,7 @@
 | 행 수 | `raw_policy_documents` 26,079 / `pipeline_ingestion_runs` 26,077 / `policies` 743 |
 
 **이 확인은 인덱스를 추가하기 이전 시점의 상태다.** 이후 인덱스가 추가되면 아래 "실재 여부" 열의 값은 달라질 수 있다.
+이 확인 이후 외래키 컬럼 인덱스 2개가 추가됐다. 그 내역과 측정은 `FK_INDEX_MEASUREMENT.md`에 있다.
 
 ## 대조 결과
 
