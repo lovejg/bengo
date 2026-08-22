@@ -1,3 +1,8 @@
+-- 이 파일은 실 데이터베이스에 한 번도 적용된 적이 없다.
+-- 실 스키마는 TypeORM synchronize가 생성한다.
+-- 아래에서 선언한 인덱스 6개는 실 데이터베이스에 하나도 존재하지 않는다.
+--   대조 결과: docs/MIGRATION_INDEX_AUDIT.md
+
 -- Initial schema for Bengo MVP
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
