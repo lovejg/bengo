@@ -55,7 +55,7 @@ npm run format      # Prettier 포매팅
 ## 참고 사항
 - 첫 실행 시 MVP 샘플 정책 2건이 자동으로 시드됩니다.
 - 로컬 개발 환경에서는 `POSTGRES_SYNC=true`로 빠르게 시작할 수 있습니다.
-- SQL 마이그레이션 템플릿: `db/migrations/0001_init.sql`
+- `db/migrations/0001_init.sql`은 실 데이터베이스에 적용된 적이 없는 초기 스키마 초안입니다. 실 스키마는 TypeORM synchronize가 생성합니다. 이 파일이 선언한 인덱스와 실 스키마의 대조 결과는 `docs/MIGRATION_INDEX_AUDIT.md`에 있습니다.
 - `pipeline` 흐름은 `미리보기(preview)`와 `실제 적재(ingest)`를 분리해 운영합니다.
 - 현재 MVP 범위는 `청년정책 + 서울 전체`로 강제됩니다.
 - 범위 밖 데이터는 적재 시 `action=skipped`로 기록됩니다.
