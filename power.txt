@@ -1,0 +1,3 @@
+docker start bengo-postgres bengo-redis
+backend -> npm run start:dev
+frontend -> npm run dev
