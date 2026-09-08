@@ -141,3 +141,6 @@ vite.config.ts.timestamp-*
 # Local system files
 .DS_Store
 .vscode/
+
+# AI Code Editors / Assistants
+.claude/
