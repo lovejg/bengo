@@ -34,6 +34,7 @@ export const REQUIREMENT_KEY_LABELS: Record<string, string> = {
 
   // 신청자·자격 상태
   applicantStatus: '신청자 상태',
+  employmentStatus: '고용 형태',
   applicantType: '신청자 유형',
   tenantType: '신청자 유형',
   housingStatus: '입주(예정) 유형',

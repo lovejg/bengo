@@ -16,6 +16,7 @@ import { PolicyCardSkeleton } from '../components/molecules/PolicyCardSkeleton';
 import { Button } from '../components/atoms/Button';
 import type { PolicyListItem, RegionCode } from '../types';
 import { REGION_LABELS } from '../lib/regions';
+import { POLICY_CATEGORY_LABELS } from '../lib/policy-text';
 
 const PAGE_SIZE = 12;
 
@@ -37,8 +38,7 @@ const TEMP_VISIBILITY_TEST_LABELS: Record<string, string> = Object.fromEntries(
 
 // 칩 표시용 라벨 맵 (ExpandableFilters 실제 옵션 id 기준)
 const CATEGORY_LABELS: Record<string, string> = {
-  youth_policy: '청년정책',
-  childcare_policy: '육아정책',
+  ...POLICY_CATEGORY_LABELS,
   ...TEMP_VISIBILITY_TEST_LABELS,
 };
 const FILTER_REGION_LABELS: Record<string, string> = { ...REGION_LABELS, ...TEMP_VISIBILITY_TEST_LABELS };

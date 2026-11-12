@@ -8,6 +8,7 @@ import { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { PolicyListItem } from '../../types';
 import { formatRegionCodes } from '../../lib/regions';
+import { formatPolicyPeriod, getCategoryLabel, toCardSummary } from '../../lib/policy-text';
 
 interface BadgeItem { key: string; label: string; el: React.ReactNode; }
 
@@ -96,12 +97,6 @@ export interface PolicyCardProps extends PolicyListItem {
   className?: string;
 }
 
-function formatPolicyPeriod(startsAt: string | null, endsAt: string | null, isAlwaysOpen: boolean, periodRaw?: string | null): string {
-  if (isAlwaysOpen) return '상시모집';
-  if (startsAt && endsAt) return `${startsAt.slice(0, 10)} ~ ${endsAt.slice(0, 10)}`;
-  if (periodRaw) return periodRaw;
-  return '기간확인불가';
-}
 
 function getDaysUntilEnd(endsAt: string | null): number | null {
   if (!endsAt) return null;
@@ -212,10 +207,6 @@ export function PolicyCard({
     infoLacking: 'default' as const,
   };
   
-  const categoryLabels: Record<string, string> = {
-    youth_policy: '청년정책',
-    childcare_policy: '육아정책',
-  };
 
   return (
     <Link to={`/policies/${id}`} className="block h-full cursor-pointer" onClick={handleCardClick}>
@@ -245,7 +236,10 @@ export function PolicyCard({
             <BadgeRow badges={[
               ...(status ? [{ key: 'status', label: statusLabels[status], el: <Badge variant={status}>{statusLabels[status]}</Badge> }] : []),
               { key: 'provider', label: providerName, el: <Badge variant="default"><span className="max-w-[120px] truncate block">{providerName}</span></Badge> },
-              ...categories.map((c) => ({ key: c, label: categoryLabels[c] || c, el: <Badge variant="default" className="bg-blue-50 text-blue-700 border-blue-200">{categoryLabels[c] || c}</Badge> })),
+              ...categories.flatMap((c) => {
+                const label = getCategoryLabel(c);
+                return label ? [{ key: c, label, el: <Badge variant="default" className="bg-blue-50 text-blue-700 border-blue-200">{label}</Badge> }] : [];
+              }),
               ...(eligibility ? [{ key: 'eligibility', label: eligibilityLabels[eligibility], el: <Badge variant={eligibilityVariants[eligibility]}>{eligibilityLabels[eligibility]}</Badge> }] : []),
             ]} />
           </div>
@@ -271,7 +265,7 @@ export function PolicyCard({
         </div>
 
         <p className="text-[var(--muted-foreground)] text-sm leading-relaxed mb-5">
-          {shortDescription || '요약 정보가 없습니다.'}
+          {toCardSummary(shortDescription) || '요약 정보가 없습니다.'}
         </p>
         </div>
 

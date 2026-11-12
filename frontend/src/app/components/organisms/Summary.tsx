@@ -20,7 +20,7 @@ export function Summary() {
           {[
             { icon: Zap, title: '빠른 검색', desc: '키워드와 필터로 원하는 정책을 즉시 검색합니다' },
             { icon: User, title: '맞춤 추천', desc: '내 정보 입력으로 신청 가능한 정책만 추천합니다' },
-            { icon: Bookmark, title: '저장 & 알림', desc: '관심 정책 저장하고 마감일 알림을 받습니다' }
+            { icon: Bookmark, title: '저장 & 알림', desc: '관심 정책을 저장하고 마감 임박 정책을 알림함에서 확인합니다' }
           ].map((item, index) => (
             <motion.div
               key={index}

@@ -3,13 +3,23 @@ import { ArrowRight, Search, Bookmark, ChevronDown, User, Check, Bell, Calendar,
 import { Button } from '../components/atoms/Button';
 import { MainLayout } from '../components/templates/MainLayout';
 import { motion } from 'motion/react';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { getPolicies } from '../api/policies';
 import { Summary } from '../components/organisms/Summary';
 import { FAQ } from '../components/organisms/FAQ';
 import { SignupPromptDialog } from '../components/molecules/SignupPromptDialog';
 
 export function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [policyTotal, setPolicyTotal] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPolicies()
+      .then((res) => { if (!cancelled) setPolicyTotal(res.total); })
+      .catch(() => { /* 개수를 못 가져오면 해당 문구만 숨긴다 */ });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <MainLayout>
@@ -133,17 +143,16 @@ export function HomePage() {
               transition={{ duration: 0.6, delay: 0.5 }}
               className="mt-8 flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-[var(--muted-foreground)]"
             >
+              {/* 수록 개수는 목록 화면과 같은 API 값을 그대로 쓴다 (하드코딩 금지) */}
+              {policyTotal !== null && (
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <span>정책 {policyTotal.toLocaleString()}개 수록</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-blue-600" />
-                <span>서울시 청년정책 200개+ 수록</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <span>매일 업데이트</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-blue-600" />
-                <span>마감 임박 알림</span>
+                <Check className="h-4 w-4 text-blue-600" />
+                <span>신청 가능 여부 자동 판별</span>
               </div>
             </motion.div>
             <motion.p 
@@ -447,12 +456,12 @@ export function HomePage() {
                   놓치지 말아야 할<br />정책을 저장하세요
                 </h2>
                 <p className="text-[var(--muted-foreground)] text-lg mb-6 leading-relaxed">
-                  관심 있는 정책을 저장하고,<br className="sm:hidden" /> 마감일이 다가오면<br className="hidden sm:block lg:hidden" /> 알림을 받아 신청 기회를 놓치지 마세요
+                  관심 있는 정책을 저장하고,<br className="sm:hidden" /> 마감이 다가오는 정책을<br className="hidden sm:block lg:hidden" /> 알림함에서 확인해 신청 기회를 놓치지 마세요
                 </p>
                 <ul className="space-y-3">
                   {[
                     '원클릭 북마크로 간편 저장',
-                    '마감일 D-7, D-1 자동 알림',
+                    '마감 7일 전부터 알림함에 표시',
                     'MY 페이지에서 한눈에 관리'
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3">

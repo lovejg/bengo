@@ -4,6 +4,7 @@ import { PolicyType } from '../common/enums/policy-type.enum';
 import { RegionCode, SEOUL_GU_MAP } from '../common/enums/region-code.enum';
 import { NormalizedPolicyDocument } from './interfaces/normalized-policy.interface';
 import { RawPolicyDocument } from './interfaces/raw-policy.interface';
+import { cleanSourceText, cleanSourceTextDeep } from './text-cleanup.helper';
 
 interface NormalizationResult {
   normalized: NormalizedPolicyDocument;
@@ -128,8 +129,15 @@ const RESIDENCY_CONTEXT_WINDOW = 30;
 export class PolicyNormalizationService {
   normalize(raw: RawPolicyDocument): NormalizationResult {
     // MVP 단계는 규칙 기반 정규화 우선. 추후 LLM fallback은 JSON Schema로 확장 예정.
+    // 원문 문서(raw)는 그대로 보존하고, 정규화 입력에서만 HTML 엔티티를 디코딩한다
+    const cleaned: RawPolicyDocument = {
+      ...raw,
+      title: cleanSourceText(raw.title),
+      body: cleanSourceText(raw.body),
+      metadata: raw.metadata ? cleanSourceTextDeep(raw.metadata) : raw.metadata,
+    };
     return {
-      normalized: this.ruleBasedNormalize(raw),
+      normalized: this.ruleBasedNormalize(cleaned),
       confidence: 0.75,
       usedLlmFallback: false,
     };

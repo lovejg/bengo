@@ -14,6 +14,7 @@ import { CustomSelect } from '../components/atoms/CustomSelect';
 import { EmptyState } from '../components/molecules/EmptyState';
 import type { MyPolicyItem, PolicyDetail, UserProfileSummary } from '../types';
 import { formatRegionCode, REGION_OPTIONS } from '../lib/regions';
+import { POLICY_CATEGORY_LABELS } from '../lib/policy-text';
 
 type StatusFilter = 'all' | 'upcoming' | 'recruiting' | 'closed';
 type SavedPolicy = PolicyCardProps & {
@@ -52,10 +53,7 @@ const INTEREST_OPTIONS: { value: string; label: string }[] = [
   { value: 'childcare_policy', label: '육아/보육정책' },
 ];
 
-const interestLabels: Record<string, string> = {
-  youth_policy: '청년정책',
-  childcare_policy: '육아정책',
-};
+const interestLabels: Record<string, string> = POLICY_CATEGORY_LABELS;
 
 function mapApplicationStatus(detail: PolicyDetail, state: MyPolicyItem['state']): SavedPolicy['applicationStatus'] {
   if (state === 'applied' || (detail.endsAt && new Date(detail.endsAt).getTime() < Date.now())) {

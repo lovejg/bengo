@@ -13,6 +13,13 @@ const RECRUIT_STATUS_FILTER = ['001', '002', '003'];
 
 const REQUEST_DELAY_MS = 300;
 
+/** "0", "0명", "-" 등 값이 없다는 뜻의 지원규모는 본문에 넣지 않는다 */
+export function hasMeaningfulScale(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.replace(/\s+/g, '');
+  return normalized !== '' && !/^(0+(명|건|개|팀|가구)?|-|없음|해당없음)$/.test(normalized);
+}
+
 interface PolicyListItem {
   id: string;
   title: string;
@@ -208,7 +215,8 @@ export class YouthSeoulCollector implements PolicyCollector {
     const bodyParts = [
       overview['정책 소개'],
       overview['지원 내용'],
-      overview['지원규모'] ? `지원규모: ${overview['지원규모']}` : null,
+      // 원문에 규모가 없으면 "0"으로 채워져 오므로 의미 있는 값일 때만 넣는다
+      hasMeaningfulScale(overview['지원규모']) ? `지원규모: ${overview['지원규모']}` : null,
       eligibility['취업상태'] ? `취업상태 조건: ${eligibility['취업상태']}` : null,
       eligibility['학력'] ? `학력 조건: ${eligibility['학력']}` : null,
       eligibility['추가단서 사항'] ? `추가단서 사항: ${eligibility['추가단서 사항']}` : null,

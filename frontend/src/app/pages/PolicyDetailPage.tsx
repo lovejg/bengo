@@ -47,6 +47,7 @@ import type {
 import { cn } from '../lib/utils';
 import { CustomSelect } from '../components/atoms/CustomSelect';
 import { formatRegionCodes } from '../lib/regions';
+import { formatPolicyPeriod } from '../lib/policy-text';
 
 const statusLabels: Record<string, string> = {
   recruiting: '모집중',
@@ -214,13 +215,6 @@ const reliabilityNoticeClassNames: Record<ReliabilityNoticeTone, string> = {
     'mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-3 text-rose-950',
 };
 
-function formatPolicyPeriod(startsAt?: string | null, endsAt?: string | null, isAlwaysOpen?: boolean, periodRaw?: string | null) {
-  if (isAlwaysOpen) return '상시모집';
-  if (startsAt && endsAt) return `${startsAt.slice(0, 10)} ~ ${endsAt.slice(0, 10)}`;
-  if (periodRaw) return periodRaw;
-  return '기간확인불가';
-}
-
 function mapStatus(endsAt?: string | null, isAlwaysOpen?: boolean): 'recruiting' | 'always' | 'closed' | null {
   if (isAlwaysOpen) return 'always';
   if (!endsAt) return null;
@@ -249,6 +243,15 @@ function getSourceUrl(sourceUrl: string | null | undefined, title: string): stri
   return `https://search.naver.com/search.naver?query=${encodeURIComponent(title)}`;
 }
 
+// 폼의 예/아니오 버튼과 같은 표기로 보여준다 (내부 값은 'true'/'false' 문자열)
+function formatAnswerValue(type: string | undefined, value: string) {
+  if (type === 'boolean') {
+    if (value === 'true') return '예';
+    if (value === 'false') return '아니오';
+  }
+  return value;
+}
+
 function getEvidence(
   policy: ApiPolicyDetail,
   eligibilityResult?: EligibilityResponse | null,
@@ -258,11 +261,9 @@ function getEvidence(
     const answerItems = (policy.requirements ?? [])
       .filter((req, i, arr) => arr.findIndex((r) => r.key === req.key) === i)
       .filter((req) => eligibilityAnswers?.[req.key])
-      .map((req) => ({ text: `${req.label ?? req.key}: ${eligibilityAnswers![req.key]}`, source: '입력한 정보' }));
-    const reasonItems =
-      eligibilityResult.reasons.length > 0
-        ? eligibilityResult.reasons.map((reason) => ({ text: reason, source: '자격 확인 결과' }))
-        : [{ text: eligibilityResult.explanation, source: '자격 확인 결과' }];
+      .map((req) => ({ text: `${req.label ?? req.key}: ${formatAnswerValue(req.type, eligibilityAnswers![req.key])}`, source: '입력한 정보' }));
+    // 사유가 없으면(적격) 결과 배너의 설명과 같은 문장이므로 근거에 반복하지 않는다
+    const reasonItems = eligibilityResult.reasons.map((reason) => ({ text: reason, source: '자격 확인 결과' }));
     return [...answerItems, ...reasonItems];
   }
   const requirementItems = (policy.requirements ?? [])
@@ -884,7 +885,16 @@ export function PolicyDetailPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-amber-900 mb-1">추가 확인이 필요합니다</p>
-                        <p className="text-xs text-amber-700 mb-3">{eligibilityResult.explanation}</p>
+                        {eligibilityResult.reasons.length > 0 ? (
+                          <>
+                            <p className="text-xs text-amber-700 mb-2">기본 조건은 충족하지만, 최종 심사를 통해 확인되는 조건이 있습니다.</p>
+                            <ul className="list-disc pl-4 space-y-1 text-xs text-amber-700 mb-3">
+                              {eligibilityResult.reasons.map((reason, i) => <li key={i}>{reason}</li>)}
+                            </ul>
+                          </>
+                        ) : (
+                          <p className="text-xs text-amber-700 mb-3">{eligibilityResult.explanation}</p>
+                        )}
                         <Button size="sm" variant="secondary" className="text-xs h-8" onClick={() => window.open(getSourceUrl(policy.sourceUrl, policy.title), '_blank', 'noopener,noreferrer')}>
                           원문 보기
                         </Button>
@@ -903,7 +913,16 @@ export function PolicyDetailPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-rose-900 mb-1">현재 조건으로는 신청이 어렵습니다</p>
-                        <p className="text-xs text-rose-700">{eligibilityResult.explanation}</p>
+                        {eligibilityResult.reasons.length > 1 ? (
+                          <>
+                            <p className="text-xs text-rose-700 mb-2">현재 입력 정보로는 신청이 어렵습니다.</p>
+                            <ul className="list-disc pl-4 space-y-1 text-xs text-rose-700">
+                              {eligibilityResult.reasons.map((reason, i) => <li key={i}>{reason}</li>)}
+                            </ul>
+                          </>
+                        ) : (
+                          <p className="text-xs text-rose-700">{eligibilityResult.explanation}</p>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -936,7 +955,7 @@ export function PolicyDetailPage() {
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 + index * 0.05 }}
-                    className="bg-[var(--muted)] rounded-xl p-4 hover:bg-amber-50 transition-colors duration-200 border border-transparent hover:border-amber-200"
+                    className="bg-[var(--muted)] rounded-xl p-4 border border-transparent"
                   >
                     <div className="prose prose-sm max-w-none mb-2">
                       <ReactMarkdown remarkPlugins={[remarkBreaks, remarkGfmNoSingleTilde]}>{item.text}</ReactMarkdown>
@@ -1021,10 +1040,10 @@ export function PolicyDetailPage() {
                       <span className="font-bold text-sm text-rose-500">D-{daysLeft}</span>
                     ) : policy.isAlwaysOpen ? (
                       <span className="font-semibold text-sm text-emerald-600">상시모집</span>
-                    ) : policy.periodRaw ? (
-                      <span className="font-semibold text-sm text-[var(--muted-foreground)]">{policy.periodRaw}</span>
                     ) : (
-                      <span className="font-semibold text-sm text-[var(--muted-foreground)]">기간 미정</span>
+                      <span className="font-semibold text-sm text-[var(--muted-foreground)]">
+                        {formatPolicyPeriod(policy.startsAt, policy.endsAt, policy.isAlwaysOpen, policy.periodRaw)}
+                      </span>
                     )}
                   </div>
                 </div>
